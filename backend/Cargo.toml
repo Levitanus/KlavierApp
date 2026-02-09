@@ -1,8 +1,24 @@
 [package]
-name = "backend"
+name = "klavierapp_backend"
 version = "0.1.0"
 edition = "2021"
+default-run = "klavierapp_backend"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "klavierapp_backend"
+path = "src/main.rs"
 
 [dependencies]
 actix-web = "4"
 tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "migrate"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+jsonwebtoken = "9"
+argon2 = { version = "0.5", features = ["std"] }
+dotenv = "0.15"
+chrono = { version = "0.4", features = ["serde"] }
+rand_core = { version = "0.6", features = ["getrandom"] }

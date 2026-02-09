@@ -1,4 +1,4 @@
-name: frontend
+name: klavierapp_frontend
 description: Klavier Flutter frontend (scaffold)
 publish_to: 'none'
 version: 0.1.0
@@ -8,6 +8,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  shared_preferences: ^2.2.2
+  http: ^1.1.2
+  provider: ^6.1.1
+  jwt_decode: ^0.3.1
 
 flutter:
   uses-material-design: true

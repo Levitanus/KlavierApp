@@ -1,0 +1,18 @@
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Environment variables
+.env
+
+# Rust build artifacts
+target/
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
