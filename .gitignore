@@ -1,0 +1,15 @@
+.idea/
+.vscode/
+/.dart_tool/
+/.packages
+/.flutter-plugins
+/build/
+/frontend/build/
+/frontend/.gradle/
+/backend/target/
+*.log
+node_modules/
+/.DS_Store
+/.env
+/.env.local
+/.env.test

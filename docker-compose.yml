@@ -1,0 +1,27 @@
+version: "3.8"
+services:
+  db_prod:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: klavier
+      POSTGRES_PASSWORD: secret_prod
+      POSTGRES_DB: klavier_prod
+    volumes:
+      - db_prod_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  db_test:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: klavier_test
+      POSTGRES_PASSWORD: secret_test
+      POSTGRES_DB: klavier_test
+    volumes:
+      - db_test_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+
+volumes:
+  db_prod_data:
+  db_test_data:
