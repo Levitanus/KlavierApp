@@ -29,6 +29,8 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
 > {
     let profile_images_dir = app_state.upload_dir.clone();
     
+    println!("=== Creating App ===");
+    
     App::new()
         .app_data(app_state)
         .app_data(web::PayloadConfig::new(10 * 1024 * 1024)) // 10MB max payload
@@ -39,7 +41,7 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
                 .allow_any_header()
                 .max_age(3600)
         )
-        .wrap(middleware::Logger::default())
+        .wrap(middleware::Logger::new("%a %{User-Agent}i %r %s %b %Dms"))
         .configure(users::configure)
         .configure(admin::configure)
         .service(fs::Files::new("/uploads/profile_images", profile_images_dir).show_files_listing())

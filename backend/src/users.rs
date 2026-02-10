@@ -303,7 +303,7 @@ pub struct ChangePasswordRequest {
 }
 
 /// Get current user's profile
-#[get("/profile")]
+#[get("")]
 async fn get_profile(
     app_state: web::Data<AppState>,
     req: HttpRequest,
@@ -335,7 +335,7 @@ async fn get_profile(
 }
 
 /// Update current user's profile
-#[actix_web::put("/profile")]
+#[actix_web::put("")]
 async fn update_profile(
     app_state: web::Data<AppState>,
     req: HttpRequest,
@@ -388,7 +388,7 @@ async fn update_profile(
 }
 
 /// Change current user's password
-#[post("/profile/change-password")]
+#[post("/change-password")]
 async fn change_password(
     app_state: web::Data<AppState>,
     req: HttpRequest,
@@ -483,7 +483,7 @@ async fn change_password(
 }
 
 /// Upload profile image
-#[post("/profile/upload-image")]
+#[post("/upload-image")]
 async fn upload_profile_image(
     app_state: web::Data<AppState>,
     req: HttpRequest,
@@ -622,7 +622,7 @@ async fn upload_profile_image(
 }
 
 /// Delete profile image
-#[actix_web::delete("/profile/image")]
+#[actix_web::delete("/image")]
 async fn delete_profile_image(
     app_state: web::Data<AppState>,
     req: HttpRequest,
@@ -677,7 +677,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(reset_password)
     );
     cfg.service(
-        web::scope("/api")
+        web::scope("/api/profile")
             .service(get_profile)
             .service(update_profile)
             .service(change_password)

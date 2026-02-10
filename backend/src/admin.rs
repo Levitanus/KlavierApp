@@ -50,7 +50,14 @@ fn verify_admin_role(req: &HttpRequest, app_state: &AppState) -> Result<(), Http
     Ok(())
 }
 
-#[get("/users")]
+#[get("/api/admin/test")]
+async fn test_route() -> impl Responder {
+    HttpResponse::Ok().json(serde_json::json!({
+        "message": "Admin routes are working!"
+    }))
+}
+
+#[get("/api/admin/users")]
 async fn get_users(
     req: HttpRequest,
     app_state: web::Data<AppState>,
@@ -93,7 +100,7 @@ async fn get_users(
     HttpResponse::Ok().json(users)
 }
 
-#[post("/users")]
+#[post("/api/admin/users")]
 async fn create_user(
     req: HttpRequest,
     app_state: web::Data<AppState>,
@@ -164,7 +171,7 @@ async fn create_user(
     }))
 }
 
-#[put("/users/{id}")]
+#[put("/api/admin/users/{id}")]
 async fn update_user(
     req: HttpRequest,
     app_state: web::Data<AppState>,
@@ -282,7 +289,7 @@ async fn update_user(
     }))
 }
 
-#[delete("/users/{id}")]
+#[delete("/api/admin/users/{id}")]
 async fn delete_user(
     req: HttpRequest,
     app_state: web::Data<AppState>,
@@ -318,7 +325,7 @@ pub struct GenerateResetLinkResponse {
     pub expires_at: String,
 }
 
-#[post("/users/{id}/generate-reset-link")]
+#[post("/api/admin/users/{id}/generate-reset-link")]
 async fn generate_reset_link(
     req: HttpRequest,
     app_state: web::Data<AppState>,
@@ -375,7 +382,7 @@ pub struct PasswordResetRequestResponse {
     pub resolved_by_admin_id: Option<i32>,
 }
 
-#[get("/password-reset-requests")]
+#[get("/api/admin/password-reset-requests")]
 async fn get_password_reset_requests(
     req: HttpRequest,
     app_state: web::Data<AppState>,
@@ -408,7 +415,7 @@ async fn get_password_reset_requests(
     }
 }
 
-#[post("/password-reset-requests/{id}/resolve")]
+#[post("/api/admin/password-reset-requests/{id}/resolve")]
 async fn resolve_password_reset_request(
     req: HttpRequest,
     app_state: web::Data<AppState>,
@@ -453,14 +460,13 @@ async fn resolve_password_reset_request(
 }
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/api/admin")
-            .service(get_users)
-            .service(create_user)
-            .service(update_user)
-            .service(delete_user)
-            .service(generate_reset_link)
-            .service(get_password_reset_requests)
-            .service(resolve_password_reset_request)
-    );
+    println!("=== ADMIN CONFIGURE CALLED ===");
+    cfg.service(test_route)
+        .service(get_users)
+        .service(create_user)
+        .service(update_user)
+        .service(delete_user)
+        .service(generate_reset_link)
+        .service(get_password_reset_requests)
+        .service(resolve_password_reset_request);
 }

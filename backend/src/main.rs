@@ -6,6 +6,9 @@ use std::sync::Arc;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Initialize logger
+    env_logger::init();
+    
     // Load environment variables from .env file in project root
     let env_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
