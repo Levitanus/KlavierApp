@@ -4,9 +4,12 @@ import 'auth.dart';
 import 'login_screen.dart';
 import 'admin_panel.dart';
 import 'profile_screen.dart';
+import 'widgets/notification_widget.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final String? adminUsername;
+  
+  const HomeScreen({super.key, this.adminUsername});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -19,7 +22,14 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _currentPage = const DashboardPage();
+    
+    // If adminUsername is provided, navigate to admin panel
+    if (widget.adminUsername != null) {
+      _currentPage = AdminPanel(username: widget.adminUsername);
+      _selectedIndex = 100;
+    } else {
+      _currentPage = const DashboardPage();
+    }
   }
 
   void _navigateTo(Widget page, int index) {
@@ -68,6 +78,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Klavier'),
+        actions: const [
+          NotificationBellWidget(),
+        ],
       ),
       drawer: Drawer(
         child: ListView(

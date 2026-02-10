@@ -7,7 +7,9 @@ import 'dart:math';
 import 'auth.dart';
 
 class AdminPanel extends StatefulWidget {
-  const AdminPanel({super.key});
+  final String? username;
+  
+  const AdminPanel({super.key, this.username});
 
   @override
   State<AdminPanel> createState() => _AdminPanelState();
@@ -29,6 +31,8 @@ class _AdminPanelState extends State<AdminPanel> {
     super.initState();
     _loadUsers();
   }
+  
+  bool _hasOpenedDialog = false;
 
   Future<void> _loadUsers() async {
     setState(() {
@@ -51,6 +55,17 @@ class _AdminPanelState extends State<AdminPanel> {
           _users = data.map((json) => User.fromJson(json)).toList();
           _isLoading = false;
         });
+        
+        // After loading users, open dialog if username is specified
+        if (widget.username != null && !_hasOpenedDialog && mounted) {
+          _hasOpenedDialog = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final matchingUsers = _users.where((u) => u.username == widget.username);
+            if (matchingUsers.isNotEmpty && mounted) {
+              _showEditUserDialog(matchingUsers.first);
+            }
+          });
+        }
       } else {
         setState(() {
           _errorMessage = 'Failed to load users';

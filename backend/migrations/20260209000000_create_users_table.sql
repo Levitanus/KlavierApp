@@ -66,3 +66,25 @@ INSERT INTO user_roles (user_id, role_id)
 SELECT u.id, r.id 
 FROM users u, roles r 
 WHERE u.username = 'levitanus' AND r.name = 'admin';
+
+-- Create notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    type TEXT NOT NULL, -- e.g., 'task_assigned', 'password_issued', 'schedule_change', 'results_available'
+    title TEXT NOT NULL,
+    body JSONB NOT NULL, -- Rich content structure
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    read_at TIMESTAMPTZ, -- NULL if unread
+    priority TEXT DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent'))
+);
+
+-- Create indexes for efficient queries
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_read_at ON notifications(read_at) WHERE read_at IS NULL; -- Index only unread
+CREATE INDEX IF NOT EXISTS idx_notifications_type ON notifications(type);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, read_at) WHERE read_at IS NULL;
+
+-- GIN index for JSONB queries (for searching within notification body)
+CREATE INDEX IF NOT EXISTS idx_notifications_body_gin ON notifications USING gin(body);

@@ -2,6 +2,8 @@ pub mod users;
 pub mod admin;
 pub mod email;
 pub mod password_reset;
+pub mod notifications;
+pub mod notification_builders;
 
 use actix_web::{middleware, web, App};
 use actix_files as fs;
@@ -44,6 +46,7 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
         .wrap(middleware::Logger::new("%a %{User-Agent}i %r %s %b %Dms"))
         .configure(users::configure)
         .configure(admin::configure)
+        .configure(notifications::configure)
         .service(fs::Files::new("/uploads/profile_images", profile_images_dir).show_files_listing())
 }
 

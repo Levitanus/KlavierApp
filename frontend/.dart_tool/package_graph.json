@@ -10,6 +10,7 @@
         "file_picker",
         "flutter",
         "http",
+        "intl",
         "jwt_decode",
         "provider",
         "shared_preferences"
@@ -23,6 +24,15 @@
       "version": "2.0.3",
       "dependencies": [
         "lints"
+      ]
+    },
+    {
+      "name": "intl",
+      "version": "0.18.1",
+      "dependencies": [
+        "clock",
+        "meta",
+        "path"
       ]
     },
     {
@@ -93,16 +103,26 @@
       "dependencies": []
     },
     {
+      "name": "path",
+      "version": "1.9.1",
+      "dependencies": []
+    },
+    {
+      "name": "meta",
+      "version": "1.17.0",
+      "dependencies": []
+    },
+    {
+      "name": "clock",
+      "version": "1.1.2",
+      "dependencies": []
+    },
+    {
       "name": "win32",
       "version": "5.15.0",
       "dependencies": [
         "ffi"
       ]
-    },
-    {
-      "name": "path",
-      "version": "1.9.1",
-      "dependencies": []
     },
     {
       "name": "ffi",
@@ -145,11 +165,6 @@
     {
       "name": "web",
       "version": "1.1.1",
-      "dependencies": []
-    },
-    {
-      "name": "meta",
-      "version": "1.17.0",
       "dependencies": []
     },
     {

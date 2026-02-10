@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'auth.dart';
+import 'services/notification_service.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 import 'reset_password_screen.dart';
@@ -12,8 +13,17 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => AuthService(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AuthService()),
+        ChangeNotifierProxyProvider<AuthService, NotificationService>(
+          create: (context) => NotificationService(
+            authService: context.read<AuthService>(),
+          ),
+          update: (context, authService, previous) =>
+              previous ?? NotificationService(authService: authService),
+        ),
+      ],
       child: MaterialApp(
         title: 'Klavier',
         theme: ThemeData(

@@ -7,6 +7,7 @@ use rand::{distributions::Alphanumeric, Rng};
 use sqlx::{PgPool, FromRow};
 
 use crate::email::{EmailError, EmailService};
+use crate::notification_builders::build_password_reset_request_notification;
 
 #[derive(Debug)]
 pub enum PasswordResetError {
@@ -139,12 +140,32 @@ pub async fn request_password_reset(
         email_service.send_password_reset_email(&email, &user.username, &token)?;
     } else {
         // User has no email - create a request for admin
-        sqlx::query(
-            "INSERT INTO password_reset_requests (username) VALUES ($1)"
+        let request_id = sqlx::query_scalar::<_, i32>(
+            "INSERT INTO password_reset_requests (username) VALUES ($1) RETURNING id"
         )
         .bind(username)
-        .execute(pool)
+        .fetch_one(pool)
         .await?;
+        
+        // Get all admin user IDs
+        let admin_ids = get_admin_user_ids(pool).await?;
+        
+        // Create notification for each admin
+        let notification_body = build_password_reset_request_notification(username, request_id);
+        
+        for admin_id in admin_ids {
+            let _ = sqlx::query(
+                "INSERT INTO notifications (user_id, type, title, body, priority)
+                 VALUES ($1, $2, $3, $4, $5)"
+            )
+            .bind(admin_id)
+            .bind(&notification_body.body_type)
+            .bind(&notification_body.title)
+            .bind(serde_json::to_value(&notification_body).unwrap_or_default())
+            .bind("high") // High priority for admin action items
+            .execute(pool)
+            .await;
+        }
     }
 
     Ok(())
@@ -277,4 +298,18 @@ pub async fn cleanup_expired_tokens(pool: &PgPool) -> Result<u64, PasswordResetE
     .await?;
 
     Ok(result.rows_affected())
+}
+
+/// Get all user IDs that have the 'admin' role
+async fn get_admin_user_ids(pool: &PgPool) -> Result<Vec<i32>, PasswordResetError> {
+    let admin_ids = sqlx::query_scalar::<_, i32>(
+        "SELECT u.id FROM users u
+         INNER JOIN user_roles ur ON u.id = ur.user_id
+         INNER JOIN roles r ON ur.role_id = r.id
+         WHERE r.name = 'admin'"
+    )
+    .fetch_all(pool)
+    .await?;
+    
+    Ok(admin_ids)
 }
