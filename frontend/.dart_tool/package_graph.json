@@ -7,13 +7,36 @@
       "name": "klavierapp_frontend",
       "version": "0.1.0",
       "dependencies": [
+        "file_picker",
         "flutter",
         "http",
         "jwt_decode",
         "provider",
         "shared_preferences"
       ],
-      "devDependencies": []
+      "devDependencies": [
+        "flutter_lints"
+      ]
+    },
+    {
+      "name": "flutter_lints",
+      "version": "2.0.3",
+      "dependencies": [
+        "lints"
+      ]
+    },
+    {
+      "name": "file_picker",
+      "version": "6.2.1",
+      "dependencies": [
+        "ffi",
+        "flutter",
+        "flutter_plugin_android_lifecycle",
+        "flutter_web_plugins",
+        "path",
+        "plugin_platform_interface",
+        "win32"
+      ]
     },
     {
       "name": "jwt_decode",
@@ -62,6 +85,49 @@
         "meta",
         "sky_engine",
         "vector_math"
+      ]
+    },
+    {
+      "name": "lints",
+      "version": "2.1.1",
+      "dependencies": []
+    },
+    {
+      "name": "win32",
+      "version": "5.15.0",
+      "dependencies": [
+        "ffi"
+      ]
+    },
+    {
+      "name": "path",
+      "version": "1.9.1",
+      "dependencies": []
+    },
+    {
+      "name": "ffi",
+      "version": "2.1.5",
+      "dependencies": []
+    },
+    {
+      "name": "plugin_platform_interface",
+      "version": "2.1.8",
+      "dependencies": [
+        "meta"
+      ]
+    },
+    {
+      "name": "flutter_plugin_android_lifecycle",
+      "version": "2.0.33",
+      "dependencies": [
+        "flutter"
+      ]
+    },
+    {
+      "name": "flutter_web_plugins",
+      "version": "0.0.0",
+      "dependencies": [
+        "flutter"
       ]
     },
     {
@@ -227,30 +293,11 @@
       ]
     },
     {
-      "name": "path",
-      "version": "1.9.1",
-      "dependencies": []
-    },
-    {
       "name": "file",
       "version": "7.0.1",
       "dependencies": [
         "meta",
         "path"
-      ]
-    },
-    {
-      "name": "flutter_web_plugins",
-      "version": "0.0.0",
-      "dependencies": [
-        "flutter"
-      ]
-    },
-    {
-      "name": "plugin_platform_interface",
-      "version": "2.1.8",
-      "dependencies": [
-        "meta"
       ]
     },
     {
@@ -267,11 +314,6 @@
     {
       "name": "term_glyph",
       "version": "1.2.2",
-      "dependencies": []
-    },
-    {
-      "name": "ffi",
-      "version": "2.1.5",
       "dependencies": []
     },
     {

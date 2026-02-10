@@ -32,10 +32,28 @@
       "languageVersion": "3.0"
     },
     {
+      "name": "file_picker",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/file_picker-6.2.1",
+      "packageUri": "lib/",
+      "languageVersion": "2.19"
+    },
+    {
       "name": "flutter",
       "rootUri": "file:///home/levitanus/flutter/packages/flutter",
       "packageUri": "lib/",
       "languageVersion": "3.8"
+    },
+    {
+      "name": "flutter_lints",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/flutter_lints-2.0.3",
+      "packageUri": "lib/",
+      "languageVersion": "2.19"
+    },
+    {
+      "name": "flutter_plugin_android_lifecycle",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/flutter_plugin_android_lifecycle-2.0.33",
+      "packageUri": "lib/",
+      "languageVersion": "3.9"
     },
     {
       "name": "flutter_web_plugins",
@@ -60,6 +78,12 @@
       "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/jwt_decode-0.3.1",
       "packageUri": "lib/",
       "languageVersion": "2.12"
+    },
+    {
+      "name": "lints",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/lints-2.1.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.0"
     },
     {
       "name": "material_color_utilities",
@@ -204,6 +228,12 @@
       "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/web-1.1.1",
       "packageUri": "lib/",
       "languageVersion": "3.4"
+    },
+    {
+      "name": "win32",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/win32-5.15.0",
+      "packageUri": "lib/",
+      "languageVersion": "3.8"
     },
     {
       "name": "xdg_directories",

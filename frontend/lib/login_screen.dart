@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
 import 'auth.dart';
 import 'home_screen.dart';
 
@@ -58,20 +60,116 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _handleForgotPassword() {
-    // Show dialog or navigate to forgot password screen
+    final usernameController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Forgot Password'),
-        content: const Text('Password recovery feature will be implemented soon.'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Enter your username to request a password reset.',
+                style: TextStyle(fontSize: 14),
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: usernameController,
+                decoration: const InputDecoration(
+                  labelText: 'Username',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Please enter your username';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('OK'),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                Navigator.of(context).pop();
+                await _sendPasswordResetRequest(usernameController.text.trim());
+              }
+            },
+            child: const Text('Send'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _sendPasswordResetRequest(String username) async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://localhost:8080/api/auth/forgot-password'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'username': username}),
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Request Sent'),
+            content: Text(data['message'] ?? 'Password reset request sent successfully.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Error'),
+            content: const Text('Failed to send password reset request. Please try again.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Error'),
+          content: Text('An error occurred: $e'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
   }
 
   @override

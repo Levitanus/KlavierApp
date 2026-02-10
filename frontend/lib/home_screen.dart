@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'auth.dart';
 import 'login_screen.dart';
 import 'admin_panel.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -121,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
               leading: const Icon(Icons.person),
               title: const Text('Profile'),
               selected: _selectedIndex == 2,
-              onTap: () => _navigateTo(const ProfilePage(), 2),
+              onTap: () => _navigateTo(const ProfileScreen(), 2),
             ),
             const Divider(),
             if (authService.isAdmin) ...[

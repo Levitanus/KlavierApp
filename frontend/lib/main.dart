@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'auth.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
+import 'reset_password_screen.dart';
 
 void main() => runApp(const MyApp());
 
@@ -19,7 +20,23 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.blue,
           useMaterial3: true,
         ),
-        home: const AuthWrapper(),
+        onGenerateRoute: (settings) {
+          final name = settings.name ?? '/';
+          final uri = Uri.parse(name);
+
+          if (uri.pathSegments.length == 2 &&
+              uri.pathSegments.first == 'reset-password') {
+            final token = uri.pathSegments[1];
+            return MaterialPageRoute(
+              builder: (context) => ResetPasswordScreen(token: token),
+            );
+          }
+
+          return MaterialPageRoute(
+            builder: (context) => const AuthWrapper(),
+          );
+        },
+        initialRoute: '/',
       ),
     );
   }
@@ -45,7 +62,7 @@ class AuthWrapper extends StatelessWidget {
                   ),
                 );
               }
-              
+
               // After initialization, decide which screen to show
               return authService.isAuthenticated
                   ? const HomeScreen()
