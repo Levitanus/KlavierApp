@@ -4,7 +4,7 @@ use futures_util::stream::StreamExt as _;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use jsonwebtoken::{encode, decode, EncodingKey, DecodingKey, Header, Validation};
-use chrono::{Duration, Utc};
+use chrono::{Duration, Utc, NaiveDate};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use std::io::Write;
 use uuid::Uuid;
@@ -279,7 +279,36 @@ async fn reset_password(
     }
 }
 
-#[derive(Debug, Serialize, Deserialize, FromRow)]
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StudentData {
+    pub full_name: String,
+    pub address: String,
+    pub birthday: NaiveDate,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ParentData {
+    pub full_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub children: Option<Vec<StudentInfo>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct StudentInfo {
+    pub user_id: i32,
+    pub username: String,
+    pub full_name: String,
+    pub address: String,
+    pub birthday: NaiveDate,
+    pub profile_image: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TeacherData {
+    pub full_name: String,
+}
+
+#[derive(Debug, Serialize, FromRow)]
 pub struct UserProfile {
     pub id: i32,
     pub username: String,
@@ -288,12 +317,28 @@ pub struct UserProfile {
     pub profile_image: Option<String>,
     #[serde(with = "chrono::serde::ts_seconds")]
     pub created_at: chrono::DateTime<chrono::Utc>,
+    #[sqlx(skip)]
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub roles: Vec<String>,
+    #[sqlx(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub student_data: Option<StudentData>,
+    #[sqlx(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent_data: Option<ParentData>,
+    #[sqlx(skip)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub teacher_data: Option<TeacherData>,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct UpdateProfileRequest {
     pub email: Option<String>,
     pub phone: Option<String>,
+    // Role-specific fields
+    pub full_name: Option<String>,
+    pub address: Option<String>,
+    pub birthday: Option<String>, // YYYY-MM-DD format
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -313,25 +358,108 @@ async fn get_profile(
         Err(response) => return response,
     };
 
-    let profile_result = sqlx::query_as::<_, UserProfile>(
+    let mut profile = match sqlx::query_as::<_, UserProfile>(
         "SELECT id, username, email, phone, profile_image, created_at FROM users WHERE username = $1"
     )
     .bind(&claims.sub)
     .fetch_optional(&app_state.db)
-    .await;
-
-    match profile_result {
-        Ok(Some(profile)) => HttpResponse::Ok().json(profile),
-        Ok(None) => HttpResponse::NotFound().json(ErrorResponse {
-            error: "User not found".to_string(),
-        }),
+    .await
+    {
+        Ok(Some(profile)) => profile,
+        Ok(None) => {
+            return HttpResponse::NotFound().json(ErrorResponse {
+                error: "User not found".to_string(),
+            });
+        }
         Err(e) => {
             eprintln!("Database error: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse {
+            return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
-            })
+            });
+        }
+    };
+
+    // Get user roles
+    profile.roles = sqlx::query_scalar::<_, String>(
+        "SELECT r.name FROM roles r 
+         INNER JOIN user_roles ur ON r.id = ur.role_id 
+         WHERE ur.user_id = $1"
+    )
+    .bind(profile.id)
+    .fetch_all(&app_state.db)
+    .await
+    .unwrap_or_default();
+
+    // Get student data if user is a student
+    if profile.roles.contains(&"student".to_string()) {
+        if let Ok(Some((full_name, address, birthday))) = sqlx::query_as::<_, (String, String, NaiveDate)>(
+            "SELECT full_name, address, birthday FROM students WHERE user_id = $1"
+        )
+        .bind(profile.id)
+        .fetch_optional(&app_state.db)
+        .await
+        {
+            profile.student_data = Some(StudentData {
+                full_name,
+                address,
+                birthday,
+            });
         }
     }
+
+    // Get parent data if user is a parent
+    if profile.roles.contains(&"parent".to_string()) {
+        if let Ok(Some(full_name)) = sqlx::query_scalar::<_, String>(
+            "SELECT full_name FROM parents WHERE user_id = $1"
+        )
+        .bind(profile.id)
+        .fetch_optional(&app_state.db)
+        .await
+        {
+            // Get children
+            let children: Vec<_> = sqlx::query_as::<_, (i32, String, String, String, NaiveDate, Option<String>)>(
+                "SELECT u.id, u.username, s.full_name, s.address, s.birthday, u.profile_image
+                 FROM users u
+                 INNER JOIN students s ON u.id = s.user_id
+                 INNER JOIN parent_student_relations psr ON s.user_id = psr.student_user_id
+                 WHERE psr.parent_user_id = $1"
+            )
+            .bind(profile.id)
+            .fetch_all(&app_state.db)
+            .await
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(user_id, username, full_name, address, birthday, profile_image)| StudentInfo {
+                user_id,
+                username,
+                full_name,
+                address,
+                birthday,
+                profile_image,
+            })
+            .collect();
+
+            profile.parent_data = Some(ParentData {
+                full_name,
+                children: if children.is_empty() { None } else { Some(children) },
+            });
+        }
+    }
+
+    // Get teacher data if user is a teacher
+    if profile.roles.contains(&"teacher".to_string()) {
+        if let Ok(Some(full_name)) = sqlx::query_scalar::<_, String>(
+            "SELECT full_name FROM teachers WHERE user_id = $1"
+        )
+        .bind(profile.id)
+        .fetch_optional(&app_state.db)
+        .await
+        {
+            profile.teacher_data = Some(TeacherData { full_name });
+        }
+    }
+
+    HttpResponse::Ok().json(profile)
 }
 
 /// Update current user's profile
@@ -346,45 +474,223 @@ async fn update_profile(
         Err(response) => return response,
     };
 
-    let update_result = sqlx::query(
-        "UPDATE users SET email = $1, phone = $2 WHERE username = $3"
+    // Get user ID
+    let user_id = match sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM users WHERE username = $1"
+    )
+    .bind(&claims.sub)
+    .fetch_optional(&app_state.db)
+    .await
+    {
+        Ok(Some(id)) => id,
+        _ => {
+            return HttpResponse::NotFound().json(ErrorResponse {
+                error: "User not found".to_string(),
+            });
+        }
+    };
+
+    // Start transaction
+    let mut tx = match app_state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            eprintln!("Failed to start transaction: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Database error".to_string(),
+            });
+        }
+    };
+
+    // Update user table
+    if let Err(e) = sqlx::query(
+        "UPDATE users SET email = $1, phone = $2 WHERE id = $3"
     )
     .bind(&update_req.email)
     .bind(&update_req.phone)
-    .bind(&claims.sub)
-    .execute(&app_state.db)
-    .await;
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await
+    {
+        eprintln!("Failed to update user: {}", e);
+        let _ = tx.rollback().await;
+        return HttpResponse::InternalServerError().json(ErrorResponse {
+            error: "Failed to update profile".to_string(),
+        });
+    }
 
-    match update_result {
-        Ok(_) => {
-            // Fetch updated profile
-            let profile_result = sqlx::query_as::<_, UserProfile>(
-                "SELECT id, username, email, phone, profile_image, created_at FROM users WHERE username = $1"
-            )
-            .bind(&claims.sub)
-            .fetch_optional(&app_state.db)
-            .await;
+    // Update role-specific data if provided
+    if update_req.full_name.is_some() || update_req.address.is_some() || update_req.birthday.is_some() {
+        // Check if user is a student
+        let is_student = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
+        )
+        .bind(user_id)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap_or(false);
 
-            match profile_result {
-                Ok(Some(profile)) => HttpResponse::Ok().json(profile),
-                Ok(None) => HttpResponse::NotFound().json(ErrorResponse {
-                    error: "User not found".to_string(),
-                }),
-                Err(e) => {
-                    eprintln!("Database error: {}", e);
-                    HttpResponse::InternalServerError().json(ErrorResponse {
-                        error: "Internal server error".to_string(),
-                    })
+        if is_student {
+            let mut updates = Vec::new();
+            let mut bind_count = 1;
+            
+            let birthday_date = if let Some(ref birthday_str) = update_req.birthday {
+                match NaiveDate::parse_from_str(birthday_str, "%Y-%m-%d") {
+                    Ok(date) => Some(date),
+                    Err(_) => {
+                        let _ = tx.rollback().await;
+                        return HttpResponse::BadRequest().json(ErrorResponse {
+                            error: "Invalid birthday format. Use YYYY-MM-DD".to_string(),
+                        });
+                    }
+                }
+            } else {
+                None
+            };
+
+            if update_req.full_name.is_some() {
+                updates.push(format!("full_name = ${}", bind_count));
+                bind_count += 1;
+            }
+            if update_req.address.is_some() {
+                updates.push(format!("address = ${}", bind_count));
+                bind_count += 1;
+            }
+            if birthday_date.is_some() {
+                updates.push(format!("birthday = ${}", bind_count));
+                bind_count += 1;
+            }
+
+            if !updates.is_empty() {
+                let query = format!(
+                    "UPDATE students SET {} WHERE user_id = ${}",
+                    updates.join(", "),
+                    bind_count
+                );
+
+                let mut q = sqlx::query(&query);
+                
+                if let Some(ref full_name) = update_req.full_name {
+                    q = q.bind(full_name);
+                }
+                if let Some(ref address) = update_req.address {
+                    q = q.bind(address);
+                }
+                if let Some(date) = birthday_date {
+                    q = q.bind(date);
+                }
+                q = q.bind(user_id);
+
+                if let Err(e) = q.execute(&mut *tx).await {
+                    eprintln!("Failed to update student data: {}", e);
+                    let _ = tx.rollback().await;
+                    return HttpResponse::InternalServerError().json(ErrorResponse {
+                        error: "Failed to update student data".to_string(),
+                    });
+                }
+
+                // Sync full_name to other role tables
+                if let Some(ref full_name) = update_req.full_name {
+                    let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
+                        .bind(full_name)
+                        .bind(user_id)
+                        .execute(&mut *tx)
+                        .await;
+                    
+                    let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
+                        .bind(full_name)
+                        .bind(user_id)
+                        .execute(&mut *tx)
+                        .await;
                 }
             }
         }
-        Err(e) => {
-            eprintln!("Database error: {}", e);
-            HttpResponse::InternalServerError().json(ErrorResponse {
-                error: "Failed to update profile".to_string(),
-            })
+
+        // Update parent data if user is a parent and full_name provided
+        if let Some(ref full_name) = update_req.full_name {
+            let is_parent = sqlx::query_scalar::<_, bool>(
+                "SELECT EXISTS(SELECT 1 FROM parents WHERE user_id = $1)"
+            )
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap_or(false);
+
+            if is_parent {
+                if let Err(e) = sqlx::query(
+                    "UPDATE parents SET full_name = $1 WHERE user_id = $2"
+                )
+                .bind(full_name)
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await
+                {
+                    eprintln!("Failed to update parent data: {}", e);
+                }
+
+                // Sync to other role tables
+                let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
+                    .bind(full_name)
+                    .bind(user_id)
+                    .execute(&mut *tx)
+                    .await;
+                
+                let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
+                    .bind(full_name)
+                    .bind(user_id)
+                    .execute(&mut *tx)
+                    .await;
+            }
+        }
+
+        // Update teacher data if user is a teacher and full_name provided
+        if let Some(ref full_name) = update_req.full_name {
+            let is_teacher = sqlx::query_scalar::<_, bool>(
+                "SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1)"
+            )
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await
+            .unwrap_or(false);
+
+            if is_teacher {
+                if let Err(e) = sqlx::query(
+                    "UPDATE teachers SET full_name = $1 WHERE user_id = $2"
+                )
+                .bind(full_name)
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await
+                {
+                    eprintln!("Failed to update teacher data: {}", e);
+                }
+
+                // Sync to other role tables
+                let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
+                    .bind(full_name)
+                    .bind(user_id)
+                    .execute(&mut *tx)
+                    .await;
+                
+                let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
+                    .bind(full_name)
+                    .bind(user_id)
+                    .execute(&mut *tx)
+                    .await;
+            }
         }
     }
+
+    // Commit transaction
+    if let Err(e) = tx.commit().await {
+        eprintln!("Failed to commit transaction: {}", e);
+        return HttpResponse::InternalServerError().json(ErrorResponse {
+            error: "Failed to save changes".to_string(),
+        });
+    }
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "message": "Profile updated successfully"
+    }))
 }
 
 /// Change current user's password

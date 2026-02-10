@@ -88,3 +88,95 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_i
 
 -- GIN index for JSONB queries (for searching within notification body)
 CREATE INDEX IF NOT EXISTS idx_notifications_body_gin ON notifications USING gin(body);
+
+-- ============================================================================
+-- Role-Specific Tables (Students, Parents, Teachers)
+-- ============================================================================
+
+-- Create students table with additional details
+CREATE TABLE IF NOT EXISTS students (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL,
+    address TEXT NOT NULL,
+    birthday DATE NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Create parents table with additional details
+CREATE TABLE IF NOT EXISTS parents (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Create teachers table with additional details
+CREATE TABLE IF NOT EXISTS teachers (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    full_name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Create parent-student relationship table (many-to-many)
+CREATE TABLE IF NOT EXISTS parent_student_relations (
+    parent_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    student_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (parent_user_id, student_user_id),
+    -- Ensure both users have the appropriate roles
+    CONSTRAINT fk_parent FOREIGN KEY (parent_user_id) REFERENCES parents(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_student FOREIGN KEY (student_user_id) REFERENCES students(user_id) ON DELETE CASCADE,
+    -- Prevent self-parenting
+    CONSTRAINT no_self_parenting CHECK (parent_user_id != student_user_id)
+);
+
+-- Create registration tokens table
+CREATE TABLE IF NOT EXISTS registration_tokens (
+    id SERIAL PRIMARY KEY,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role TEXT NOT NULL CHECK (role IN ('student', 'parent', 'teacher')),
+    -- For parent registration from student profile
+    related_student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
+    used_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Create indexes for role tables
+CREATE INDEX IF NOT EXISTS idx_students_full_name ON students(full_name);
+CREATE INDEX IF NOT EXISTS idx_parents_full_name ON parents(full_name);
+CREATE INDEX IF NOT EXISTS idx_teachers_full_name ON teachers(full_name);
+CREATE INDEX IF NOT EXISTS idx_parent_student_parent ON parent_student_relations(parent_user_id);
+CREATE INDEX IF NOT EXISTS idx_parent_student_student ON parent_student_relations(student_user_id);
+CREATE INDEX IF NOT EXISTS idx_registration_tokens_hash ON registration_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_registration_tokens_expires ON registration_tokens(expires_at);
+CREATE INDEX IF NOT EXISTS idx_registration_tokens_related_student ON registration_tokens(related_student_id);
+
+-- Trigger function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Create triggers for updated_at
+CREATE TRIGGER update_students_updated_at 
+    BEFORE UPDATE ON students 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_parents_updated_at 
+    BEFORE UPDATE ON parents 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_teachers_updated_at 
+    BEFORE UPDATE ON teachers 
+    FOR EACH ROW 
+    EXECUTE FUNCTION update_updated_at_column();

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use argon2::{Argon2, PasswordHasher};
 use argon2::password_hash::{SaltString, rand_core::OsRng};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Utc, NaiveDate};
 
 use crate::AppState;
 use crate::users::verify_token;
@@ -459,6 +459,505 @@ async fn resolve_password_reset_request(
     }
 }
 
+#[derive(Debug, Deserialize)]
+pub struct MakeStudentRequest {
+    pub full_name: String,
+    pub address: String,
+    pub birthday: String, // YYYY-MM-DD format
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MakeParentRequest {
+    pub full_name: String,
+    pub student_ids: Vec<i32>, // At least one required
+}
+
+#[derive(Debug, Deserialize)]
+pub struct MakeTeacherRequest {
+    pub full_name: String,
+}
+
+/// Convert an existing user to a student
+#[post("/api/admin/users/{id}/make-student")]
+async fn make_student(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    user_id: web::Path<i32>,
+    student_data: web::Json<MakeStudentRequest>,
+) -> impl Responder {
+    if let Err(response) = verify_admin_role(&req, &app_state) {
+        return response;
+    }
+
+    let user_id = user_id.into_inner();
+
+    // Parse birthday
+    let birthday = match NaiveDate::parse_from_str(&student_data.birthday, "%Y-%m-%d") {
+        Ok(date) => date,
+        Err(_) => {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "Invalid birthday format. Use YYYY-MM-DD"
+            }));
+        }
+    };
+
+    // Start transaction
+    let mut tx = match app_state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            eprintln!("Failed to start transaction: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Database error"
+            }));
+        }
+    };
+
+    // Check if user exists
+    let user_exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)"
+    )
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await;
+
+    if !user_exists.unwrap_or(false) {
+        return HttpResponse::NotFound().json(serde_json::json!({
+            "error": "User not found"
+        }));
+    }
+
+    // Check if already a student
+    let is_student = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
+    )
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await;
+
+    if is_student.unwrap_or(false) {
+        return HttpResponse::Conflict().json(serde_json::json!({
+            "error": "User is already a student"
+        }));
+    }
+
+    // Get student role ID
+    let role_id = match sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM roles WHERE name = 'student'"
+    )
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("Failed to get student role: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Student role not found"
+            }));
+        }
+    };
+
+    // Check if user already has the role
+    let has_role = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = $1 AND role_id = $2)"
+    )
+    .bind(user_id)
+    .bind(role_id)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap_or(false);
+
+    // Assign student role if not already assigned
+    if !has_role {
+        if let Err(e) = sqlx::query(
+            "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)"
+        )
+        .bind(user_id)
+        .bind(role_id)
+        .execute(&mut *tx)
+        .await
+        {
+            eprintln!("Failed to assign role: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to assign role"
+            }));
+        }
+    }
+
+    // Create student entry
+    if let Err(e) = sqlx::query(
+        "INSERT INTO students (user_id, full_name, address, birthday) 
+         VALUES ($1, $2, $3, $4)"
+    )
+    .bind(user_id)
+    .bind(&student_data.full_name)
+    .bind(&student_data.address)
+    .bind(birthday)
+    .execute(&mut *tx)
+    .await
+    {
+        eprintln!("Failed to create student entry: {}", e);
+        let _ = tx.rollback().await;
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Failed to create student"
+        }));
+    }
+
+    // Update other role tables if they exist with the same full_name
+    let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
+        .bind(&student_data.full_name)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await;
+
+    let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
+        .bind(&student_data.full_name)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await;
+
+    // Commit transaction
+    if let Err(e) = tx.commit().await {
+        eprintln!("Failed to commit transaction: {}", e);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Failed to commit transaction"
+        }));
+    }
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "message": "User converted to student successfully"
+    }))
+}
+
+/// Convert an existing user to a parent
+#[post("/api/admin/users/{id}/make-parent")]
+async fn make_parent(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    user_id: web::Path<i32>,
+    parent_data: web::Json<MakeParentRequest>,
+) -> impl Responder {
+    if let Err(response) = verify_admin_role(&req, &app_state) {
+        return response;
+    }
+
+    let user_id = user_id.into_inner();
+
+    // Validate at least one student
+    if parent_data.student_ids.is_empty() {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "At least one student is required"
+        }));
+    }
+
+    // Prevent self-parenting
+    if parent_data.student_ids.contains(&user_id) {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "A user cannot be their own parent"
+        }));
+    }
+
+    // Start transaction
+    let mut tx = match app_state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            eprintln!("Failed to start transaction: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Database error"
+            }));
+        }
+    };
+
+    // Check if user exists
+    let user_exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)"
+    )
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await;
+
+    if !user_exists.unwrap_or(false) {
+        return HttpResponse::NotFound().json(serde_json::json!({
+            "error": "User not found"
+        }));
+    }
+
+    // Check if already a parent
+    let is_parent = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM parents WHERE user_id = $1)"
+    )
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await;
+
+    if is_parent.unwrap_or(false) {
+        return HttpResponse::Conflict().json(serde_json::json!({
+            "error": "User is already a parent"
+        }));
+    }
+
+    // Get parent role ID
+    let role_id = match sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM roles WHERE name = 'parent'"
+    )
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("Failed to get parent role: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Parent role not found"
+            }));
+        }
+    };
+
+    // Check if user already has the role
+    let has_role = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = $1 AND role_id = $2)"
+    )
+    .bind(user_id)
+    .bind(role_id)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap_or(false);
+
+    // Assign parent role if not already assigned
+    if !has_role {
+        if let Err(e) = sqlx::query(
+            "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)"
+        )
+        .bind(user_id)
+        .bind(role_id)
+        .execute(&mut *tx)
+        .await
+        {
+            eprintln!("Failed to assign role: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to assign role"
+            }));
+        }
+    }
+
+    // Create parent entry
+    if let Err(e) = sqlx::query(
+        "INSERT INTO parents (user_id, full_name) VALUES ($1, $2)"
+    )
+    .bind(user_id)
+    .bind(&parent_data.full_name)
+    .execute(&mut *tx)
+    .await
+    {
+        eprintln!("Failed to create parent entry: {}", e);
+        let _ = tx.rollback().await;
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Failed to create parent"
+        }));
+    }
+
+    // Update other role tables if they exist with the same full_name
+    let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
+        .bind(&parent_data.full_name)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await;
+
+    let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
+        .bind(&parent_data.full_name)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await;
+
+    // Create parent-student relations
+    for student_id in &parent_data.student_ids {
+        // Verify student exists
+        let student_exists = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
+        )
+        .bind(student_id)
+        .fetch_one(&mut *tx)
+        .await;
+
+        if !student_exists.unwrap_or(false) {
+            let _ = tx.rollback().await;
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": format!("Student with ID {} not found", student_id)
+            }));
+        }
+
+        if let Err(e) = sqlx::query(
+            "INSERT INTO parent_student_relations (parent_user_id, student_user_id) 
+             VALUES ($1, $2) ON CONFLICT DO NOTHING"
+        )
+        .bind(user_id)
+        .bind(student_id)
+        .execute(&mut *tx)
+        .await
+        {
+            eprintln!("Failed to create relation: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to create parent-student relation"
+            }));
+        }
+    }
+
+    // Commit transaction
+    if let Err(e) = tx.commit().await {
+        eprintln!("Failed to commit transaction: {}", e);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Failed to commit transaction"
+        }));
+    }
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "message": "User converted to parent successfully"
+    }))
+}
+
+/// Convert an existing user to a teacher
+#[post("/api/admin/users/{id}/make-teacher")]
+async fn make_teacher(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    user_id: web::Path<i32>,
+    teacher_data: web::Json<MakeTeacherRequest>,
+) -> impl Responder {
+    if let Err(response) = verify_admin_role(&req, &app_state) {
+        return response;
+    }
+
+    let user_id = user_id.into_inner();
+
+    // Start transaction
+    let mut tx = match app_state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            eprintln!("Failed to start transaction: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Database error"
+            }));
+        }
+    };
+
+    // Check if user exists
+    let user_exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)"
+    )
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await;
+
+    if !user_exists.unwrap_or(false) {
+        return HttpResponse::NotFound().json(serde_json::json!({
+            "error": "User not found"
+        }));
+    }
+
+    // Check if already a teacher
+    let is_teacher = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1)"
+    )
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await;
+
+    if is_teacher.unwrap_or(false) {
+        return HttpResponse::Conflict().json(serde_json::json!({
+            "error": "User is already a teacher"
+        }));
+    }
+
+    // Get teacher role ID
+    let role_id = match sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM roles WHERE name = 'teacher'"
+    )
+    .fetch_one(&mut *tx)
+    .await
+    {
+        Ok(id) => id,
+        Err(e) => {
+            eprintln!("Failed to get teacher role: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Teacher role not found"
+            }));
+        }
+    };
+
+    // Check if user already has the role
+    let has_role = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = $1 AND role_id = $2)"
+    )
+    .bind(user_id)
+    .bind(role_id)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap_or(false);
+
+    // Assign teacher role if not already assigned
+    if !has_role {
+        if let Err(e) = sqlx::query(
+            "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)"
+        )
+        .bind(user_id)
+        .bind(role_id)
+        .execute(&mut *tx)
+        .await
+        {
+            eprintln!("Failed to assign role: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to assign role"
+            }));
+        }
+    }
+
+    // Create teacher entry
+    if let Err(e) = sqlx::query(
+        "INSERT INTO teachers (user_id, full_name) VALUES ($1, $2)"
+    )
+    .bind(user_id)
+    .bind(&teacher_data.full_name)
+    .execute(&mut *tx)
+    .await
+    {
+        eprintln!("Failed to create teacher entry: {}", e);
+        let _ = tx.rollback().await;
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Failed to create teacher"
+        }));
+    }
+
+    // Update other role tables if they exist with the same full_name
+    let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
+        .bind(&teacher_data.full_name)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await;
+
+    let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
+        .bind(&teacher_data.full_name)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await;
+
+    // Commit transaction
+    if let Err(e) = tx.commit().await {
+        eprintln!("Failed to commit transaction: {}", e);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Failed to commit transaction"
+        }));
+    }
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "message": "User converted to teacher successfully"
+    }))
+}
+
 pub fn configure(cfg: &mut web::ServiceConfig) {
     println!("=== ADMIN CONFIGURE CALLED ===");
     cfg.service(test_route)
@@ -466,6 +965,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(create_user)
         .service(update_user)
         .service(delete_user)
+        .service(make_student)
+        .service(make_parent)
+        .service(make_teacher)
         .service(generate_reset_link)
         .service(get_password_reset_requests)
         .service(resolve_password_reset_request);

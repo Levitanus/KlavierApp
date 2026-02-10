@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'auth.dart';
 import 'services/notification_service.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 import 'reset_password_screen.dart';
+import 'register_screen.dart';
 
-void main() => runApp(const MyApp());
+void main() {
+  // Use path-based URL strategy instead of hash-based
+  usePathUrlStrategy();
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -34,11 +40,20 @@ class MyApp extends StatelessWidget {
           final name = settings.name ?? '/';
           final uri = Uri.parse(name);
 
+          // Handle /reset-password/{token}
           if (uri.pathSegments.length == 2 &&
               uri.pathSegments.first == 'reset-password') {
             final token = uri.pathSegments[1];
             return MaterialPageRoute(
               builder: (context) => ResetPasswordScreen(token: token),
+            );
+          }
+
+          // Handle /register?token=xxx
+          if (uri.path == '/register' && uri.queryParameters.containsKey('token')) {
+            final token = uri.queryParameters['token']!;
+            return MaterialPageRoute(
+              builder: (context) => RegisterScreen(token: token),
             );
           }
 
