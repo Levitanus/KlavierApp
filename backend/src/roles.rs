@@ -45,6 +45,7 @@ pub struct StudentWithUserInfo {
     pub full_name: String,
     pub address: String,
     pub birthday: NaiveDate,
+    pub status: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -54,6 +55,7 @@ pub struct ParentWithUserInfo {
     pub email: Option<String>,
     pub phone: Option<String>,
     pub full_name: String,
+    pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<StudentWithUserInfo>>,
 }
@@ -161,11 +163,12 @@ async fn verify_can_edit_student(
         }))),
     };
     
-    // Check if current user is a parent of this student
+    // Check if current user is an active parent of this student
     let relation_exists = sqlx::query_scalar::<_, bool>(
         "SELECT EXISTS(
-            SELECT 1 FROM parent_student_relations 
-            WHERE parent_user_id = $1 AND student_user_id = $2
+            SELECT 1 FROM parent_student_relations psr
+            JOIN parents p ON psr.parent_user_id = p.user_id
+            WHERE psr.parent_user_id = $1 AND psr.student_user_id = $2 AND p.status = 'active'
         )"
     )
     .bind(current_user_id)
@@ -178,6 +181,463 @@ async fn verify_can_edit_student(
         _ => Err(HttpResponse::Forbidden().json(serde_json::json!({
             "error": "Not authorized to edit this student"
         }))),
+    }
+}
+
+/// Check if all students of parents are archived, and archive those parent roles
+/// Called when archiving a student role
+pub async fn check_and_archive_parents(
+    student_user_id: i32,
+    archived_by_user_id: i32,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+) -> Result<(), sqlx::Error> {
+    // Get all parents of this student
+    let parent_ids: Vec<(i32,)> = sqlx::query_as(
+        "SELECT parent_user_id FROM parent_student_relations WHERE student_user_id = $1"
+    )
+    .bind(student_user_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    // For each parent, check if all their students are archived
+    for (parent_id,) in parent_ids {
+        let has_active_students: (bool,) = sqlx::query_as(
+            "SELECT EXISTS(
+                SELECT 1 FROM parent_student_relations psr
+                JOIN students s ON psr.student_user_id = s.user_id
+                WHERE psr.parent_user_id = $1 AND s.status = 'active'
+            )"
+        )
+        .bind(parent_id)
+        .fetch_one(&mut **tx)
+        .await?;
+
+        // If parent has no active students, archive their parent role
+        if !has_active_students.0 {
+            sqlx::query(
+                "UPDATE parents SET status = 'archived', archived_at = NOW(), archived_by = $1 
+                 WHERE user_id = $2"
+            )
+            .bind(archived_by_user_id)
+            .bind(parent_id)
+            .execute(&mut **tx)
+            .await?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Check if parents should be reactivated when a student role is unarchived
+/// Called when unarchiving a student role
+pub async fn check_and_unarchive_parents(
+    student_user_id: i32,
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+) -> Result<(), sqlx::Error> {
+    // Get all archived parents of this student
+    let parent_ids: Vec<(i32,)> = sqlx::query_as(
+        "SELECT DISTINCT psr.parent_user_id 
+         FROM parent_student_relations psr
+         JOIN parents p ON psr.parent_user_id = p.user_id
+         WHERE psr.student_user_id = $1 AND p.status = 'archived'"
+    )
+    .bind(student_user_id)
+    .fetch_all(&mut **tx)
+    .await?;
+
+    // Unarchive each parent role (they now have at least one active student)
+    for (parent_id,) in parent_ids {
+        sqlx::query(
+            "UPDATE parents SET status = 'active', archived_at = NULL, archived_by = NULL 
+             WHERE user_id = $1"
+        )
+        .bind(parent_id)
+        .execute(&mut **tx)
+        .await?;
+    }
+
+    Ok(())
+}
+
+// ============================================================================
+// Role Archive/Unarchive Endpoints
+// ============================================================================
+
+#[post("/api/admin/students/{user_id}/archive")]
+async fn archive_student_role(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    user_id: web::Path<i32>,
+) -> impl Responder {
+    if let Err(response) = verify_admin_role(&req, &app_state) {
+        return response;
+    }
+
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let user_id = user_id.into_inner();
+
+    // Start transaction
+    let mut tx = match app_state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            eprintln!("Failed to start transaction: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to start transaction"
+            }));
+        }
+    };
+
+    // Get the admin user ID from username
+    let admin_user_id: Option<(i32,)> = match sqlx::query_as(
+        "SELECT id FROM users WHERE username = $1"
+    )
+    .bind(&claims.sub)
+    .fetch_optional(&mut *tx)
+    .await {
+        Ok(result) => result,
+        Err(e) => {
+            eprintln!("Failed to get admin user ID: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to get admin user information"
+            }));
+        }
+    };
+
+    let admin_user_id = match admin_user_id {
+        Some((id,)) => id,
+        None => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Admin user not found"
+            }));
+        }
+    };
+
+    // Archive the student role
+    let result = sqlx::query(
+        "UPDATE students SET status = 'archived', archived_at = NOW(), archived_by = $1 WHERE user_id = $2"
+    )
+    .bind(admin_user_id)
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await;
+
+    match result {
+        Ok(result) => {
+            if result.rows_affected() == 0 {
+                let _ = tx.rollback().await;
+                return HttpResponse::NotFound().json(serde_json::json!({
+                    "error": "Student role not found"
+                }));
+            }
+            // Cascade to parents
+            if let Err(e) = check_and_archive_parents(user_id, admin_user_id, &mut tx).await {
+                eprintln!("Failed to archive parents: {}", e);
+                let _ = tx.rollback().await;
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Failed to update parent status"
+                }));
+            }
+
+            match tx.commit().await {
+                Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+                    "message": "Student role archived successfully"
+                })),
+                Err(e) => {
+                    eprintln!("Failed to commit transaction: {}", e);
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Failed to archive student role"
+                    }))
+                }
+            }
+        }
+        Err(e) => {
+            let _ = tx.rollback().await;
+            eprintln!("Database error: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to archive student role"
+            }))
+        }
+    }
+}
+
+#[post("/api/admin/students/{user_id}/unarchive")]
+async fn unarchive_student_role(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    user_id: web::Path<i32>,
+) -> impl Responder {
+    if let Err(response) = verify_admin_role(&req, &app_state) {
+        return response;
+    }
+
+    let user_id = user_id.into_inner();
+
+    let mut tx = match app_state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            eprintln!("Failed to start transaction: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to start transaction"
+            }));
+        }
+    };
+
+    // Unarchive the student role
+    let result = sqlx::query(
+        "UPDATE students SET status = 'active', archived_at = NULL, archived_by = NULL WHERE user_id = $1"
+    )
+    .bind(user_id)
+    .execute(&mut *tx)
+    .await;
+
+    match result {
+        Ok(result) => {
+            if result.rows_affected() == 0 {
+                let _ = tx.rollback().await;
+                return HttpResponse::NotFound().json(serde_json::json!({
+                    "error": "Student role not found"
+                }));
+            }
+            // Cascade to parents
+            if let Err(e) = check_and_unarchive_parents(user_id, &mut tx).await {
+                eprintln!("Failed to unarchive parents: {}", e);
+                let _ = tx.rollback().await;
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Failed to update parent status"
+                }));
+            }
+
+            match tx.commit().await {
+                Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+                    "message": "Student role unarchived successfully"
+                })),
+                Err(e) => {
+                    eprintln!("Failed to commit transaction: {}", e);
+                    HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Failed to unarchive student role"
+                    }))
+                }
+            }
+        }
+        Err(e) => {
+            let _ = tx.rollback().await;
+            eprintln!("Database error: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to unarchive student role"
+            }))
+        }
+    }
+}
+
+#[post("/api/admin/parents/{user_id}/archive")]
+async fn archive_parent_role(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    user_id: web::Path<i32>,
+) -> impl Responder {
+    if let Err(response) = verify_admin_role(&req, &app_state) {
+        return response;
+    }
+
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let user_id = user_id.into_inner();
+
+    // Get the admin user ID from username
+    let admin_user_id: Option<(i32,)> = sqlx::query_as(
+        "SELECT id FROM users WHERE username = $1"
+    )
+    .bind(&claims.sub)
+    .fetch_optional(&app_state.db)
+    .await
+    .unwrap_or(None);
+
+    let admin_user_id = match admin_user_id {
+        Some((id,)) => id,
+        None => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Admin user not found"
+            }));
+        }
+    };
+
+    // Archive the parent role
+    let result = sqlx::query(
+        "UPDATE parents SET status = 'archived', archived_at = NOW(), archived_by = $1 WHERE user_id = $2"
+    )
+    .bind(admin_user_id)
+    .bind(user_id)
+    .execute(&app_state.db)
+    .await;
+
+    match result {
+        Ok(result) => {
+            if result.rows_affected() == 0 {
+                return HttpResponse::NotFound().json(serde_json::json!({
+                    "error": "Parent role not found"
+                }));
+            }
+            HttpResponse::Ok().json(serde_json::json!({
+                "message": "Parent role archived successfully"
+            }))
+        }
+        Err(e) => {
+            eprintln!("Database error: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to archive parent role"
+            }))
+        }
+    }
+}
+
+#[post("/api/admin/parents/{user_id}/unarchive")]
+async fn unarchive_parent_role(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    user_id: web::Path<i32>,
+) -> impl Responder {
+    if let Err(response) = verify_admin_role(&req, &app_state) {
+        return response;
+    }
+
+    let user_id = user_id.into_inner();
+
+    // Unarchive the parent role
+    let result = sqlx::query(
+        "UPDATE parents SET status = 'active', archived_at = NULL, archived_by = NULL WHERE user_id = $1"
+    )
+    .bind(user_id)
+    .execute(&app_state.db)
+    .await;
+
+    match result {
+        Ok(result) => {
+            if result.rows_affected() == 0 {
+                return HttpResponse::NotFound().json(serde_json::json!({
+                    "error": "Parent role not found"
+                }));
+            }
+            HttpResponse::Ok().json(serde_json::json!({
+                "message": "Parent role unarchived successfully"
+            }))
+        }
+        Err(e) => {
+            eprintln!("Database error: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to unarchive parent role"
+            }))
+        }
+    }
+}
+
+#[post("/api/admin/teachers/{user_id}/archive")]
+async fn archive_teacher_role(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    user_id: web::Path<i32>,
+) -> impl Responder {
+    if let Err(response) = verify_admin_role(&req, &app_state) {
+        return response;
+    }
+
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let user_id = user_id.into_inner();
+
+    // Get the admin user ID from username
+    let admin_user_id: Option<(i32,)> = sqlx::query_as(
+        "SELECT id FROM users WHERE username = $1"
+    )
+    .bind(&claims.sub)
+    .fetch_optional(&app_state.db)
+    .await
+    .unwrap_or(None);
+
+    let admin_user_id = match admin_user_id {
+        Some((id,)) => id,
+        None => {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Admin user not found"
+            }));
+        }
+    };
+
+    // Archive the teacher role
+    let result = sqlx::query(
+        "UPDATE teachers SET status = 'archived', archived_at = NOW(), archived_by = $1 WHERE user_id = $2"
+    )
+    .bind(admin_user_id)
+    .bind(user_id)
+    .execute(&app_state.db)
+    .await;
+
+    match result {
+        Ok(result) => {
+            if result.rows_affected() == 0 {
+                return HttpResponse::NotFound().json(serde_json::json!({
+                    "error": "Teacher role not found"
+                }));
+            }
+            HttpResponse::Ok().json(serde_json::json!({
+                "message": "Teacher role archived successfully"
+            }))
+        }
+        Err(e) => {
+            eprintln!("Database error: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to archive teacher role"
+            }))
+        }
+    }
+}
+
+#[post("/api/admin/teachers/{user_id}/unarchive")]
+async fn unarchive_teacher_role(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    user_id: web::Path<i32>,
+) -> impl Responder {
+    if let Err(response) = verify_admin_role(&req, &app_state) {
+        return response;
+    }
+
+    let user_id = user_id.into_inner();
+
+    // Unarchive the teacher role
+    let result = sqlx::query(
+        "UPDATE teachers SET status = 'active', archived_at = NULL, archived_by = NULL WHERE user_id = $1"
+    )
+    .bind(user_id)
+    .execute(&app_state.db)
+    .await;
+
+    match result {
+        Ok(result) => {
+            if result.rows_affected() == 0 {
+                return HttpResponse::NotFound().json(serde_json::json!({
+                    "error": "Teacher role not found"
+                }));
+            }
+            HttpResponse::Ok().json(serde_json::json!({
+                "message": "Teacher role unarchived successfully"
+            }))
+        }
+        Err(e) => {
+            eprintln!("Database error: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to unarchive teacher role"
+            }))
+        }
     }
 }
 
@@ -332,8 +792,8 @@ async fn get_student(
     }
     
     // Get student with user info
-    let student = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate)>(
-        "SELECT u.id, u.username, u.email, u.phone, s.full_name, s.address, s.birthday
+    let student = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
+        "SELECT u.id, u.username, u.email, u.phone, s.full_name, s.address, s.birthday, s.status::text
          FROM users u
          INNER JOIN students s ON u.id = s.user_id
          WHERE u.id = $1"
@@ -343,7 +803,7 @@ async fn get_student(
     .await;
     
     match student {
-        Ok(Some((user_id, username, email, phone, full_name, address, birthday))) => {
+        Ok(Some((user_id, username, email, phone, full_name, address, birthday, status))) => {
             HttpResponse::Ok().json(StudentWithUserInfo {
                 user_id,
                 username,
@@ -352,6 +812,7 @@ async fn get_student(
                 full_name,
                 address,
                 birthday,
+                status,
             })
         }
         Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
@@ -701,8 +1162,8 @@ async fn get_parent(
     }
     
     // Get parent with user info
-    let parent = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, p.full_name
+            let parent = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String)>(
+        "SELECT u.id, u.username, u.email, u.phone, p.full_name, p.status::text
          FROM users u
          INNER JOIN parents p ON u.id = p.user_id
          WHERE u.id = $1"
@@ -712,10 +1173,10 @@ async fn get_parent(
     .await;
     
     match parent {
-        Ok(Some((user_id, username, email, phone, full_name))) => {
+        Ok(Some((user_id, username, email, phone, full_name, status))) => {
             // Get children
-            let children = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate)>(
-                "SELECT u.id, u.username, u.email, u.phone, s.full_name, s.address, s.birthday
+            let children = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
+                "SELECT u.id, u.username, u.email, u.phone, s.full_name, s.address, s.birthday, s.status::text
                  FROM users u
                  INNER JOIN students s ON u.id = s.user_id
                  INNER JOIN parent_student_relations psr ON s.user_id = psr.student_user_id
@@ -726,7 +1187,7 @@ async fn get_parent(
             .await
             .unwrap_or_default()
             .into_iter()
-            .map(|(user_id, username, email, phone, full_name, address, birthday)| {
+            .map(|(user_id, username, email, phone, full_name, address, birthday, status)| {
                 StudentWithUserInfo {
                     user_id,
                     username,
@@ -735,6 +1196,7 @@ async fn get_parent(
                     full_name,
                     address,
                     birthday,
+                    status,
                 }
             })
             .collect();
@@ -745,6 +1207,7 @@ async fn get_parent(
                 email,
                 phone,
                 full_name,
+                status,
                 children: Some(children),
             })
         }
@@ -1142,8 +1605,8 @@ async fn get_teacher(
     }
     
     // Get teacher with user info
-    let teacher = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, t.full_name
+    let teacher = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String)>(
+        "SELECT u.id, u.username, u.email, u.phone, t.full_name, t.status::text
          FROM users u
          INNER JOIN teachers t ON u.id = t.user_id
          WHERE u.id = $1"
@@ -1153,13 +1616,14 @@ async fn get_teacher(
     .await;
     
     match teacher {
-        Ok(Some((user_id, username, email, phone, full_name))) => {
+        Ok(Some((user_id, username, email, phone, full_name, status))) => {
             HttpResponse::Ok().json(serde_json::json!({
                 "user_id": user_id,
                 "username": username,
                 "email": email,
                 "phone": phone,
                 "full_name": full_name,
+                "status": status,
             }))
         }
         Ok(None) => HttpResponse::NotFound().json(serde_json::json!({
@@ -1311,14 +1775,20 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
         .service(create_student)
         .service(get_student)
         .service(update_student)
+        .service(archive_student_role)
+        .service(unarchive_student_role)
         // Parent routes
         .service(create_parent)
         .service(get_parent)
         .service(update_parent)
         .service(add_parent_student_relation)
         .service(remove_parent_student_relation)
+        .service(archive_parent_role)
+        .service(unarchive_parent_role)
         // Teacher routes
         .service(create_teacher)
         .service(get_teacher)
-        .service(update_teacher);
+        .service(update_teacher)
+        .service(archive_teacher_role)
+        .service(unarchive_teacher_role);
 }

@@ -1,3 +1,6 @@
+-- Create role status enum
+CREATE TYPE role_status AS ENUM ('active', 'archived');
+
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
@@ -99,6 +102,9 @@ CREATE TABLE IF NOT EXISTS students (
     full_name TEXT NOT NULL,
     address TEXT NOT NULL,
     birthday DATE NOT NULL,
+    status role_status NOT NULL DEFAULT 'active',
+    archived_at TIMESTAMPTZ,
+    archived_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -107,6 +113,9 @@ CREATE TABLE IF NOT EXISTS students (
 CREATE TABLE IF NOT EXISTS parents (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     full_name TEXT NOT NULL,
+    status role_status NOT NULL DEFAULT 'active',
+    archived_at TIMESTAMPTZ,
+    archived_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -115,6 +124,9 @@ CREATE TABLE IF NOT EXISTS parents (
 CREATE TABLE IF NOT EXISTS teachers (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
     full_name TEXT NOT NULL,
+    status role_status NOT NULL DEFAULT 'active',
+    archived_at TIMESTAMPTZ,
+    archived_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -148,8 +160,14 @@ CREATE TABLE IF NOT EXISTS registration_tokens (
 
 -- Create indexes for role tables
 CREATE INDEX IF NOT EXISTS idx_students_full_name ON students(full_name);
+CREATE INDEX IF NOT EXISTS idx_students_status ON students(status);
+CREATE INDEX IF NOT EXISTS idx_students_archived_at ON students(archived_at);
 CREATE INDEX IF NOT EXISTS idx_parents_full_name ON parents(full_name);
+CREATE INDEX IF NOT EXISTS idx_parents_status ON parents(status);
+CREATE INDEX IF NOT EXISTS idx_parents_archived_at ON parents(archived_at);
 CREATE INDEX IF NOT EXISTS idx_teachers_full_name ON teachers(full_name);
+CREATE INDEX IF NOT EXISTS idx_teachers_status ON teachers(status);
+CREATE INDEX IF NOT EXISTS idx_teachers_archived_at ON teachers(archived_at);
 CREATE INDEX IF NOT EXISTS idx_parent_student_parent ON parent_student_relations(parent_user_id);
 CREATE INDEX IF NOT EXISTS idx_parent_student_student ON parent_student_relations(student_user_id);
 CREATE INDEX IF NOT EXISTS idx_registration_tokens_hash ON registration_tokens(token_hash);

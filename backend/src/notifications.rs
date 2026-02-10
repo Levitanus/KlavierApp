@@ -204,6 +204,39 @@ pub async fn create_notification(
     db: web::Data<PgPool>,
     payload: web::Json<CreateNotification>,
 ) -> Result<HttpResponse> {
+    // Check if target user has admin role or any active activity role
+    let role_statuses: (bool, bool, bool, bool, bool) = sqlx::query_as(
+        "SELECT
+            EXISTS(SELECT 1 FROM users u WHERE u.id = $1) AS user_exists,
+            EXISTS(
+                SELECT 1 FROM user_roles ur
+                JOIN roles r ON ur.role_id = r.id
+                WHERE ur.user_id = $1 AND r.name = 'admin'
+            ) AS is_admin,
+            EXISTS(SELECT 1 FROM students s WHERE s.user_id = $1 AND s.status = 'active') AS has_active_student,
+            EXISTS(SELECT 1 FROM parents p WHERE p.user_id = $1 AND p.status = 'active') AS has_active_parent,
+            EXISTS(SELECT 1 FROM teachers t WHERE t.user_id = $1 AND t.status = 'active') AS has_active_teacher"
+    )
+    .bind(payload.user_id)
+    .fetch_one(db.get_ref())
+    .await
+    .map_err(|e| {
+        eprintln!("Database error checking role status: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to verify user")
+    })?;
+
+    let (user_exists, is_admin, has_active_student, has_active_parent, has_active_teacher) = role_statuses;
+
+    if !user_exists {
+        return Err(actix_web::error::ErrorNotFound("User not found"));
+    }
+
+    if !(is_admin || has_active_student || has_active_parent || has_active_teacher) {
+        return Err(actix_web::error::ErrorBadRequest(
+            "Cannot create notification for user without active roles"
+        ));
+    }
+
     let body_json = serde_json::to_value(&payload.body)
         .map_err(|e| {
             eprintln!("Failed to serialize notification body: {:?}", e);

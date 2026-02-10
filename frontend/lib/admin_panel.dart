@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:math';
 import 'auth.dart';
+import 'profile_screen.dart';
 
 class AdminPanel extends StatefulWidget {
   final String? username;
@@ -17,14 +18,9 @@ class AdminPanel extends StatefulWidget {
 
 class _AdminPanelState extends State<AdminPanel> {
   List<User> _users = [];
+  final Map<int, String> _userFullNames = {};
   bool _isLoading = false;
   String? _errorMessage;
-  final List<String> _availableRoles = [
-    'admin',
-    'teacher',
-    'parent',
-    'student'
-  ];
 
   @override
   void initState() {
@@ -55,6 +51,8 @@ class _AdminPanelState extends State<AdminPanel> {
           _users = data.map((json) => User.fromJson(json)).toList();
           _isLoading = false;
         });
+
+        _loadUserFullNames(_users);
         
         // After loading users, open dialog if username is specified
         if (widget.username != null && !_hasOpenedDialog && mounted) {
@@ -62,7 +60,12 @@ class _AdminPanelState extends State<AdminPanel> {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             final matchingUsers = _users.where((u) => u.username == widget.username);
             if (matchingUsers.isNotEmpty && mounted) {
-              _showEditUserDialog(matchingUsers.first);
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) =>
+                      AdminUserProfilePage(userId: matchingUsers.first.id),
+                ),
+              );
             }
           });
         }
@@ -80,59 +83,53 @@ class _AdminPanelState extends State<AdminPanel> {
     }
   }
 
-  Future<void> _deleteUser(int userId) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete User'),
-        content: const Text('Are you sure you want to delete this user?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
+  Future<void> _loadUserFullNames(List<User> users) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final token = authService.token;
 
-    if (confirmed == true) {
-      try {
-        final authService = Provider.of<AuthService>(context, listen: false);
-        final response = await http.delete(
-          Uri.parse('http://localhost:8080/api/admin/users/$userId'),
-          headers: {
-            'Authorization': 'Bearer ${authService.token}',
-          },
-        );
+    if (token == null) return;
 
-        if (response.statusCode == 200) {
-          _loadUsers();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('User deleted successfully')),
-            );
-          }
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to delete user')),
-            );
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $e')),
-          );
-        }
-      }
+    for (final user in users) {
+      if (!mounted) return;
+      final fullName = await _fetchUserFullName(user, token);
+      if (!mounted) return;
+
+      setState(() {
+        _userFullNames[user.id] = fullName ?? user.username;
+      });
     }
   }
+
+  Future<String?> _fetchUserFullName(User user, String token) async {
+    Future<String?> fetchFrom(String url) async {
+      try {
+        final response = await http.get(
+          Uri.parse(url),
+          headers: {'Authorization': 'Bearer $token'},
+        );
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          return data['full_name']?.toString();
+        }
+      } catch (_) {}
+      return null;
+    }
+
+    if (user.roles.contains('student')) {
+      return fetchFrom('http://localhost:8080/api/students/${user.id}');
+    }
+
+    if (user.roles.contains('parent')) {
+      return fetchFrom('http://localhost:8080/api/parents/${user.id}');
+    }
+
+    if (user.roles.contains('teacher')) {
+      return fetchFrom('http://localhost:8080/api/teachers/${user.id}');
+    }
+
+    return null;
+  }
+
 
   String _generatePassword({int length = 12}) {
     const chars =
@@ -258,7 +255,7 @@ class _AdminPanelState extends State<AdminPanel> {
                     Wrap(
                       spacing: 8,
                       children: [
-                        if (!user!.roles.contains('student'))
+                        if (!user.roles.contains('student'))
                           OutlinedButton.icon(
                             icon: const Icon(Icons.school, size: 16),
                             label: const Text('Make Student'),
@@ -332,7 +329,7 @@ class _AdminPanelState extends State<AdminPanel> {
                 final rolesToSave = isNewUser
                     ? selectedRoles.toList()
                     : [
-                        ...user!.roles.where((r) => r != 'admin'),
+                        ...user.roles.where((r) => r != 'admin'),
                         if (selectedRoles.contains('admin')) 'admin',
                       ];
                 await _saveUser(
@@ -1574,102 +1571,140 @@ class _AdminPanelState extends State<AdminPanel> {
             child: Row(
               children: [
                 const Text(
-                  'User Management',
+                  'Admin Panel',
                   style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _loadUsers,
-                  tooltip: 'Refresh',
                 ),
               ],
             ),
           ),
-          if (_errorMessage != null)
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                _errorMessage!,
-                style: const TextStyle(color: Colors.red),
-              ),
-            ),
           Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _users.isEmpty
-                    ? const Center(child: Text('No users found'))
-                    : SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: SingleChildScrollView(
-                          child: DataTable(
-                            dataRowMinHeight: 48,
-                            dataRowMaxHeight: double.infinity,
-                            columns: const [
-                              DataColumn(label: Text('Username')),
-                              DataColumn(label: Text('Email')),
-                              DataColumn(label: Text('Roles')),
-                              DataColumn(label: Text('Actions')),
-                            ],
-                            rows: _users.map((user) {
-                              return DataRow(
-                                cells: [
-                                  DataCell(Text(user.username)),
-                                  DataCell(Text(user.email ?? '-')),
-                                  DataCell(
-                                    ConstrainedBox(
-                                      constraints:
-                                          const BoxConstraints(maxWidth: 300),
-                                      child: Wrap(
-                                        spacing: 4,
-                                        runSpacing: 4,
-                                        children: user.roles.map((role) {
-                                          return Chip(
-                                            label: Text(role,
-                                                style: const TextStyle(
-                                                    fontSize: 12)),
-                                            visualDensity:
-                                                VisualDensity.compact,
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ),
-                                  ),
-                                  DataCell(
-                                    Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        IconButton(
-                                          icon:
-                                              const Icon(Icons.link, size: 20),
-                                          onPressed: () =>
-                                              _generateResetLink(user),
-                                          tooltip: 'Generate Reset Link',
-                                          color: Colors.blue,
-                                        ),
-                                        IconButton(
-                                          icon:
-                                              const Icon(Icons.edit, size: 20),
-                                          onPressed: () =>
-                                              _showEditUserDialog(user),
-                                          tooltip: 'Edit',
-                                        ),
-                                        IconButton(
-                                          icon: const Icon(Icons.delete,
-                                              size: 20),
-                                          color: Colors.red,
-                                          onPressed: () => _deleteUser(user.id),
-                                          tooltip: 'Delete',
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              );
-                            }).toList(),
+            child: Row(
+              children: [
+                Container(
+                  width: 220,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    border: Border(
+                      right: BorderSide(color: Colors.grey[300]!),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Text(
+                          'Module',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.grey,
                           ),
                         ),
                       ),
+                      ListTile(
+                        leading: const Icon(Icons.people),
+                        title: const Text('User Management'),
+                        selected: true,
+                        onTap: () {},
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              'User Management',
+                              style: TextStyle(
+                                  fontSize: 20, fontWeight: FontWeight.bold),
+                            ),
+                            const Spacer(),
+                            IconButton(
+                              icon: const Icon(Icons.refresh),
+                              onPressed: _loadUsers,
+                              tooltip: 'Refresh',
+                            ),
+                          ],
+                        ),
+                        if (_errorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12.0),
+                            child: Text(
+                              _errorMessage!,
+                              style: const TextStyle(color: Colors.red),
+                            ),
+                          ),
+                        Expanded(
+                          child: _isLoading
+                              ? const Center(child: CircularProgressIndicator())
+                              : _users.isEmpty
+                                  ? const Center(child: Text('No users found'))
+                                  : SingleChildScrollView(
+                                      scrollDirection: Axis.horizontal,
+                                      child: SingleChildScrollView(
+                                        child: DataTable(
+                                          dataRowMinHeight: 48,
+                                          dataRowMaxHeight: double.infinity,
+                                          columns: const [
+                                            DataColumn(label: Text('Full Name')),
+                                            DataColumn(label: Text('Username')),
+                                            DataColumn(label: Text('Actions')),
+                                          ],
+                                          rows: _users.map((user) {
+                                            return DataRow(
+                                              cells: [
+                                                DataCell(
+                                                  Text(
+                                                    _userFullNames[user.id] ?? '-',
+                                                  ),
+                                                ),
+                                                DataCell(Text(user.username)),
+                                                DataCell(
+                                                  Wrap(
+                                                    spacing: 8,
+                                                    runSpacing: 4,
+                                                    children: [
+                                                      OutlinedButton.icon(
+                                                        icon: const Icon(Icons.link, size: 16),
+                                                        label: const Text('Reset Link'),
+                                                        onPressed: () =>
+                                                            _generateResetLink(user),
+                                                      ),
+                                                      ElevatedButton.icon(
+                                                        icon: const Icon(Icons.edit, size: 16),
+                                                        label: const Text('Edit User'),
+                                                        onPressed: () {
+                                                          Navigator.of(context).push(
+                                                            MaterialPageRoute(
+                                                              builder: (context) =>
+                                                                  AdminUserProfilePage(userId: user.id),
+                                                            ),
+                                                          );
+                                                        },
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ),
+                                    ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
           Container(
             padding: const EdgeInsets.all(16.0),
@@ -1724,12 +1759,31 @@ class _AdminPanelState extends State<AdminPanel> {
   }
 }
 
+enum RoleStatus {
+  active,
+  archived;
+
+  static RoleStatus fromString(String status) {
+    switch (status.toLowerCase()) {
+      case 'active':
+        return RoleStatus.active;
+      case 'archived':
+        return RoleStatus.archived;
+      default:
+        return RoleStatus.active;
+    }
+  }
+}
+
 class User {
   final int id;
   final String username;
   final String? email;
   final String? phone;
   final List<String> roles;
+  final RoleStatus? studentStatus;
+  final RoleStatus? parentStatus;
+  final RoleStatus? teacherStatus;
 
   User({
     required this.id,
@@ -1737,7 +1791,34 @@ class User {
     this.email,
     this.phone,
     required this.roles,
+    this.studentStatus,
+    this.parentStatus,
+    this.teacherStatus,
   });
+
+  RoleStatus? statusForRole(String role) {
+    switch (role) {
+      case 'student':
+        return studentStatus;
+      case 'parent':
+        return parentStatus;
+      case 'teacher':
+        return teacherStatus;
+      default:
+        return null;
+    }
+  }
+
+  bool isRoleArchived(String role) {
+    return statusForRole(role) == RoleStatus.archived;
+  }
+
+  static RoleStatus? _parseRoleStatus(dynamic value) {
+    if (value == null) {
+      return null;
+    }
+    return RoleStatus.fromString(value.toString());
+  }
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
@@ -1746,6 +1827,9 @@ class User {
       email: json['email'],
       phone: json['phone'],
       roles: List<String>.from(json['roles'] ?? []),
+      studentStatus: _parseRoleStatus(json['student_status']),
+      parentStatus: _parseRoleStatus(json['parent_status']),
+      teacherStatus: _parseRoleStatus(json['teacher_status']),
     );
   }
 }

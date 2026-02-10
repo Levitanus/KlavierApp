@@ -17,6 +17,12 @@ pub struct UserResponse {
     pub phone: Option<String>,
     #[sqlx(skip)]
     pub roles: Vec<String>,
+    #[sqlx(skip)]
+    pub student_status: Option<String>,
+    #[sqlx(skip)]
+    pub parent_status: Option<String>,
+    #[sqlx(skip)]
+    pub teacher_status: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -66,7 +72,7 @@ async fn get_users(
         return response;
     }
 
-    // Get all users with their roles
+    // Get all users
     let users_result = sqlx::query_as::<_, UserResponse>(
         "SELECT id, username, email, phone FROM users ORDER BY username"
     )
@@ -95,6 +101,42 @@ async fn get_users(
         .await;
 
         user.roles = roles_result.unwrap_or_default();
+
+        if user.roles.contains(&"student".to_string()) {
+            let status: Option<String> = sqlx::query_scalar(
+                "SELECT status::text FROM students WHERE user_id = $1"
+            )
+            .bind(user.id)
+            .fetch_optional(&app_state.db)
+            .await
+            .unwrap_or(None);
+
+            user.student_status = status;
+        }
+
+        if user.roles.contains(&"parent".to_string()) {
+            let status: Option<String> = sqlx::query_scalar(
+                "SELECT status::text FROM parents WHERE user_id = $1"
+            )
+            .bind(user.id)
+            .fetch_optional(&app_state.db)
+            .await
+            .unwrap_or(None);
+
+            user.parent_status = status;
+        }
+
+        if user.roles.contains(&"teacher".to_string()) {
+            let status: Option<String> = sqlx::query_scalar(
+                "SELECT status::text FROM teachers WHERE user_id = $1"
+            )
+            .bind(user.id)
+            .fetch_optional(&app_state.db)
+            .await
+            .unwrap_or(None);
+
+            user.teacher_status = status;
+        }
     }
 
     HttpResponse::Ok().json(users)
@@ -334,6 +376,11 @@ async fn generate_reset_link(
     if let Err(response) = verify_admin_role(&req, &app_state) {
         return response;
     }
+
+    let _claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
 
     let user_id = user_id.into_inner();
 

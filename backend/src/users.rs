@@ -150,6 +150,65 @@ async fn login(
         }
     };
 
+    // Check if user has admin role OR at least one active activity role
+    let has_admin = roles.contains(&"admin".to_string());
+    
+    if !has_admin {
+        // Check if user has any active activity roles
+        let mut has_active_role = false;
+        
+        // Check if student role is active
+        if roles.contains(&"student".to_string()) {
+            let is_active: Option<(bool,)> = sqlx::query_as(
+                "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1 AND status = 'active')"
+            )
+            .bind(user.id)
+            .fetch_optional(&app_state.db)
+            .await
+            .unwrap_or(None);
+            
+            if is_active.map(|(exists,)| exists).unwrap_or(false) {
+                has_active_role = true;
+            }
+        }
+        
+        // Check if parent role is active
+        if !has_active_role && roles.contains(&"parent".to_string()) {
+            let is_active: Option<(bool,)> = sqlx::query_as(
+                "SELECT EXISTS(SELECT 1 FROM parents WHERE user_id = $1 AND status = 'active')"
+            )
+            .bind(user.id)
+            .fetch_optional(&app_state.db)
+            .await
+            .unwrap_or(None);
+            
+            if is_active.map(|(exists,)| exists).unwrap_or(false) {
+                has_active_role = true;
+            }
+        }
+        
+        // Check if teacher role is active
+        if !has_active_role && roles.contains(&"teacher".to_string()) {
+            let is_active: Option<(bool,)> = sqlx::query_as(
+                "SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1 AND status = 'active')"
+            )
+            .bind(user.id)
+            .fetch_optional(&app_state.db)
+            .await
+            .unwrap_or(None);
+            
+            if is_active.map(|(exists,)| exists).unwrap_or(false) {
+                has_active_role = true;
+            }
+        }
+        
+        if !has_active_role {
+            return HttpResponse::Unauthorized().json(ErrorResponse {
+                error: "All roles are archived".to_string(),
+            });
+        }
+    }
+
     // Generate JWT token
     let expiration = Utc::now()
         .checked_add_signed(Duration::hours(24))
@@ -284,11 +343,13 @@ pub struct StudentData {
     pub full_name: String,
     pub address: String,
     pub birthday: NaiveDate,
+    pub status: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ParentData {
     pub full_name: String,
+    pub status: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub children: Option<Vec<StudentInfo>>,
 }
@@ -301,11 +362,13 @@ pub struct StudentInfo {
     pub address: String,
     pub birthday: NaiveDate,
     pub profile_image: Option<String>,
+    pub status: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TeacherData {
     pub full_name: String,
+    pub status: String,
 }
 
 #[derive(Debug, Serialize, FromRow)]
@@ -392,8 +455,8 @@ async fn get_profile(
 
     // Get student data if user is a student
     if profile.roles.contains(&"student".to_string()) {
-        if let Ok(Some((full_name, address, birthday))) = sqlx::query_as::<_, (String, String, NaiveDate)>(
-            "SELECT full_name, address, birthday FROM students WHERE user_id = $1"
+        if let Ok(Some((full_name, address, birthday, status))) = sqlx::query_as::<_, (String, String, NaiveDate, String)>(
+            "SELECT full_name, address, birthday, status::text FROM students WHERE user_id = $1"
         )
         .bind(profile.id)
         .fetch_optional(&app_state.db)
@@ -403,22 +466,23 @@ async fn get_profile(
                 full_name,
                 address,
                 birthday,
+                status,
             });
         }
     }
 
     // Get parent data if user is a parent
     if profile.roles.contains(&"parent".to_string()) {
-        if let Ok(Some(full_name)) = sqlx::query_scalar::<_, String>(
-            "SELECT full_name FROM parents WHERE user_id = $1"
+        if let Ok(Some((full_name, status))) = sqlx::query_as::<_, (String, String)>(
+            "SELECT full_name, status::text FROM parents WHERE user_id = $1"
         )
         .bind(profile.id)
         .fetch_optional(&app_state.db)
         .await
         {
             // Get children
-            let children: Vec<_> = sqlx::query_as::<_, (i32, String, String, String, NaiveDate, Option<String>)>(
-                "SELECT u.id, u.username, s.full_name, s.address, s.birthday, u.profile_image
+            let children: Vec<_> = sqlx::query_as::<_, (i32, String, String, String, NaiveDate, Option<String>, String)>(
+                "SELECT u.id, u.username, s.full_name, s.address, s.birthday, u.profile_image, s.status::text
                  FROM users u
                  INNER JOIN students s ON u.id = s.user_id
                  INNER JOIN parent_student_relations psr ON s.user_id = psr.student_user_id
@@ -429,18 +493,20 @@ async fn get_profile(
             .await
             .unwrap_or_default()
             .into_iter()
-            .map(|(user_id, username, full_name, address, birthday, profile_image)| StudentInfo {
+            .map(|(user_id, username, full_name, address, birthday, profile_image, status)| StudentInfo {
                 user_id,
                 username,
                 full_name,
                 address,
                 birthday,
                 profile_image,
+                status,
             })
             .collect();
 
             profile.parent_data = Some(ParentData {
                 full_name,
+                status,
                 children: if children.is_empty() { None } else { Some(children) },
             });
         }
@@ -448,14 +514,14 @@ async fn get_profile(
 
     // Get teacher data if user is a teacher
     if profile.roles.contains(&"teacher".to_string()) {
-        if let Ok(Some(full_name)) = sqlx::query_scalar::<_, String>(
-            "SELECT full_name FROM teachers WHERE user_id = $1"
+        if let Ok(Some((full_name, status))) = sqlx::query_as::<_, (String, String)>(
+            "SELECT full_name, status::text FROM teachers WHERE user_id = $1"
         )
         .bind(profile.id)
         .fetch_optional(&app_state.db)
         .await
         {
-            profile.teacher_data = Some(TeacherData { full_name });
+            profile.teacher_data = Some(TeacherData { full_name, status });
         }
     }
 
