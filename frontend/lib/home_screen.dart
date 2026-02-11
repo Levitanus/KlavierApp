@@ -9,8 +9,9 @@ import 'widgets/notification_widget.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? adminUsername;
+  final int? initialStudentId;
   
-  const HomeScreen({super.key, this.adminUsername});
+  const HomeScreen({super.key, this.adminUsername, this.initialStudentId});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -28,6 +29,9 @@ class _HomeScreenState extends State<HomeScreen> {
     if (widget.adminUsername != null) {
       _currentPage = AdminPanel(username: widget.adminUsername);
       _selectedIndex = 100;
+    } else if (widget.initialStudentId != null) {
+      _currentPage = HometasksScreen(initialStudentId: widget.initialStudentId);
+      _selectedIndex = 0;
     } else {
       _currentPage = const DashboardPage();
     }
@@ -169,11 +173,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
 // Dashboard Page
 class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key});
+  final int? initialStudentId;
+
+  const DashboardPage({super.key, this.initialStudentId});
 
   @override
   Widget build(BuildContext context) {
-    return const HometasksScreen();
+    return HometasksScreen(initialStudentId: initialStudentId);
   }
 }
 

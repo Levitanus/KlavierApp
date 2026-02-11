@@ -114,6 +114,209 @@ pub fn build_task_notification(
     }
 }
 
+pub fn build_hometask_assigned_notification(
+    hometask_id: i32,
+    task_title: &str,
+    teacher_name: &str,
+    due_date: Option<&str>,
+    student_id: i32,
+) -> NotificationBody {
+    let due_label = due_date.unwrap_or("No due date");
+
+    NotificationBody {
+        body_type: "hometask_assigned".to_string(),
+        title: "New Hometask".to_string(),
+        route: Some("/hometasks".to_string()),
+        content: NotificationContent {
+            blocks: vec![
+                ContentBlock::Text {
+                    text: format!("{} assigned a new hometask:", teacher_name),
+                    style: Some("body".to_string()),
+                },
+                ContentBlock::Text {
+                    text: task_title.to_string(),
+                    style: Some("title".to_string()),
+                },
+                ContentBlock::Spacer { height: Some(8) },
+                ContentBlock::Text {
+                    text: format!("Due: {}", due_label),
+                    style: Some("caption".to_string()),
+                },
+            ],
+            actions: Some(vec![
+                ActionButton {
+                    label: "View Hometasks".to_string(),
+                    route: Some("/hometasks".to_string()),
+                    action: None,
+                    primary: true,
+                    icon: Some("task".to_string()),
+                },
+            ]),
+        },
+        metadata: Some(json!({
+            "hometask_id": hometask_id,
+            "student_id": student_id,
+            "teacher_name": teacher_name,
+        })),
+    }
+}
+
+pub fn build_hometask_accomplished_notification(
+    hometask_id: i32,
+    task_title: &str,
+    teacher_name: &str,
+    student_id: i32,
+) -> NotificationBody {
+    NotificationBody {
+        body_type: "hometask_accomplished".to_string(),
+        title: "Hometask Accomplished".to_string(),
+        route: Some("/hometasks".to_string()),
+        content: NotificationContent {
+            blocks: vec![
+                ContentBlock::Text {
+                    text: format!("{} marked a hometask as accomplished:", teacher_name),
+                    style: Some("body".to_string()),
+                },
+                ContentBlock::Text {
+                    text: task_title.to_string(),
+                    style: Some("title".to_string()),
+                },
+            ],
+            actions: Some(vec![
+                ActionButton {
+                    label: "View Hometasks".to_string(),
+                    route: Some("/hometasks".to_string()),
+                    action: None,
+                    primary: true,
+                    icon: Some("task".to_string()),
+                },
+            ]),
+        },
+        metadata: Some(json!({
+            "hometask_id": hometask_id,
+            "student_id": student_id,
+            "teacher_name": teacher_name,
+        })),
+    }
+}
+
+pub fn build_hometask_completed_notification(
+    hometask_id: i32,
+    task_title: &str,
+    student_name: &str,
+    student_id: i32,
+) -> NotificationBody {
+    NotificationBody {
+        body_type: "hometask_completed".to_string(),
+        title: "Hometask Completed".to_string(),
+        route: Some("/hometasks".to_string()),
+        content: NotificationContent {
+            blocks: vec![
+                ContentBlock::Text {
+                    text: format!("{} completed a hometask:", student_name),
+                    style: Some("body".to_string()),
+                },
+                ContentBlock::Text {
+                    text: task_title.to_string(),
+                    style: Some("title".to_string()),
+                },
+            ],
+            actions: Some(vec![
+                ActionButton {
+                    label: "Review Hometasks".to_string(),
+                    route: Some("/hometasks".to_string()),
+                    action: None,
+                    primary: true,
+                    icon: Some("task".to_string()),
+                },
+            ]),
+        },
+        metadata: Some(json!({
+            "hometask_id": hometask_id,
+            "student_id": student_id,
+            "student_name": student_name,
+        })),
+    }
+}
+
+pub fn build_hometask_reopened_notification(
+    hometask_id: i32,
+    task_title: &str,
+    teacher_name: &str,
+    student_id: i32,
+) -> NotificationBody {
+    NotificationBody {
+        body_type: "hometask_reopened".to_string(),
+        title: "Hometask Reopened".to_string(),
+        route: Some("/hometasks".to_string()),
+        content: NotificationContent {
+            blocks: vec![
+                ContentBlock::Text {
+                    text: format!("{} marked a hometask as uncompleted:", teacher_name),
+                    style: Some("body".to_string()),
+                },
+                ContentBlock::Text {
+                    text: task_title.to_string(),
+                    style: Some("title".to_string()),
+                },
+            ],
+            actions: Some(vec![
+                ActionButton {
+                    label: "View Hometasks".to_string(),
+                    route: Some("/hometasks".to_string()),
+                    action: None,
+                    primary: true,
+                    icon: Some("task".to_string()),
+                },
+            ]),
+        },
+        metadata: Some(json!({
+            "hometask_id": hometask_id,
+            "student_id": student_id,
+            "teacher_name": teacher_name,
+        })),
+    }
+}
+
+pub fn build_hometask_refreshed_notification(
+    hometask_id: i32,
+    task_title: &str,
+    teacher_name: &str,
+    student_id: i32,
+) -> NotificationBody {
+    NotificationBody {
+        body_type: "hometask_refreshed".to_string(),
+        title: "Hometask Refreshed".to_string(),
+        route: Some("/hometasks".to_string()),
+        content: NotificationContent {
+            blocks: vec![
+                ContentBlock::Text {
+                    text: format!("{} refreshed a repeating hometask:", teacher_name),
+                    style: Some("body".to_string()),
+                },
+                ContentBlock::Text {
+                    text: task_title.to_string(),
+                    style: Some("title".to_string()),
+                },
+            ],
+            actions: Some(vec![
+                ActionButton {
+                    label: "View Hometasks".to_string(),
+                    route: Some("/hometasks".to_string()),
+                    action: None,
+                    primary: true,
+                    icon: Some("task".to_string()),
+                },
+            ]),
+        },
+        metadata: Some(json!({
+            "hometask_id": hometask_id,
+            "student_id": student_id,
+            "teacher_name": teacher_name,
+        })),
+    }
+}
+
 /// Create a password issued notification for new users
 pub fn build_password_issued_notification(
     admin_name: &str,

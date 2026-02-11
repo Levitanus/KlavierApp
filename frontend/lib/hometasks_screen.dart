@@ -6,7 +6,9 @@ import 'services/hometask_service.dart';
 import 'widgets/hometask_widget.dart';
 
 class HometasksScreen extends StatefulWidget {
-  const HometasksScreen({super.key});
+  final int? initialStudentId;
+
+  const HometasksScreen({super.key, this.initialStudentId});
 
   @override
   State<HometasksScreen> createState() => _HometasksScreenState();
@@ -92,7 +94,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
 
     setState(() {
       _students = students;
-      _selectedStudentId = students.first.userId;
+      if (widget.initialStudentId != null &&
+          students.any((student) => student.userId == widget.initialStudentId)) {
+        _selectedStudentId = widget.initialStudentId;
+      } else {
+        _selectedStudentId = students.first.userId;
+      }
       _isLoadingStudents = false;
     });
 
@@ -230,6 +237,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
               canReorder: isTeacher && !_showArchive,
               canToggleItems: canComplete,
               canAccomplish: isTeacher && !_showArchive,
+              canReopen: isTeacher,
             ),
           ),
         ],
@@ -243,6 +251,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
     required bool canReorder,
     required bool canToggleItems,
     required bool canAccomplish,
+    required bool canReopen,
   }) {
     if (hometaskService.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -326,6 +335,9 @@ class _HometasksScreenState extends State<HometasksScreen> {
               onMarkAccomplished: canAccomplish
                   ? () async => _markAccomplished(hometask.id)
                   : null,
+              onMarkReopened: canReopen
+                  ? () async => _markReopened(hometask.id)
+                  : null,
             ),
           );
         },
@@ -369,6 +381,9 @@ class _HometasksScreenState extends State<HometasksScreen> {
                               : null,
                           onMarkAccomplished: canAccomplish
                               ? () async => _markAccomplished(hometask.id)
+                              : null,
+                          onMarkReopened: canReopen
+                              ? () async => _markReopened(hometask.id)
                               : null,
                         ),
                       ),
@@ -438,6 +453,19 @@ class _HometasksScreenState extends State<HometasksScreen> {
   Future<void> _markAccomplished(int hometaskId) async {
     final hometaskService = context.read<HometaskService>();
     final success = await hometaskService.markAccomplished(hometaskId);
+    if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update hometask.')),
+      );
+    }
+    if (success && mounted) {
+      await _loadHometasks();
+    }
+  }
+
+  Future<void> _markReopened(int hometaskId) async {
+    final hometaskService = context.read<HometaskService>();
+    final success = await hometaskService.markReopened(hometaskId);
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to update hometask.')),

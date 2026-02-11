@@ -299,9 +299,11 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
     final itemControllers = [TextEditingController()];
+    final repeatDaysController = TextEditingController();
     DateTime? dueDate;
     bool isSubmitting = false;
     HometaskType selectedType = HometaskType.checklist;
+    String repeatSelection = 'none';
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -368,6 +370,59 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                           }
                         },
                       ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: repeatSelection,
+                        decoration: const InputDecoration(
+                          labelText: 'Repeat',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'none',
+                            child: Text('No repeat'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'daily',
+                            child: Text('Each day'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'weekly',
+                            child: Text('Each week'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'custom',
+                            child: Text('Custom interval'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setDialogState(() {
+                            repeatSelection = value;
+                          });
+                        },
+                      ),
+                      if (repeatSelection == 'custom') ...[
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: repeatDaysController,
+                          decoration: const InputDecoration(
+                            labelText: 'Repeat every (days)',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (repeatSelection != 'custom') {
+                              return null;
+                            }
+                            final parsed = int.tryParse(value ?? '');
+                            if (parsed == null || parsed <= 0) {
+                              return 'Enter a positive number of days';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       DropdownButtonFormField<HometaskType>(
                         initialValue: selectedType,
@@ -480,6 +535,31 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                           return;
                         }
 
+                        int? repeatEveryDays;
+                        switch (repeatSelection) {
+                          case 'daily':
+                            repeatEveryDays = 1;
+                            break;
+                          case 'weekly':
+                            repeatEveryDays = 7;
+                            break;
+                          case 'custom':
+                            repeatEveryDays =
+                                int.tryParse(repeatDaysController.text.trim());
+                            if (repeatEveryDays == null || repeatEveryDays <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Enter a valid repeat interval.'),
+                                ),
+                              );
+                              return;
+                            }
+                            break;
+                          case 'none':
+                          default:
+                            repeatEveryDays = null;
+                        }
+
                         setDialogState(() {
                           isSubmitting = true;
                         });
@@ -495,6 +575,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                           dueDate: dueDate,
                           hometaskType: selectedType,
                           items: items.isEmpty ? null : items,
+                          repeatEveryDays: repeatEveryDays,
                         );
 
                         if (success && context.mounted) {

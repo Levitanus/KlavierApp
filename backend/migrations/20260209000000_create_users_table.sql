@@ -232,6 +232,8 @@ CREATE TABLE IF NOT EXISTS hometasks (
     description TEXT,
     status hometask_status NOT NULL DEFAULT 'assigned',
     due_date TIMESTAMPTZ,
+    repeat_every_days INTEGER,
+    next_reset_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     sort_order INTEGER NOT NULL DEFAULT 0,
@@ -262,6 +264,7 @@ CREATE TABLE IF NOT EXISTS hometask_submissions (
 CREATE INDEX IF NOT EXISTS idx_hometasks_teacher_id ON hometasks(teacher_id);
 CREATE INDEX IF NOT EXISTS idx_hometasks_student_id ON hometasks(student_id);
 CREATE INDEX IF NOT EXISTS idx_hometasks_status ON hometasks(status);
+CREATE INDEX IF NOT EXISTS idx_hometasks_next_reset_at ON hometasks(next_reset_at);
 CREATE INDEX IF NOT EXISTS idx_hometask_submissions_hometask_id ON hometask_submissions(hometask_id);
 CREATE INDEX IF NOT EXISTS idx_hometask_submissions_student_id ON hometask_submissions(student_id);
 

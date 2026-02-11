@@ -6,6 +6,7 @@ class HometaskWidget extends StatelessWidget {
   final VoidCallback? onMarkCompleted;
   final void Function(int index, bool isDone)? onToggleItem;
   final VoidCallback? onMarkAccomplished;
+  final VoidCallback? onMarkReopened;
 
   const HometaskWidget({
     super.key,
@@ -13,6 +14,7 @@ class HometaskWidget extends StatelessWidget {
     this.onMarkCompleted,
     this.onToggleItem,
     this.onMarkAccomplished,
+    this.onMarkReopened,
   });
 
   @override
@@ -114,6 +116,23 @@ class HometaskWidget extends StatelessWidget {
                     onPressed: onMarkAccomplished,
                     icon: const Icon(Icons.verified),
                     label: const Text('Mark accomplished'),
+                  ),
+                ),
+              ),
+            if (onMarkReopened != null &&
+                hometask.status != HometaskStatus.assigned)
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: TextButton.icon(
+                    onPressed: onMarkReopened,
+                    icon: const Icon(Icons.restore),
+                    label: Text(
+                      hometask.status == HometaskStatus.accomplishedByTeacher
+                          ? 'Return to active'
+                          : 'Mark uncompleted',
+                    ),
                   ),
                 ),
               ),

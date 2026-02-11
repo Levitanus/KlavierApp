@@ -28,6 +28,14 @@ void _navigateToRoute(BuildContext context, String route, Map<String, dynamic>? 
         ),
       );
     }
+  } else if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'hometasks') {
+    final rawStudentId = metadata?['student_id'];
+    final studentId = rawStudentId is int ? rawStudentId : null;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => HomeScreen(initialStudentId: studentId),
+      ),
+    );
   } else {
     // Handle other routes - just go back to home
     Navigator.of(context).pushReplacement(

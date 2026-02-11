@@ -5,6 +5,14 @@ use serde_json::json;
 use sqlx::{FromRow, PgPool};
 
 use crate::models::hometask::{HometaskStatus, HometaskType};
+use crate::notification_builders::{
+    build_hometask_accomplished_notification,
+    build_hometask_assigned_notification,
+    build_hometask_completed_notification,
+    build_hometask_refreshed_notification,
+    build_hometask_reopened_notification,
+};
+use crate::notifications::NotificationBody;
 use crate::roles::helpers::verify_can_access_student;
 use crate::users::{verify_token, Claims};
 use crate::AppState;
@@ -22,6 +30,7 @@ struct CreateHometaskRequest {
     due_date: Option<DateTime<Utc>>,
     hometask_type: HometaskType,
     items: Option<Vec<ChecklistItemInput>>,
+    repeat_every_days: Option<i32>,
 }
 
 #[derive(Deserialize)]
@@ -66,6 +75,174 @@ struct HometaskWithChecklist {
     content_id: Option<i32>,
     checklist_items: Option<serde_json::Value>,
     teacher_name: Option<String>,
+}
+
+#[derive(FromRow)]
+struct RepeatableHometask {
+    id: i32,
+    teacher_id: i32,
+    student_id: i32,
+    title: String,
+    hometask_type: HometaskType,
+    content_id: Option<i32>,
+    repeat_every_days: i32,
+    next_reset_at: DateTime<Utc>,
+}
+
+async fn insert_notification(
+    db: &PgPool,
+    user_id: i32,
+    body: &NotificationBody,
+    priority: &str,
+) {
+    let _ = sqlx::query(
+        "INSERT INTO notifications (user_id, type, title, body, priority)
+         VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(user_id)
+    .bind(&body.body_type)
+    .bind(&body.title)
+    .bind(serde_json::to_value(body).unwrap_or_default())
+    .bind(priority)
+    .execute(db)
+    .await;
+}
+
+async fn fetch_teacher_name(db: &PgPool, teacher_id: i32) -> String {
+    sqlx::query_scalar::<_, String>(
+        "SELECT COALESCE(t.full_name, u.username)
+         FROM users u
+         LEFT JOIN teachers t ON u.id = t.user_id
+         WHERE u.id = $1",
+    )
+    .bind(teacher_id)
+    .fetch_optional(db)
+    .await
+    .unwrap_or(None)
+    .unwrap_or_else(|| "Teacher".to_string())
+}
+
+async fn fetch_student_name(db: &PgPool, student_id: i32) -> String {
+    sqlx::query_scalar::<_, String>(
+        "SELECT COALESCE(s.full_name, u.username)
+         FROM users u
+         LEFT JOIN students s ON u.id = s.user_id
+         WHERE u.id = $1",
+    )
+    .bind(student_id)
+    .fetch_optional(db)
+    .await
+    .unwrap_or(None)
+    .unwrap_or_else(|| "Student".to_string())
+}
+
+async fn fetch_parent_ids(db: &PgPool, student_id: i32) -> Vec<i32> {
+    sqlx::query_scalar::<_, i32>(
+        "SELECT parent_user_id FROM parent_student_relations WHERE student_user_id = $1",
+    )
+    .bind(student_id)
+    .fetch_all(db)
+    .await
+    .unwrap_or_default()
+}
+
+async fn reset_checklist_items(db: &PgPool, content_id: i32) {
+    let items = sqlx::query_scalar::<_, serde_json::Value>(
+        "SELECT items FROM hometask_checklists WHERE id = $1",
+    )
+    .bind(content_id)
+    .fetch_optional(db)
+    .await
+    .unwrap_or(None);
+
+    let items = match items.and_then(|value| value.as_array().cloned()) {
+        Some(items) => items,
+        None => return,
+    };
+
+    let updated_items = items
+        .iter()
+        .map(|item| {
+            let text = item
+                .get("text")
+                .and_then(|value| value.as_str())
+                .unwrap_or("")
+                .to_string();
+            json!({ "text": text, "is_done": false })
+        })
+        .collect::<Vec<_>>();
+
+    let _ = sqlx::query(
+        "UPDATE hometask_checklists SET items = $1 WHERE id = $2",
+    )
+    .bind(serde_json::to_value(updated_items).unwrap_or_default())
+    .bind(content_id)
+    .execute(db)
+    .await;
+}
+
+async fn refresh_repeatable_hometasks(db: &PgPool, student_id: i32) {
+    let tasks = sqlx::query_as::<_, RepeatableHometask>(
+        "SELECT id, teacher_id, student_id, title, hometask_type, content_id,
+                repeat_every_days, next_reset_at
+         FROM hometasks
+         WHERE student_id = $1
+           AND repeat_every_days IS NOT NULL
+           AND next_reset_at IS NOT NULL
+                     AND next_reset_at <= NOW()
+                     AND status <> 'accomplished_by_teacher'",
+    )
+    .bind(student_id)
+    .fetch_all(db)
+    .await
+    .unwrap_or_default();
+
+    if tasks.is_empty() {
+        return;
+    }
+
+    let now = Utc::now();
+
+    for task in tasks {
+        if task.repeat_every_days <= 0 {
+            continue;
+        }
+
+        let interval = chrono::Duration::days(task.repeat_every_days as i64);
+        let mut next_reset_at = task.next_reset_at;
+        while next_reset_at <= now {
+            next_reset_at = next_reset_at + interval;
+        }
+
+        if task.hometask_type == HometaskType::Checklist {
+            if let Some(content_id) = task.content_id {
+                reset_checklist_items(db, content_id).await;
+            }
+        }
+
+        let _ = sqlx::query(
+            "UPDATE hometasks
+             SET status = 'assigned', next_reset_at = $1
+             WHERE id = $2",
+        )
+        .bind(next_reset_at)
+        .bind(task.id)
+        .execute(db)
+        .await;
+
+        let teacher_name = fetch_teacher_name(db, task.teacher_id).await;
+        let refreshed_body = build_hometask_refreshed_notification(
+            task.id,
+            &task.title,
+            &teacher_name,
+            task.student_id,
+        );
+        insert_notification(db, task.student_id, &refreshed_body, "normal").await;
+        let parent_ids = fetch_parent_ids(db, task.student_id).await;
+        for parent_id in parent_ids {
+            insert_notification(db, parent_id, &refreshed_body, "normal").await;
+        }
+    }
 }
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
@@ -132,7 +309,7 @@ async fn create_hometask(
         }
     };
 
-    let mut content_id: Option<i32> = None;
+    let content_id: Option<i32>;
 
     match payload.hometask_type {
         HometaskType::Checklist => {
@@ -208,9 +385,13 @@ async fn create_hometask(
         }
     };
 
+    let repeat_every_days = payload.repeat_every_days.filter(|value| *value > 0);
+    let next_reset_at = repeat_every_days
+        .map(|value| Utc::now() + chrono::Duration::days(value as i64));
+
     let hometask_id = match sqlx::query_scalar::<_, i32>(
-        "INSERT INTO hometasks (teacher_id, student_id, title, description, due_date, sort_order, hometask_type, content_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id",
+        "INSERT INTO hometasks (teacher_id, student_id, title, description, due_date, sort_order, hometask_type, content_id, repeat_every_days, next_reset_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id",
     )
     .bind(current_user_id)
     .bind(payload.student_id)
@@ -220,6 +401,8 @@ async fn create_hometask(
     .bind(next_sort_order)
     .bind(payload.hometask_type.clone())
     .bind(content_id)
+    .bind(repeat_every_days)
+    .bind(next_reset_at)
     .fetch_one(&mut *tx)
     .await
     {
@@ -240,6 +423,24 @@ async fn create_hometask(
         }));
     }
 
+    let teacher_name = fetch_teacher_name(&app_state.db, current_user_id).await;
+    let parent_ids = fetch_parent_ids(&app_state.db, payload.student_id).await;
+    let due_date = payload
+        .due_date
+        .map(|date| date.format("%Y-%m-%d").to_string());
+    let assigned_body = build_hometask_assigned_notification(
+        hometask_id,
+        &payload.title,
+        &teacher_name,
+        due_date.as_deref(),
+        payload.student_id,
+    );
+
+    insert_notification(&app_state.db, payload.student_id, &assigned_body, "normal").await;
+    for parent_id in parent_ids {
+        insert_notification(&app_state.db, parent_id, &assigned_body, "normal").await;
+    }
+
     HttpResponse::Created().json(json!({ "id": hometask_id }))
 }
 
@@ -255,6 +456,8 @@ async fn list_student_hometasks(
     if let Err(response) = verify_can_access_student(&req, &app_state, student_id).await {
         return response;
     }
+
+    refresh_repeatable_hometasks(&app_state.db, student_id).await;
 
     let claims = match verify_token(&req, &app_state) {
         Ok(claims) => claims,
@@ -535,8 +738,9 @@ async fn update_hometask_status(
         Err(response) => return response,
     };
 
-    let hometask = match sqlx::query_as::<_, (i32, i32, HometaskStatus)>(
-        "SELECT teacher_id, student_id, status FROM hometasks WHERE id = $1",
+    let hometask = match sqlx::query_as::<_, (i32, i32, String, Option<DateTime<Utc>>, HometaskStatus, Option<i32>, Option<DateTime<Utc>>)>(
+        "SELECT teacher_id, student_id, title, due_date, status, repeat_every_days, next_reset_at
+         FROM hometasks WHERE id = $1",
     )
     .bind(hometask_id)
     .fetch_optional(&app_state.db)
@@ -556,7 +760,7 @@ async fn update_hometask_status(
         }
     };
 
-    let (teacher_id, student_id, current_status) = hometask;
+    let (teacher_id, student_id, task_title, due_date, current_status, repeat_every_days, next_reset_at) = hometask;
 
     match payload.status {
         HometaskStatus::CompletedByStudent => {
@@ -619,22 +823,126 @@ async fn update_hometask_status(
             }
         }
         HometaskStatus::Assigned => {
-            return HttpResponse::BadRequest().json(json!({
-                "error": "Invalid status update"
-            }));
+            let is_admin = claims.roles.contains(&"admin".to_string());
+            let is_teacher = claims.roles.contains(&"teacher".to_string());
+
+            if !is_admin && !is_teacher {
+                return HttpResponse::Forbidden().json(json!({
+                    "error": "Teacher access required"
+                }));
+            }
+
+            if !is_admin {
+                let has_relation = match verify_teacher_student_relation(
+                    current_user_id,
+                    student_id,
+                    &app_state.db,
+                )
+                .await
+                {
+                    Ok(result) => result,
+                    Err(response) => return response,
+                };
+
+                if !has_relation || current_user_id != teacher_id {
+                    return HttpResponse::Forbidden().json(json!({
+                        "error": "Not authorized to reopen this hometask"
+                    }));
+                }
+            }
+
+            if current_status == HometaskStatus::Assigned {
+                return HttpResponse::Ok().json(json!({ "status": "updated" }));
+            }
+
+            if current_status != HometaskStatus::CompletedByStudent
+                && current_status != HometaskStatus::AccomplishedByTeacher
+            {
+                return HttpResponse::BadRequest().json(json!({
+                    "error": "Hometask cannot be reopened from this state"
+                }));
+            }
         }
     }
 
-    let result = sqlx::query(
-        "UPDATE hometasks SET status = $1 WHERE id = $2",
-    )
-    .bind(payload.status.clone())
-    .bind(hometask_id)
-    .execute(&app_state.db)
-    .await;
+    let mut next_reset_update: Option<DateTime<Utc>> = None;
+    if payload.status == HometaskStatus::Assigned {
+        if let Some(repeat_days) = repeat_every_days {
+            if repeat_days > 0 {
+                let now = Utc::now();
+                let is_stale = next_reset_at.map(|value| value <= now).unwrap_or(true);
+                if is_stale {
+                    next_reset_update = Some(now + chrono::Duration::days(repeat_days as i64));
+                }
+            }
+        }
+    }
+
+    let result = if let Some(next_reset_at) = next_reset_update {
+        sqlx::query(
+            "UPDATE hometasks SET status = $1, next_reset_at = $2 WHERE id = $3",
+        )
+        .bind(payload.status.clone())
+        .bind(next_reset_at)
+        .bind(hometask_id)
+        .execute(&app_state.db)
+        .await
+    } else {
+        sqlx::query(
+            "UPDATE hometasks SET status = $1 WHERE id = $2",
+        )
+        .bind(payload.status.clone())
+        .bind(hometask_id)
+        .execute(&app_state.db)
+        .await
+    };
 
     match result {
-        Ok(_) => HttpResponse::Ok().json(json!({ "status": "updated" })),
+        Ok(_) => {
+            match payload.status {
+                HometaskStatus::CompletedByStudent => {
+                    let student_name = fetch_student_name(&app_state.db, student_id).await;
+                    let completed_body = build_hometask_completed_notification(
+                        hometask_id,
+                        &task_title,
+                        &student_name,
+                        student_id,
+                    );
+                    insert_notification(&app_state.db, teacher_id, &completed_body, "normal").await;
+                }
+                HometaskStatus::AccomplishedByTeacher => {
+                    let teacher_name = fetch_teacher_name(&app_state.db, teacher_id).await;
+                    let accomplished_body = build_hometask_accomplished_notification(
+                        hometask_id,
+                        &task_title,
+                        &teacher_name,
+                        student_id,
+                    );
+                    insert_notification(&app_state.db, student_id, &accomplished_body, "normal").await;
+                    let parent_ids = fetch_parent_ids(&app_state.db, student_id).await;
+                    for parent_id in parent_ids {
+                        insert_notification(&app_state.db, parent_id, &accomplished_body, "normal").await;
+                    }
+                }
+                HometaskStatus::Assigned => {
+                    let teacher_name = fetch_teacher_name(&app_state.db, teacher_id).await;
+                    let reopened_body = build_hometask_reopened_notification(
+                        hometask_id,
+                        &task_title,
+                        &teacher_name,
+                        student_id,
+                    );
+                    insert_notification(&app_state.db, student_id, &reopened_body, "normal").await;
+                    let parent_ids = fetch_parent_ids(&app_state.db, student_id).await;
+                    for parent_id in parent_ids {
+                        insert_notification(&app_state.db, parent_id, &reopened_body, "normal").await;
+                    }
+                }
+                _ => {}
+            }
+
+            HttpResponse::Ok().json(json!({ "status": "updated" }))
+        }
         Err(e) => {
             eprintln!("Failed to update hometask status: {}", e);
             HttpResponse::InternalServerError().json(json!({

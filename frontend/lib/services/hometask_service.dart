@@ -149,6 +149,33 @@ class HometaskService extends ChangeNotifier {
     return false;
   }
 
+  Future<bool> markReopened(int hometaskId) async {
+    if (authService.token == null) return false;
+
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/hometasks/$hometaskId/status'),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'status': 'assigned',
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return true;
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error reopening hometask: $e');
+      }
+    }
+
+    return false;
+  }
+
   Future<bool> updateChecklistItems({
     required int hometaskId,
     required List<ChecklistItem> items,
@@ -185,6 +212,7 @@ class HometaskService extends ChangeNotifier {
     DateTime? dueDate,
     required HometaskType hometaskType,
     List<String>? items,
+    int? repeatEveryDays,
   }) async {
     if (authService.token == null) return false;
 
@@ -203,6 +231,8 @@ class HometaskService extends ChangeNotifier {
           'hometask_type': _serializeType(hometaskType),
           if (items != null)
             'items': items.map((text) => {'text': text}).toList(),
+          if (repeatEveryDays != null && repeatEveryDays > 0)
+            'repeat_every_days': repeatEveryDays,
         }),
       );
 

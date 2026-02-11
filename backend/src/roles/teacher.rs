@@ -4,7 +4,7 @@ use chrono::NaiveDate;
 use super::helpers::verify_admin_role;
 use super::models::{
     AddTeacherStudentRelationRequest, CreateTeacherRequest, StudentWithUserInfo,
-    TeacherWithUserInfo, UpdateTeacherRequest,
+     UpdateTeacherRequest,
 };
 use crate::users::verify_token;
 use crate::AppState;
