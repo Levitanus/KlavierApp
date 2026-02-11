@@ -145,9 +145,9 @@ class HometaskWidget extends StatelessWidget {
 
     return Chip(
       label: Text(label),
-      backgroundColor: color.withOpacity(0.1),
+      backgroundColor: color.withValues(alpha: 26),
       labelStyle: TextStyle(color: color),
-      side: BorderSide(color: color.withOpacity(0.4)),
+      side: BorderSide(color: color.withValues(alpha: 102)),
     );
   }
 

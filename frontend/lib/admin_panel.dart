@@ -73,10 +73,6 @@ abstract class _AdminPanelStateBase extends State<AdminPanel> {
     String? phone,
     String fullName,
   );
-  void _showEditUserDialog(User? user);
-  void _showAddStudentDialog();
-  void _showAddParentDialog();
-  void _showAddTeacherDialog();
 }
 
 class _AdminPanelState extends _AdminPanelStateBase

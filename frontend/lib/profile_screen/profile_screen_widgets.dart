@@ -28,7 +28,7 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
+                            color: Colors.black.withValues(alpha: 51),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),
@@ -48,7 +48,7 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
+                          color: Colors.black.withValues(alpha: 51),
                           blurRadius: 4,
                           offset: const Offset(0, 2),
                         ),
@@ -69,7 +69,7 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
               child: Container(
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.black.withOpacity(0.5),
+                  color: Colors.black.withValues(alpha: 128),
                 ),
                 child: const Center(
                   child: CircularProgressIndicator(color: Colors.white),

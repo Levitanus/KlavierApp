@@ -370,7 +370,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                       ),
                       const SizedBox(height: 12),
                       DropdownButtonFormField<HometaskType>(
-                        value: selectedType,
+                        initialValue: selectedType,
                         decoration: const InputDecoration(
                           labelText: 'Hometask type',
                           border: OutlineInputBorder(),
