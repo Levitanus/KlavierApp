@@ -32,7 +32,7 @@ class HometaskWidget extends StatefulWidget {
 class _HometaskWidgetState extends State<HometaskWidget> {
   late bool _isEditMode;
   late List<ChecklistItem> _editingItems;
-  late List<TextEditingController_itemControllers;
+  late List<TextEditingController> _itemControllers;
 
   @override
   void initState() {
