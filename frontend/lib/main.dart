@@ -3,6 +3,7 @@ import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'auth.dart';
 import 'services/notification_service.dart';
+import 'services/hometask_service.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 import 'reset_password_screen.dart';
@@ -28,6 +29,16 @@ class MyApp extends StatelessWidget {
           ),
           update: (context, authService, previous) =>
               previous ?? NotificationService(authService: authService),
+        ),
+        ChangeNotifierProxyProvider<AuthService, HometaskService>(
+          create: (context) => HometaskService(
+            authService: context.read<AuthService>(),
+          ),
+          update: (context, authService, previous) {
+            final service = previous ?? HometaskService(authService: authService);
+            service.syncAuth();
+            return service;
+          },
         ),
       ],
       child: MaterialApp(

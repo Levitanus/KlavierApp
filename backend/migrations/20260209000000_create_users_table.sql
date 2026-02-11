@@ -212,3 +212,76 @@ CREATE TRIGGER update_teachers_updated_at
     BEFORE UPDATE ON teachers 
     FOR EACH ROW 
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- Hometask System Tables
+-- ============================================================================
+
+-- Create hometask status enum
+CREATE TYPE hometask_status AS ENUM ('assigned', 'completed_by_student', 'accomplished_by_teacher');
+
+-- Create hometask type enum
+CREATE TYPE hometask_type AS ENUM ('checklist', 'daily_routine', 'photo_submission', 'text_submission');
+
+-- Create hometasks table
+CREATE TABLE IF NOT EXISTS hometasks (
+    id SERIAL PRIMARY KEY,
+    teacher_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    description TEXT,
+    status hometask_status NOT NULL DEFAULT 'assigned',
+    due_date TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    hometask_type hometask_type NOT NULL,
+    content_id INTEGER NOT NULL
+);
+
+-- Create hometask_checklists table
+CREATE TABLE IF NOT EXISTS hometask_checklists (
+    id SERIAL PRIMARY KEY,
+    items JSONB NOT NULL
+);
+
+-- Create submission type enum
+CREATE TYPE submission_type AS ENUM ('photo', 'text');
+
+-- Create hometask_submissions table
+CREATE TABLE IF NOT EXISTS hometask_submissions (
+    id SERIAL PRIMARY KEY,
+    hometask_id INTEGER NOT NULL REFERENCES hometasks(id) ON DELETE CASCADE,
+    student_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    submission_type submission_type NOT NULL,
+    content TEXT NOT NULL, -- URL for photo, text for text
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Create indexes for hometask tables
+CREATE INDEX IF NOT EXISTS idx_hometasks_teacher_id ON hometasks(teacher_id);
+CREATE INDEX IF NOT EXISTS idx_hometasks_student_id ON hometasks(student_id);
+CREATE INDEX IF NOT EXISTS idx_hometasks_status ON hometasks(status);
+CREATE INDEX IF NOT EXISTS idx_hometask_submissions_hometask_id ON hometask_submissions(hometask_id);
+CREATE INDEX IF NOT EXISTS idx_hometask_submissions_student_id ON hometask_submissions(student_id);
+
+-- Trigger for hometasks updated_at
+CREATE TRIGGER update_hometasks_updated_at
+    BEFORE UPDATE ON hometasks
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- Add simple hometask type and allow nullable content_id
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_enum
+        WHERE enumlabel = 'simple'
+          AND enumtypid = 'hometask_type'::regtype
+    ) THEN
+        ALTER TYPE hometask_type ADD VALUE 'simple';
+    END IF;
+END $$;
+
+ALTER TABLE hometasks
+    ALTER COLUMN content_id DROP NOT NULL;

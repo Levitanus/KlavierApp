@@ -7,6 +7,8 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'auth.dart';
+import 'services/hometask_service.dart';
+import 'models/hometask.dart';
 
 part 'profile_screen/profile_screen_data.dart';
 part 'profile_screen/profile_screen_dialogs.dart';
@@ -581,6 +583,12 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                         icon: const Icon(Icons.visibility),
                                         label: const Text('View Profile'),
                                         onPressed: () => _showStudentProfileDialog(student),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton.icon(
+                                        icon: const Icon(Icons.assignment_add),
+                                        label: const Text('Assign Hometask'),
+                                        onPressed: () => _showAssignHometaskDialog(student),
                                       ),
                                       const SizedBox(width: 8),
                                       TextButton.icon(

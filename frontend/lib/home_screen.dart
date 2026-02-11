@@ -4,6 +4,7 @@ import 'auth.dart';
 import 'login_screen.dart';
 import 'admin_panel.dart';
 import 'profile_screen.dart';
+import 'hometasks_screen.dart';
 import 'widgets/notification_widget.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -172,28 +173,7 @@ class DashboardPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.dashboard,
-            size: 80,
-            color: Colors.blue,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Welcome to Klavier!',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Your music learning dashboard',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ],
-      ),
-    );
+    return const HometasksScreen();
   }
 }
 

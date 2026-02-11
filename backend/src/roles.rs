@@ -1,6 +1,6 @@
 use actix_web::web;
 
-mod helpers;
+pub mod helpers;
 mod models;
 mod parent;
 mod student;

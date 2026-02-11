@@ -6,6 +6,8 @@ pub mod notifications;
 pub mod notification_builders;
 pub mod roles;
 pub mod registration_tokens;
+pub mod hometasks;
+pub mod models;
 
 use actix_web::{middleware, web, App};
 use actix_files as fs;
@@ -51,6 +53,7 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
         .configure(notifications::configure)
         .configure(roles::configure_routes)
         .configure(registration_tokens::configure_routes)
+        .configure(hometasks::init_routes)
         .service(fs::Files::new("/uploads/profile_images", profile_images_dir).show_files_listing())
 }
 

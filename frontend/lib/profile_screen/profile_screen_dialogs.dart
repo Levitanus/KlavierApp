@@ -291,6 +291,239 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     );
   }
 
+  void _showAssignHometaskDialog(Map<String, dynamic> student) {
+    final rawStudentId = student['user_id'] ?? student['id'];
+    if (rawStudentId is! int) return;
+    final studentId = rawStudentId;
+
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    final itemControllers = [TextEditingController()];
+    DateTime? dueDate;
+    bool isSubmitting = false;
+    HometaskType selectedType = HometaskType.checklist;
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text('Assign Hometask to ${student['full_name'] ?? 'Student'}'),
+            content: SizedBox(
+              width: 520,
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: titleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Title',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Title is required'
+                                : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: descriptionController,
+                        decoration: const InputDecoration(
+                          labelText: 'Description (optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                        minLines: 2,
+                        maxLines: 4,
+                      ),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Due date'),
+                        subtitle: Text(
+                          dueDate != null
+                              ? '${dueDate!.year}-${dueDate!.month.toString().padLeft(2, '0')}-${dueDate!.day.toString().padLeft(2, '0')}'
+                              : 'No due date',
+                        ),
+                        trailing: const Icon(Icons.calendar_today),
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: dueDate ?? DateTime.now(),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 1),
+                            ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 3650),
+                            ),
+                          );
+                          if (picked != null) {
+                            setDialogState(() {
+                              dueDate = picked;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<HometaskType>(
+                        value: selectedType,
+                        decoration: const InputDecoration(
+                          labelText: 'Hometask type',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: HometaskType.simple,
+                            child: Text('Simple'),
+                          ),
+                          DropdownMenuItem(
+                            value: HometaskType.checklist,
+                            child: Text('Checklist'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setDialogState(() {
+                            selectedType = value;
+                          });
+                        },
+                      ),
+                      const Divider(),
+                      if (selectedType == HometaskType.checklist) ...[
+                        Text(
+                          'Checklist items',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        ...List.generate(itemControllers.length, (index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: itemControllers[index],
+                                    decoration: InputDecoration(
+                                      labelText: 'Item ${index + 1}',
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                    validator: (value) =>
+                                        value == null || value.trim().isEmpty
+                                            ? 'Required'
+                                            : null,
+                                  ),
+                                ),
+                                if (itemControllers.length > 1)
+                                  IconButton(
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        itemControllers.removeAt(index);
+                                      });
+                                    },
+                                    icon: const Icon(Icons.remove_circle_outline),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              setDialogState(() {
+                                itemControllers.add(TextEditingController());
+                              });
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add item'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        if (!formKey.currentState!.validate()) {
+                          return;
+                        }
+
+                        final items = selectedType == HometaskType.checklist
+                            ? itemControllers
+                                .map((controller) => controller.text.trim())
+                                .where((text) => text.isNotEmpty)
+                                .toList()
+                            : <String>[];
+
+                        if (selectedType == HometaskType.checklist &&
+                            items.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Add at least one checklist item.'),
+                            ),
+                          );
+                          return;
+                        }
+
+                        setDialogState(() {
+                          isSubmitting = true;
+                        });
+
+                        final hometaskService =
+                            context.read<HometaskService>();
+                        final success = await hometaskService.createHometask(
+                          studentId: studentId,
+                          title: titleController.text.trim(),
+                          description: descriptionController.text.trim().isEmpty
+                              ? null
+                              : descriptionController.text.trim(),
+                          dueDate: dueDate,
+                          hometaskType: selectedType,
+                          items: items.isEmpty ? null : items,
+                        );
+
+                        if (success && context.mounted) {
+                          Navigator.of(context).pop();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Hometask assigned.'),
+                            ),
+                          );
+                        } else if (context.mounted) {
+                          setDialogState(() {
+                            isSubmitting = false;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Failed to assign hometask.'),
+                            ),
+                          );
+                        }
+                      },
+                child: const Text('Assign'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   void _showTeacherProfileDialog(Map<String, dynamic> teacher) {
     List<Map<String, dynamic>> teacherStudents = [];
     bool isLoadingStudents = true;
@@ -312,6 +545,9 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
               });
             }
           }
+
+          final authService = Provider.of<AuthService>(context, listen: false);
+          final canAssign = authService.roles.contains('teacher');
 
           return AlertDialog(
             title: Text(teacher['full_name'] ?? 'Teacher Profile'),
@@ -378,6 +614,14 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                   label: const Text('View Profile'),
                                   onPressed: () => _showStudentProfileDialog(student),
                                 ),
+                                if (canAssign) ...[
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () => _showAssignHometaskDialog(student),
+                                    icon: const Icon(Icons.assignment_add),
+                                    label: const Text('Assign'),
+                                  ),
+                                ],
                               ],
                             ),
                           ),
