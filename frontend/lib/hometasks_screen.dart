@@ -290,6 +290,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
 
     if (canReorder) {
       return ReorderableListView.builder(
+        buildDefaultDragHandles: false,
         itemCount: hometasks.length,
         onReorder: (oldIndex, newIndex) async {
           if (newIndex > oldIndex) {
@@ -317,11 +318,15 @@ class _HometasksScreenState extends State<HometasksScreen> {
         },
         itemBuilder: (context, index) {
           final hometask = hometasks[index];
-          return Padding(
+          return ReorderableDragStartListener(
             key: ValueKey('hometask-${hometask.id}'),
-            padding: const EdgeInsets.only(bottom: 8),
-            child: HometaskWidget(
-              hometask: hometask,
+            index: index,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: HometaskWidget(
+                hometask: hometask,
+                showDragHandle: true,
+                canEditItems: _isTeacher(context.read<AuthService>()),
               onMarkCompleted: canComplete
                   ? () async => _markCompleted(hometask.id)
                   : null,
@@ -341,12 +346,19 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         progress: progress,
                       )
                   : null,
+              onSaveItems: _isTeacher(context.read<AuthService>())
+                  ? (items) async => _saveHometaskItems(
+                        hometaskId: hometask.id,
+                        items: items,
+                      )
+                  : null,
               onMarkAccomplished: canAccomplish
                   ? () async => _markAccomplished(hometask.id)
                   : null,
               onMarkReopened: canReopen
                   ? () async => _markReopened(hometask.id)
                   : null,
+              ),
             ),
           );
         },
@@ -376,6 +388,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: HometaskWidget(
                           hometask: hometask,
+                          canEditItems: _isTeacher(context.read<AuthService>()),
                           onMarkCompleted: canComplete
                               ? () async => _markCompleted(hometask.id)
                               : null,
@@ -395,6 +408,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
                                     hometaskId: hometask.id,
                                     itemIndex: index,
                                     progress: progress,
+                                  )
+                              : null,
+                          onSaveItems: _isTeacher(context.read<AuthService>())
+                              ? (items) async => _saveHometaskItems(
+                                    hometaskId: hometask.id,
+                                    items: items,
                                   )
                               : null,
                           onMarkAccomplished: canAccomplish
@@ -451,6 +470,28 @@ class _HometasksScreenState extends State<HometasksScreen> {
       await _loadHometasks();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to update checklist item.')),
+      );
+    }
+  }
+
+  Future<void> _saveHometaskItems({
+    required int hometaskId,
+    required List<ChecklistItem> items,
+  }) async {
+    final hometaskService = context.read<HometaskService>();
+    final success = await hometaskService.updateChecklistItems(
+      hometaskId: hometaskId,
+      items: items,
+    );
+
+    if (success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Items saved successfully.')),
+      );
+      await _loadHometasks();
+    } else if (!success && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to save items.')),
       );
     }
   }

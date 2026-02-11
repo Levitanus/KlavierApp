@@ -712,10 +712,10 @@ async fn update_hometask_checklist(
         && verify_can_access_student(&req, &app_state, student_id).await.is_ok();
     let is_teacher = claims.roles.contains(&"teacher".to_string());
 
-    if hometask_type == HometaskType::Progress {
+    if hometask_type == HometaskType::Progress || hometask_type == HometaskType::Checklist {
         if !is_student && !is_parent && !is_teacher {
             return HttpResponse::Forbidden().json(json!({
-                "error": "Not authorized to update progress items"
+                "error": "Not authorized to update checklist items"
             }));
         }
 
@@ -733,14 +733,10 @@ async fn update_hometask_checklist(
 
             if !has_relation {
                 return HttpResponse::Forbidden().json(json!({
-                    "error": "Not authorized to update progress items"
+                    "error": "Not authorized to update checklist items"
                 }));
             }
         }
-    } else if !is_student && !is_parent {
-        return HttpResponse::Forbidden().json(json!({
-            "error": "Only the student can update checklist items"
-        }));
     }
 
     if status == HometaskStatus::AccomplishedByTeacher {

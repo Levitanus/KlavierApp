@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import '../models/hometask.dart';
 
-class HometaskWidget extends StatelessWidget {
+class HometaskWidget extends StatefulWidget {
   final Hometask hometask;
   final VoidCallback? onMarkCompleted;
   final void Function(int index, bool isDone)? onToggleItem;
   final void Function(int index, int progress)? onChangeProgress;
+  final void Function(List<ChecklistItem>)? onSaveItems;
   final VoidCallback? onMarkAccomplished;
   final VoidCallback? onMarkReopened;
+  final bool showDragHandle;
+  final bool canEditItems;
 
   const HometaskWidget({
     super.key,
@@ -15,9 +18,123 @@ class HometaskWidget extends StatelessWidget {
     this.onMarkCompleted,
     this.onToggleItem,
     this.onChangeProgress,
+    this.onSaveItems,
     this.onMarkAccomplished,
     this.onMarkReopened,
+    this.showDragHandle = false,
+    this.canEditItems = false,
   });
+
+  @override
+  State<HometaskWidget> createState() => _HometaskWidgetState();
+}
+
+class _HometaskWidgetState extends State<HometaskWidget> {
+  late bool _isEditMode;
+  late List<ChecklistItem> _editingItems;
+  late List<TextEditingController_itemControllers;
+
+  @override
+  void initState() {
+    super.initState();
+    _isEditMode = false;
+    _editingItems = List<ChecklistItem>.from(widget.hometask.checklistItems);
+    _initializeControllers();
+  }
+
+  void _initializeControllers() {
+    _itemControllers = _editingItems
+        .map((item) => TextEditingController(text: item.text))
+        .toList();
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _itemControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _enterEditMode() {
+    setState(() {
+      _isEditMode = true;
+      _editingItems = List<ChecklistItem>.from(widget.hometask.checklistItems);
+      _initializeControllers();
+    });
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _isEditMode = false;
+    });
+  }
+
+  void _saveEdit() {
+    // Validate that all items have non-empty text
+    final hasEmptyItems = _editingItems.any((item) => item.text.trim().isEmpty);
+    if (hasEmptyItems) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All items must have a name.')),
+      );
+      return;
+    }
+
+    final isProgress = widget.hometask.hometaskType == HometaskType.progress;
+    final normalizedItems = _editingItems
+        .map((item) {
+          final text = item.text.trim();
+          if (isProgress) {
+            return ChecklistItem(
+              text: text,
+              isDone: false,
+              progress: item.progress ?? 0,
+            );
+          }
+          return ChecklistItem(
+            text: text,
+            isDone: item.isDone,
+          );
+        })
+        .toList();
+
+    widget.onSaveItems?.call(normalizedItems);
+    setState(() {
+      _editingItems = normalizedItems;
+      _isEditMode = false;
+    });
+  }
+
+  void _updateItemText(int index, String newText) {
+    if (index < 0 || index >= _editingItems.length) return;
+    final item = _editingItems[index];
+    _editingItems[index] = ChecklistItem(
+      text: newText,
+      isDone: item.isDone,
+      progress: item.progress,
+    );
+  }
+
+  void _addItem() {
+    final isProgress = widget.hometask.hometaskType == HometaskType.progress;
+    setState(() {
+      _editingItems.add(ChecklistItem(
+        text: '',
+        isDone: false,
+        progress: isProgress ? 0 : null,
+      ));
+      _itemControllers.add(TextEditingController(text: ''));
+    });
+  }
+
+  void _removeItem(int index) {
+    if (index < 0 || index >= _itemControllers.length) return;
+    setState(() {
+      _editingItems.removeAt(index);
+      _itemControllers[index].dispose();
+      _itemControllers.removeAt(index);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,240 +146,93 @@ class HometaskWidget extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (widget.showDragHandle)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12, top: 2),
+                    child: Icon(
+                      Icons.drag_handle,
+                      size: 20,
+                      color: Colors.grey.shade400,
+                    ),
+                  ),
                 Expanded(
                   child: Text(
-                    hometask.title,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    widget.hometask.title,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                _buildStatusChip(context),
               ],
             ),
-            if (hometask.description != null && hometask.description!.isNotEmpty)
+            if (widget.hometask.description != null && widget.hometask.description!.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  hometask.description!,
+                  widget.hometask.description!,
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
               ),
-            if (hometask.dueDate != null)
+            if (widget.hometask.dueDate != null)
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Due: ${_formatDate(hometask.dueDate!)}',
+                  'Due: ${_formatDate(widget.hometask.dueDate!)}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
-            if (hometask.checklistItems.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: hometask.checklistItems
-                      .asMap()
-                      .entries
-                      .map(
-                        (entry) {
-                          final item = entry.value;
-                          final isProgress = hometask.hometaskType == HometaskType.progress;
-                          final isChecklist = hometask.hometaskType == HometaskType.checklist;
-
-                          // For progress hometasks, show progress items
-                          if (isProgress) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(item.text),
-                                  ),
-                                  if (onChangeProgress != null)
-                                    DropdownButton<int>(
-                                      value: item.progress ?? 0,
-                                      items: [
-                                        DropdownMenuItem(
-                                          value: 0,
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 12,
-                                                height: 12,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.red,
-                                                  borderRadius: BorderRadius.circular(2),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Text('Not started'),
-                                            ],
-                                          ),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 1,
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 12,
-                                                height: 12,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.orange,
-                                                  borderRadius: BorderRadius.circular(2),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Text('In progress'),
-                                            ],
-                                          ),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 2,
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 12,
-                                                height: 12,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.yellow,
-                                                  borderRadius: BorderRadius.circular(2),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Text('Nearly done'),
-                                            ],
-                                          ),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 3,
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 12,
-                                                height: 12,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.lime,
-                                                  borderRadius: BorderRadius.circular(2),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Text('Almost complete'),
-                                            ],
-                                          ),
-                                        ),
-                                        DropdownMenuItem(
-                                          value: 4,
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 12,
-                                                height: 12,
-                                                decoration: BoxDecoration(
-                                                  color: Colors.green,
-                                                  borderRadius: BorderRadius.circular(2),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              const Text('Complete'),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                      onChanged: (value) {
-                                        if (value != null) {
-                                          onChangeProgress!(entry.key, value);
-                                        }
-                                      },
-                                    )
-                                  else
-                                    Container(
-                                      width: 12,
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                        color: _getProgressColor(item.progress ?? 0),
-                                        borderRadius: BorderRadius.circular(2),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            );
-                          }
-
-                          // For checklist hometasks, show checklist items
-                          if (isChecklist) {
-                            return Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 2),
-                              child: Row(
-                                children: [
-                                  if (onToggleItem != null)
-                                    Checkbox(
-                                      value: item.isDone,
-                                      onChanged: (value) {
-                                        if (value != null) {
-                                          onToggleItem!(entry.key, value);
-                                        }
-                                      },
-                                    )
-                                  else
-                                    Icon(
-                                      item.isDone
-                                          ? Icons.check_circle
-                                          : Icons.radio_button_unchecked,
-                                      size: 16,
-                                      color: item.isDone
-                                          ? Colors.green
-                                          : Colors.grey.shade500,
-                                    ),
-                                  const SizedBox(width: 8),
-                                  Expanded(child: Text(item.text)),
-                                ],
-                              ),
-                            );
-                          }
-
-                          // Default: show nothing if type is not checklist or progress
-                          return const SizedBox.shrink();
-                        },
-                      )
-                      .toList(),
+            if (_isEditMode && widget.hometask.checklistItems.isNotEmpty)
+              _buildEditMode()
+            else if (widget.hometask.checklistItems.isNotEmpty)
+              _buildViewMode(),
+            if (widget.canEditItems && !_isEditMode && widget.hometask.checklistItems.isNotEmpty)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _enterEditMode,
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Edit items'),
                 ),
               ),
-            if (hometask.status == HometaskStatus.assigned && onMarkCompleted != null)
+            if (widget.hometask.status == HometaskStatus.assigned &&
+                widget.onMarkCompleted != null)
               Align(
                 alignment: Alignment.centerRight,
                 child: Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: ElevatedButton.icon(
-                    onPressed: onMarkCompleted,
+                    onPressed: widget.onMarkCompleted,
                     icon: const Icon(Icons.check),
                     label: const Text('Mark completed'),
                   ),
                 ),
               ),
-            if (onMarkAccomplished != null &&
-                hometask.status != HometaskStatus.accomplishedByTeacher)
+            if (widget.onMarkAccomplished != null &&
+                widget.hometask.status != HometaskStatus.accomplishedByTeacher)
               Align(
                 alignment: Alignment.centerRight,
                 child: Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: OutlinedButton.icon(
-                    onPressed: onMarkAccomplished,
+                    onPressed: widget.onMarkAccomplished,
                     icon: const Icon(Icons.verified),
                     label: const Text('Mark accomplished'),
                   ),
                 ),
               ),
-            if (onMarkReopened != null &&
-                hometask.status != HometaskStatus.assigned)
+            if (widget.onMarkReopened != null &&
+                widget.hometask.status != HometaskStatus.assigned)
               Align(
                 alignment: Alignment.centerRight,
                 child: Padding(
                   padding: const EdgeInsets.only(top: 12),
                   child: TextButton.icon(
-                    onPressed: onMarkReopened,
+                    onPressed: widget.onMarkReopened,
                     icon: const Icon(Icons.restore),
                     label: Text(
-                      hometask.status == HometaskStatus.accomplishedByTeacher
+                      widget.hometask.status == HometaskStatus.accomplishedByTeacher
                           ? 'Return to active'
                           : 'Mark uncompleted',
                     ),
@@ -275,31 +245,240 @@ class HometaskWidget extends StatelessWidget {
     );
   }
 
-  Widget _buildStatusChip(BuildContext context) {
-    String label;
-    Color color;
+  Widget _buildViewMode() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: widget.hometask.checklistItems
+            .asMap()
+            .entries
+            .map((entry) {
+              final item = entry.value;
+              final isProgress = widget.hometask.hometaskType == HometaskType.progress;
+              final isChecklist = widget.hometask.hometaskType == HometaskType.checklist;
 
-    switch (hometask.status) {
-      case HometaskStatus.completedByStudent:
-        label = 'Completed';
-        color = Colors.orange;
-        break;
-      case HometaskStatus.accomplishedByTeacher:
-        label = 'Accomplished';
-        color = Colors.green;
-        break;
-      case HometaskStatus.assigned:
-      default:
-        label = 'Assigned';
-        color = Colors.blue;
-        break;
-    }
+              // For progress hometasks, show progress items
+              if (isProgress) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(item.text)),
+                      if (widget.onChangeProgress != null)
+                        DropdownButton<int>(
+                          value: item.progress ?? 0,
+                          items: [
+                            DropdownMenuItem(
+                              value: 0,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.red,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('Not started'),
+                                ],
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 1,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.orange,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('In progress'),
+                                ],
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 2,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.yellow,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('Nearly done'),
+                                ],
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 3,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.lime,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('Almost complete'),
+                                ],
+                              ),
+                            ),
+                            DropdownMenuItem(
+                              value: 4,
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      color: Colors.green,
+                                      borderRadius: BorderRadius.circular(2),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Text('Complete'),
+                                ],
+                              ),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              widget.onChangeProgress!(entry.key, value);
+                            }
+                          },
+                        )
+                      else
+                        Container(
+                          width: 12,
+                          height: 12,
+                          decoration: BoxDecoration(
+                            color: _getProgressColor(item.progress ?? 0),
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }
 
-    return Chip(
-      label: Text(label),
-      backgroundColor: color.withValues(alpha: 26),
-      labelStyle: TextStyle(color: color),
-      side: BorderSide(color: color.withValues(alpha: 102)),
+              // For checklist hometasks, show checklist items
+              if (isChecklist) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Row(
+                    children: [
+                      if (widget.onToggleItem != null)
+                        Checkbox(
+                          value: item.isDone,
+                          onChanged: (value) {
+                            if (value != null) {
+                              widget.onToggleItem!(entry.key, value);
+                            }
+                          },
+                        )
+                      else
+                        Icon(
+                          item.isDone
+                              ? Icons.check_circle
+                              : Icons.radio_button_unchecked,
+                          size: 16,
+                          color: item.isDone
+                              ? Colors.green
+                              : Colors.grey.shade500,
+                        ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(item.text)),
+                    ],
+                  ),
+                );
+              }
+
+              return const SizedBox.shrink();
+            })
+            .toList(),
+      ),
+    );
+  }
+
+  Widget _buildEditMode() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ..._editingItems.asMap().entries.map((entry) {
+            final index = entry.key;
+            // Bounds check to prevent errors
+            if (index >= _itemControllers.length) {
+              return const SizedBox.shrink();
+            }
+            final controller = _itemControllers[index];
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: controller,
+                      decoration: InputDecoration(
+                        hintText: 'Item ${index + 1}',
+                        border: OutlineInputBorder(),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      ),
+                      onChanged: (value) => _updateItemText(index, value),
+                    ),
+                  ),
+                  if (_editingItems.length > 1)
+                    IconButton(
+                      onPressed: () => _removeItem(index),
+                      icon: const Icon(Icons.delete_outline),
+                      color: Colors.red,
+                    ),
+                ],
+              ),
+            );
+          }).toList(),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: _addItem,
+              icon: const Icon(Icons.add),
+              label: const Text('Add item'),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 12),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: _cancelEdit,
+                  child: const Text('Cancel'),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: _saveEdit,
+                  child: const Text('Save'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
