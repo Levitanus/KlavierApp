@@ -71,12 +71,15 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final hometaskService = context.read<HometaskService>();
 
     List<StudentSummary> students = [];
+    StudentSummary? selfSummary;
     if (_isParent(authService)) {
       students = await hometaskService.fetchStudentsForParent();
-      final selfSummary = await hometaskService.getCurrentStudentSummary();
-      if (selfSummary != null &&
-          !students.any((student) => student.userId == selfSummary.userId)) {
-        students = [selfSummary, ...students];
+      selfSummary = await hometaskService.getCurrentStudentSummary();
+      if (selfSummary != null) {
+        final selfId = selfSummary.userId;
+        if (!students.any((student) => student.userId == selfId)) {
+          students = [selfSummary, ...students];
+        }
       }
     } else if (_isTeacher(authService)) {
       students = await hometaskService.fetchStudentsForTeacher();
@@ -97,6 +100,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
       if (widget.initialStudentId != null &&
           students.any((student) => student.userId == widget.initialStudentId)) {
         _selectedStudentId = widget.initialStudentId;
+      } else if (_isStudent(authService) && selfSummary != null) {
+        _selectedStudentId = selfSummary.userId;
       } else {
         _selectedStudentId = students.first.userId;
       }
@@ -117,7 +122,10 @@ class _HometasksScreenState extends State<HometasksScreen> {
         studentId: studentId,
         status: _showArchive ? 'archived' : 'active',
       );
-    } else if (_isStudent(authService)) {
+      return;
+    }
+
+    if (_isStudent(authService)) {
       if (_showArchive) {
         final studentId = await hometaskService.getCurrentUserId();
         if (studentId == null) return;
@@ -143,6 +151,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final isStudent = _isStudent(authService);
     final isTeacher = _isTeacher(authService);
     final isParent = _isParent(authService);
+    final showStudentSelector = isParent || isTeacher;
     final canComplete = (isStudent || isParent) && !_showArchive;
     final canToggleItems = (isStudent || isParent || isTeacher) && !_showArchive;
 
@@ -166,7 +175,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          if (isParent || isTeacher) ...[
+          if (showStudentSelector) ...[
             if (_isLoadingStudents)
               const LinearProgressIndicator()
             else if (_studentsError != null)

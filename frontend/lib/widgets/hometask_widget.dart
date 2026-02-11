@@ -264,102 +264,142 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                   padding: const EdgeInsets.symmetric(vertical: 8),
                   child: Row(
                     children: [
-                      Expanded(child: Text(item.text)),
                       if (widget.onChangeProgress != null)
-                        DropdownButton<int>(
-                          value: item.progress ?? 0,
-                          items: [
-                            DropdownMenuItem(
-                              value: 0,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: Colors.red,
-                                      borderRadius: BorderRadius.circular(2),
+                        SizedBox(
+                          width: 160,
+                          height: 24,
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<int>(
+                              value: item.progress ?? 0,
+                              isExpanded: true,
+                              icon: const SizedBox.shrink(),
+                              iconSize: 0,
+                              selectedItemBuilder: (context) {
+                                return [0, 1, 2, 3, 4]
+                                    .map((value) => Align(
+                                          alignment: Alignment.centerLeft,
+                                          child: SizedBox(
+                                            width: 100,
+                                            height: double.infinity,
+                                            child: DecoratedBox(
+                                              decoration: BoxDecoration(
+                                                color: _getProgressColor(value),
+                                                borderRadius: BorderRadius.circular(2),
+                                              ),
+                                            ),
+                                          ),
+                                        ))
+                                    .toList();
+                              },
+                              items: [
+                                DropdownMenuItem(
+                                  value: 0,
+                                  child: SizedBox(
+                                    width: 160,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: Colors.red,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text('Not started'),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  const Text('Not started'),
-                                ],
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: 1,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange,
-                                      borderRadius: BorderRadius.circular(2),
+                                ),
+                                DropdownMenuItem(
+                                  value: 1,
+                                  child: SizedBox(
+                                    width: 160,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: Colors.orange,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text('In progress'),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  const Text('In progress'),
-                                ],
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: 2,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: Colors.yellow,
-                                      borderRadius: BorderRadius.circular(2),
+                                ),
+                                DropdownMenuItem(
+                                  value: 2,
+                                  child: SizedBox(
+                                    width: 160,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: Colors.yellow,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text('Nearly done'),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  const Text('Nearly done'),
-                                ],
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: 3,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: Colors.lime,
-                                      borderRadius: BorderRadius.circular(2),
+                                ),
+                                DropdownMenuItem(
+                                  value: 3,
+                                  child: SizedBox(
+                                    width: 160,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: Colors.lime,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text('Almost complete'),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  const Text('Almost complete'),
-                                ],
-                              ),
-                            ),
-                            DropdownMenuItem(
-                              value: 4,
-                              child: Row(
-                                children: [
-                                  Container(
-                                    width: 12,
-                                    height: 12,
-                                    decoration: BoxDecoration(
-                                      color: Colors.green,
-                                      borderRadius: BorderRadius.circular(2),
+                                ),
+                                DropdownMenuItem(
+                                  value: 4,
+                                  child: SizedBox(
+                                    width: 160,
+                                    child: Row(
+                                      children: [
+                                        Container(
+                                          width: 12,
+                                          height: 12,
+                                          decoration: BoxDecoration(
+                                            color: Colors.green,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        const Text('Complete'),
+                                      ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  const Text('Complete'),
-                                ],
-                              ),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  widget.onChangeProgress!(entry.key, value);
+                                }
+                              },
                             ),
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              widget.onChangeProgress!(entry.key, value);
-                            }
-                          },
+                          ),
                         )
                       else
                         Container(
@@ -370,6 +410,8 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                             borderRadius: BorderRadius.circular(2),
                           ),
                         ),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(item.text)),
                     ],
                   ),
                 );
