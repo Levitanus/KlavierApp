@@ -152,10 +152,21 @@ CREATE TABLE IF NOT EXISTS registration_tokens (
     role TEXT NOT NULL CHECK (role IN ('student', 'parent', 'teacher')),
     -- For parent registration from student profile
     related_student_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    -- For student registration from teacher profile
+    related_teacher_id INTEGER REFERENCES teachers(user_id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     expires_at TIMESTAMPTZ NOT NULL,
     used_at TIMESTAMPTZ,
     used_by_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Create teacher-student relationship table (many-to-many)
+CREATE TABLE IF NOT EXISTS teacher_student_relations (
+    teacher_user_id INTEGER NOT NULL REFERENCES teachers(user_id) ON DELETE CASCADE,
+    student_user_id INTEGER NOT NULL REFERENCES students(user_id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (teacher_user_id, student_user_id),
+    CONSTRAINT no_self_teacher_student CHECK (teacher_user_id != student_user_id)
 );
 
 -- Create indexes for role tables
@@ -173,6 +184,9 @@ CREATE INDEX IF NOT EXISTS idx_parent_student_student ON parent_student_relation
 CREATE INDEX IF NOT EXISTS idx_registration_tokens_hash ON registration_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_registration_tokens_expires ON registration_tokens(expires_at);
 CREATE INDEX IF NOT EXISTS idx_registration_tokens_related_student ON registration_tokens(related_student_id);
+CREATE INDEX IF NOT EXISTS idx_registration_tokens_related_teacher ON registration_tokens(related_teacher_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_student_teacher ON teacher_student_relations(teacher_user_id);
+CREATE INDEX IF NOT EXISTS idx_teacher_student_student ON teacher_student_relations(student_user_id);
 
 -- Trigger function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()

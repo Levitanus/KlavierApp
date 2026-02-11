@@ -17,6 +17,7 @@ pub struct RegistrationToken {
     pub created_by_user_id: i32,
     pub role: String,
     pub related_student_id: Option<i32>,
+    pub related_teacher_id: Option<i32>,
     pub created_at: DateTime<Utc>,
     pub expires_at: DateTime<Utc>,
     pub used_at: Option<DateTime<Utc>>,
@@ -27,6 +28,7 @@ pub struct RegistrationToken {
 pub struct CreateRegistrationTokenRequest {
     pub role: String, // 'student', 'parent', or 'teacher'
     pub related_student_id: Option<i32>, // Required for parent tokens from student profile
+    pub related_teacher_id: Option<i32>, // Optional for student tokens tied to a teacher
 }
 
 #[derive(Debug, Serialize)]
@@ -53,10 +55,18 @@ pub struct TokenInfoResponse {
     pub valid: bool,
     pub role: Option<String>,
     pub related_student: Option<StudentInfo>,
+    pub related_teacher: Option<TeacherInfo>,
 }
 
 #[derive(Debug, Serialize)]
 pub struct StudentInfo {
+    pub user_id: i32,
+    pub username: String,
+    pub full_name: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TeacherInfo {
     pub user_id: i32,
     pub username: String,
     pub full_name: String,
@@ -125,6 +135,21 @@ async fn create_registration_token(
             }));
         }
     }
+
+    if let Some(teacher_id) = token_req.related_teacher_id {
+        let teacher_exists = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1)"
+        )
+        .bind(teacher_id)
+        .fetch_one(&app_state.db)
+        .await;
+
+        if !teacher_exists.unwrap_or(false) {
+            return HttpResponse::BadRequest().json(serde_json::json!({
+                "error": "Related teacher not found"
+            }));
+        }
+    }
     
     // Generate token
     let token = Uuid::new_v4().to_string();
@@ -139,13 +164,14 @@ async fn create_registration_token(
     
     // Store token
     match sqlx::query(
-        "INSERT INTO registration_tokens (token_hash, created_by_user_id, role, related_student_id, expires_at)
-         VALUES ($1, $2, $3, $4, $5)"
+           "INSERT INTO registration_tokens (token_hash, created_by_user_id, role, related_student_id, related_teacher_id, expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6)"
     )
     .bind(&token_hash)
     .bind(admin_id)
     .bind(&token_req.role)
     .bind(token_req.related_student_id)
+        .bind(token_req.related_teacher_id)
     .bind(expires_at)
     .execute(&app_state.db)
     .await
@@ -230,8 +256,8 @@ async fn create_parent_token_from_student(
     
     // Store token
     match sqlx::query(
-        "INSERT INTO registration_tokens (token_hash, created_by_user_id, role, related_student_id, expires_at)
-         VALUES ($1, $2, 'parent', $3, $4)"
+           "INSERT INTO registration_tokens (token_hash, created_by_user_id, role, related_student_id, related_teacher_id, expires_at)
+            VALUES ($1, $2, 'parent', $3, NULL, $4)"
     )
     .bind(&token_hash)
     .bind(current_user_id)
@@ -248,6 +274,84 @@ async fn create_parent_token_from_student(
         }
         Err(e) => {
             eprintln!("Failed to create parent registration token: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to create registration token"
+            }))
+        }
+    }
+}
+
+/// Teacher creates a student registration token
+#[post("/api/teachers/{teacher_id}/student-registration-token")]
+async fn create_student_token_from_teacher(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<i32>,
+) -> impl Responder {
+    let teacher_id = path.into_inner();
+
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let current_user_id = match sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM users WHERE username = $1"
+    )
+    .bind(&claims.sub)
+    .fetch_optional(&app_state.db)
+    .await
+    {
+        Ok(Some(id)) => id,
+        _ => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "User not found"
+            }));
+        }
+    };
+
+    if current_user_id != teacher_id && !claims.roles.contains(&"admin".to_string()) {
+        return HttpResponse::Forbidden().json(serde_json::json!({
+            "error": "Not authorized"
+        }));
+    }
+
+    let teacher_exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1)"
+    )
+    .bind(teacher_id)
+    .fetch_one(&app_state.db)
+    .await;
+
+    if !teacher_exists.unwrap_or(false) {
+        return HttpResponse::NotFound().json(serde_json::json!({
+            "error": "Teacher not found"
+        }));
+    }
+
+    let token = Uuid::new_v4().to_string();
+    let mut hasher = Sha256::new();
+    hasher.update(token.as_bytes());
+    let token_hash = format!("{:x}", hasher.finalize());
+    let expires_at = Utc::now() + Duration::hours(48);
+
+    match sqlx::query(
+        "INSERT INTO registration_tokens (token_hash, created_by_user_id, role, related_student_id, related_teacher_id, expires_at)
+         VALUES ($1, $2, 'student', NULL, $3, $4)"
+    )
+    .bind(&token_hash)
+    .bind(current_user_id)
+    .bind(teacher_id)
+    .bind(expires_at)
+    .execute(&app_state.db)
+    .await
+    {
+        Ok(_) => HttpResponse::Created().json(CreateRegistrationTokenResponse {
+            token,
+            expires_at,
+        }),
+        Err(e) => {
+            eprintln!("Failed to create student registration token: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to create registration token"
             }))
@@ -280,6 +384,7 @@ async fn get_token_info(
                 valid: false,
                 role: None,
                 related_student: None,
+                related_teacher: None,
             });
         }
         Err(e) => {
@@ -296,6 +401,7 @@ async fn get_token_info(
             valid: false,
             role: None,
             related_student: None,
+            related_teacher: None,
         });
     }
     
@@ -305,6 +411,7 @@ async fn get_token_info(
             valid: false,
             role: None,
             related_student: None,
+            related_teacher: None,
         });
     }
     
@@ -330,11 +437,34 @@ async fn get_token_info(
     } else {
         None
     };
+
+    let related_teacher = if let Some(teacher_id) = token_record.related_teacher_id {
+        match sqlx::query_as::<_, (i32, String, String)>(
+            "SELECT u.id, u.username, t.full_name
+             FROM users u
+             INNER JOIN teachers t ON u.id = t.user_id
+             WHERE u.id = $1"
+        )
+        .bind(teacher_id)
+        .fetch_optional(&app_state.db)
+        .await
+        {
+            Ok(Some((user_id, username, full_name))) => Some(TeacherInfo {
+                user_id,
+                username,
+                full_name,
+            }),
+            _ => None,
+        }
+    } else {
+        None
+    };
     
     HttpResponse::Ok().json(TokenInfoResponse {
         valid: true,
         role: Some(token_record.role),
         related_student,
+        related_teacher,
     })
 }
 
@@ -505,6 +635,31 @@ async fn register_with_token(
                     "error": "Failed to create student"
                 }));
             }
+
+            if let Some(teacher_id) = token.related_teacher_id {
+                if user_id == teacher_id {
+                    let _ = tx.rollback().await;
+                    return HttpResponse::BadRequest().json(serde_json::json!({
+                        "error": "A user cannot be their own teacher"
+                    }));
+                }
+
+                if let Err(e) = sqlx::query(
+                    "INSERT INTO teacher_student_relations (teacher_user_id, student_user_id)
+                     VALUES ($1, $2)"
+                )
+                .bind(teacher_id)
+                .bind(user_id)
+                .execute(&mut *tx)
+                .await
+                {
+                    eprintln!("Failed to create teacher-student relation: {}", e);
+                    let _ = tx.rollback().await;
+                    return HttpResponse::InternalServerError().json(serde_json::json!({
+                        "error": "Failed to create teacher-student relation"
+                    }));
+                }
+            }
         }
         "parent" => {
             if let Err(e) = sqlx::query(
@@ -633,6 +788,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg
         .service(create_registration_token)
         .service(create_parent_token_from_student)
+    .service(create_student_token_from_teacher)
         .service(get_token_info)
         .service(register_with_token)
         .service(list_registration_tokens);

@@ -60,6 +60,26 @@ pub struct ParentWithUserInfo {
     pub children: Option<Vec<StudentWithUserInfo>>,
 }
 
+#[derive(Debug, Serialize)]
+pub struct ParentSummary {
+    pub user_id: i32,
+    pub username: String,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub full_name: String,
+    pub status: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TeacherWithUserInfo {
+    pub user_id: i32,
+    pub username: String,
+    pub email: Option<String>,
+    pub phone: Option<String>,
+    pub full_name: String,
+    pub status: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct CreateStudentRequest {
     pub username: String,
@@ -115,6 +135,11 @@ pub struct UpdateTeacherRequest {
 
 #[derive(Debug, Deserialize)]
 pub struct AddParentStudentRelationRequest {
+    pub student_id: i32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AddTeacherStudentRelationRequest {
     pub student_id: i32,
 }
 
@@ -181,6 +206,70 @@ async fn verify_can_edit_student(
         _ => Err(HttpResponse::Forbidden().json(serde_json::json!({
             "error": "Not authorized to edit this student"
         }))),
+    }
+}
+
+/// Check if user can access a student (admin, student themselves, or parent)
+async fn verify_can_access_student(
+    req: &HttpRequest,
+    app_state: &AppState,
+    student_user_id: i32,
+) -> Result<i32, HttpResponse> {
+    let claims = verify_token(req, app_state)?;
+
+    let current_user_id = match sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM users WHERE username = $1"
+    )
+    .bind(&claims.sub)
+    .fetch_optional(&app_state.db)
+    .await
+    {
+        Ok(Some(id)) => id,
+        _ => {
+            return Err(HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "User not found"
+            })));
+        }
+    };
+
+    if claims.roles.contains(&"admin".to_string()) || current_user_id == student_user_id {
+        return Ok(current_user_id);
+    }
+
+    let relation_exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(
+            SELECT 1 FROM parent_student_relations psr
+            JOIN parents p ON psr.parent_user_id = p.user_id
+            WHERE psr.parent_user_id = $1 AND psr.student_user_id = $2 AND p.status = 'active'
+        )"
+    )
+    .bind(current_user_id)
+    .bind(student_user_id)
+    .fetch_one(&app_state.db)
+    .await;
+
+    match relation_exists {
+        Ok(true) => Ok(current_user_id),
+        _ => {
+            let teacher_relation_exists = sqlx::query_scalar::<_, bool>(
+                "SELECT EXISTS(
+                    SELECT 1 FROM teacher_student_relations tsr
+                    JOIN teachers t ON tsr.teacher_user_id = t.user_id
+                    WHERE tsr.teacher_user_id = $1 AND tsr.student_user_id = $2 AND t.status = 'active'
+                )"
+            )
+            .bind(current_user_id)
+            .bind(student_user_id)
+            .fetch_one(&app_state.db)
+            .await;
+
+            match teacher_relation_exists {
+                Ok(true) => Ok(current_user_id),
+                _ => Err(HttpResponse::Forbidden().json(serde_json::json!({
+                    "error": "Not authorized to access this student"
+                }))),
+            }
+        }
     }
 }
 
@@ -827,6 +916,50 @@ async fn get_student(
     }
 }
 
+#[get("/api/students")]
+async fn list_students(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+) -> impl Responder {
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    if !claims.roles.contains(&"admin".to_string())
+        && !claims.roles.contains(&"teacher".to_string())
+    {
+        return HttpResponse::Forbidden().json(serde_json::json!({
+            "error": "Not authorized"
+        }));
+    }
+
+    let students: Vec<StudentWithUserInfo> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
+        "SELECT u.id, u.username, u.email, u.phone, s.full_name, s.address, s.birthday, s.status::text
+         FROM users u
+         INNER JOIN students s ON u.id = s.user_id"
+    )
+    .fetch_all(&app_state.db)
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .map(|(user_id, username, email, phone, full_name, address, birthday, status)| {
+        StudentWithUserInfo {
+            user_id,
+            username,
+            email,
+            phone,
+            full_name,
+            address,
+            birthday,
+            status,
+        }
+    })
+    .collect();
+
+    HttpResponse::Ok().json(students)
+}
+
 #[put("/api/students/{user_id}")]
 async fn update_student(
     req: HttpRequest,
@@ -1468,6 +1601,368 @@ async fn remove_parent_student_relation(
 }
 
 // ============================================================================
+// Teacher-Student Relation Routes
+// ============================================================================
+
+#[get("/api/teachers/{teacher_id}/students")]
+async fn list_teacher_students(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<i32>,
+) -> impl Responder {
+    let teacher_id = path.into_inner();
+
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let current_user_id = match sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM users WHERE username = $1"
+    )
+    .bind(&claims.sub)
+    .fetch_optional(&app_state.db)
+    .await
+    {
+        Ok(Some(id)) => id,
+        _ => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "User not found"
+            }));
+        }
+    };
+
+    if !claims.roles.contains(&"admin".to_string()) && current_user_id != teacher_id {
+        let is_related_student = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(
+                SELECT 1 FROM teacher_student_relations
+                WHERE teacher_user_id = $1 AND student_user_id = $2
+            )"
+        )
+        .bind(teacher_id)
+        .bind(current_user_id)
+        .fetch_one(&app_state.db)
+        .await
+        .unwrap_or(false);
+
+        let is_related_parent = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(
+                SELECT 1 FROM parent_student_relations psr
+                JOIN teacher_student_relations tsr ON psr.student_user_id = tsr.student_user_id
+                WHERE psr.parent_user_id = $1 AND tsr.teacher_user_id = $2
+            )"
+        )
+        .bind(current_user_id)
+        .bind(teacher_id)
+        .fetch_one(&app_state.db)
+        .await
+        .unwrap_or(false);
+
+        if !is_related_student && !is_related_parent {
+            return HttpResponse::Forbidden().json(serde_json::json!({
+                "error": "Not authorized"
+            }));
+        }
+    }
+
+    let students: Vec<StudentWithUserInfo> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
+        "SELECT u.id, u.username, u.email, u.phone, s.full_name, s.address, s.birthday, s.status::text
+         FROM users u
+         INNER JOIN students s ON u.id = s.user_id
+         INNER JOIN teacher_student_relations tsr ON s.user_id = tsr.student_user_id
+         WHERE tsr.teacher_user_id = $1"
+    )
+    .bind(teacher_id)
+    .fetch_all(&app_state.db)
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .map(|(user_id, username, email, phone, full_name, address, birthday, status)| {
+        StudentWithUserInfo {
+            user_id,
+            username,
+            email,
+            phone,
+            full_name,
+            address,
+            birthday,
+            status,
+        }
+    })
+    .collect();
+
+    HttpResponse::Ok().json(students)
+}
+
+#[post("/api/teachers/{teacher_id}/students")]
+async fn add_teacher_student_relation(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<i32>,
+    relation_req: web::Json<AddTeacherStudentRelationRequest>,
+) -> impl Responder {
+    let teacher_id = path.into_inner();
+
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let current_user_id = match sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM users WHERE username = $1"
+    )
+    .bind(&claims.sub)
+    .fetch_optional(&app_state.db)
+    .await
+    {
+        Ok(Some(id)) => id,
+        _ => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "User not found"
+            }));
+        }
+    };
+
+    if !claims.roles.contains(&"admin".to_string()) && current_user_id != teacher_id {
+        return HttpResponse::Forbidden().json(serde_json::json!({
+            "error": "Not authorized"
+        }));
+    }
+
+    if teacher_id == relation_req.student_id {
+        return HttpResponse::BadRequest().json(serde_json::json!({
+            "error": "A user cannot be their own teacher"
+        }));
+    }
+
+    let teacher_exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1)"
+    )
+    .bind(teacher_id)
+    .fetch_one(&app_state.db)
+    .await;
+
+    if !teacher_exists.unwrap_or(false) {
+        return HttpResponse::NotFound().json(serde_json::json!({
+            "error": "Teacher not found"
+        }));
+    }
+
+    let student_exists = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
+    )
+    .bind(relation_req.student_id)
+    .fetch_one(&app_state.db)
+    .await;
+
+    if !student_exists.unwrap_or(false) {
+        return HttpResponse::NotFound().json(serde_json::json!({
+            "error": "Student not found"
+        }));
+    }
+
+    match sqlx::query(
+        "INSERT INTO teacher_student_relations (teacher_user_id, student_user_id)
+         VALUES ($1, $2)"
+    )
+    .bind(teacher_id)
+    .bind(relation_req.student_id)
+    .execute(&app_state.db)
+    .await
+    {
+        Ok(_) => HttpResponse::Created().json(serde_json::json!({
+            "message": "Relation created successfully"
+        })),
+        Err(e) => {
+            eprintln!("Failed to create relation: {}", e);
+            HttpResponse::Conflict().json(serde_json::json!({
+                "error": "Relation already exists or database error"
+            }))
+        }
+    }
+}
+
+#[delete("/api/teachers/{teacher_id}/students/{student_id}")]
+async fn remove_teacher_student_relation(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<(i32, i32)>,
+) -> impl Responder {
+    let (teacher_id, student_id) = path.into_inner();
+
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let current_user_id = match sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM users WHERE username = $1"
+    )
+    .bind(&claims.sub)
+    .fetch_optional(&app_state.db)
+    .await
+    {
+        Ok(Some(id)) => id,
+        _ => {
+            return HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "User not found"
+            }));
+        }
+    };
+
+    if !claims.roles.contains(&"admin".to_string()) && current_user_id != teacher_id {
+        return HttpResponse::Forbidden().json(serde_json::json!({
+            "error": "Not authorized"
+        }));
+    }
+
+    match sqlx::query(
+        "DELETE FROM teacher_student_relations
+         WHERE teacher_user_id = $1 AND student_user_id = $2"
+    )
+    .bind(teacher_id)
+    .bind(student_id)
+    .execute(&app_state.db)
+    .await
+    {
+        Ok(result) => {
+            if result.rows_affected() > 0 {
+                HttpResponse::Ok().json(serde_json::json!({
+                    "message": "Relation removed successfully"
+                }))
+            } else {
+                HttpResponse::NotFound().json(serde_json::json!({
+                    "error": "Relation not found"
+                }))
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to remove relation: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Database error"
+            }))
+        }
+    }
+}
+
+#[get("/api/students/{student_id}/teachers")]
+async fn list_student_teachers(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<i32>,
+) -> impl Responder {
+    let student_id = path.into_inner();
+
+    if let Err(response) = verify_can_access_student(&req, &app_state, student_id).await {
+        return response;
+    }
+
+    let teachers: Vec<TeacherWithUserInfo> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String)>(
+        "SELECT u.id, u.username, u.email, u.phone, t.full_name, t.status::text
+         FROM users u
+         INNER JOIN teachers t ON u.id = t.user_id
+         INNER JOIN teacher_student_relations tsr ON t.user_id = tsr.teacher_user_id
+         WHERE tsr.student_user_id = $1"
+    )
+    .bind(student_id)
+    .fetch_all(&app_state.db)
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .map(|(user_id, username, email, phone, full_name, status)| {
+        TeacherWithUserInfo {
+            user_id,
+            username,
+            email,
+            phone,
+            full_name,
+            status,
+        }
+    })
+    .collect();
+
+    HttpResponse::Ok().json(teachers)
+}
+
+#[delete("/api/students/{student_id}/teachers/{teacher_id}")]
+async fn remove_student_teacher_relation(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<(i32, i32)>,
+) -> impl Responder {
+    let (student_id, teacher_id) = path.into_inner();
+
+    if let Err(response) = verify_can_access_student(&req, &app_state, student_id).await {
+        return response;
+    }
+
+    match sqlx::query(
+        "DELETE FROM teacher_student_relations
+         WHERE teacher_user_id = $1 AND student_user_id = $2"
+    )
+    .bind(teacher_id)
+    .bind(student_id)
+    .execute(&app_state.db)
+    .await
+    {
+        Ok(result) => {
+            if result.rows_affected() > 0 {
+                HttpResponse::Ok().json(serde_json::json!({
+                    "message": "Relation removed successfully"
+                }))
+            } else {
+                HttpResponse::NotFound().json(serde_json::json!({
+                    "error": "Relation not found"
+                }))
+            }
+        }
+        Err(e) => {
+            eprintln!("Failed to remove relation: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Database error"
+            }))
+        }
+    }
+}
+
+#[get("/api/students/{student_id}/parents")]
+async fn list_student_parents(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<i32>,
+) -> impl Responder {
+    let student_id = path.into_inner();
+
+    if let Err(response) = verify_can_access_student(&req, &app_state, student_id).await {
+        return response;
+    }
+
+    let parents: Vec<ParentSummary> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String)>(
+        "SELECT u.id, u.username, u.email, u.phone, p.full_name, p.status::text
+         FROM users u
+         INNER JOIN parents p ON u.id = p.user_id
+         INNER JOIN parent_student_relations psr ON p.user_id = psr.parent_user_id
+         WHERE psr.student_user_id = $1"
+    )
+    .bind(student_id)
+    .fetch_all(&app_state.db)
+    .await
+    .unwrap_or_default()
+    .into_iter()
+    .map(|(user_id, username, email, phone, full_name, status)| ParentSummary {
+        user_id,
+        username,
+        email,
+        phone,
+        full_name,
+        status,
+    })
+    .collect();
+
+    HttpResponse::Ok().json(parents)
+}
+
+// ============================================================================
 // Teacher Routes
 // ============================================================================
 
@@ -1773,6 +2268,7 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
     cfg
         // Student routes
         .service(create_student)
+        .service(list_students)
         .service(get_student)
         .service(update_student)
         .service(archive_student_role)
@@ -1783,6 +2279,12 @@ pub fn configure_routes(cfg: &mut web::ServiceConfig) {
         .service(update_parent)
         .service(add_parent_student_relation)
         .service(remove_parent_student_relation)
+        .service(list_teacher_students)
+        .service(add_teacher_student_relation)
+        .service(remove_teacher_student_relation)
+        .service(list_student_teachers)
+        .service(remove_student_teacher_relation)
+        .service(list_student_parents)
         .service(archive_parent_role)
         .service(unarchive_parent_role)
         // Teacher routes

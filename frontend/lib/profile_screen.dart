@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'auth.dart';
 
@@ -57,6 +58,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String? _parentStatus;
   String? _teacherStatus;
   bool _adminRoleSelected = false;
+  List<Map<String, dynamic>> _teacherStudents = [];
+  List<Map<String, dynamic>> _studentTeachers = [];
   
   // Text controllers for editing
   final TextEditingController _emailController = TextEditingController();
@@ -152,6 +155,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
           
           _isLoading = false;
         });
+
+        if (_teacherData != null) {
+          await _loadTeacherStudents();
+        }
+
+        if (_studentData != null) {
+          await _loadStudentTeachers();
+        }
       } else {
         setState(() {
           _isLoading = false;
@@ -186,6 +197,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _teacherStatus = null;
     _profileImage = null;
     _createdAt = null;
+    _teacherStudents = [];
+    _studentTeachers = [];
 
     try {
       final response = await http.get(
@@ -250,6 +263,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _isLoading = false;
       });
+
+      if (_teacherData != null) {
+        await _loadTeacherStudents();
+      }
+
+      if (_studentData != null) {
+        await _loadStudentTeachers();
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
@@ -924,6 +945,829 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _loadTeacherStudents() async {
+    if (_userId == null) return;
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final token = authService.token;
+    if (token == null) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/teachers/$_userId/students'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _teacherStudents = data
+              .whereType<Map<String, dynamic>>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchTeacherStudents(int teacherId) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final token = authService.token;
+    if (token == null) return [];
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/teachers/$teacherId/students'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data
+            .whereType<Map<String, dynamic>>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+    } catch (_) {}
+
+    return [];
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchStudentTeachers(int studentId) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final token = authService.token;
+    if (token == null) return [];
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/students/$studentId/teachers'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data
+            .whereType<Map<String, dynamic>>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+    } catch (_) {}
+
+    return [];
+  }
+
+  Future<void> _loadStudentTeachers() async {
+    if (_userId == null) return;
+    final teachers = await _fetchStudentTeachers(_userId!);
+    if (mounted) {
+      setState(() {
+        _studentTeachers = teachers;
+      });
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchStudentParents(int studentId) async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final token = authService.token;
+    if (token == null) return [];
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/students/$studentId/parents'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data
+            .whereType<Map<String, dynamic>>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
+      }
+    } catch (_) {}
+
+    return [];
+  }
+
+  Future<bool> _showLockedConfirmationDialog({
+    required String title,
+    required String content,
+    required String confirmLabel,
+  }) async {
+    int remainingSeconds = 5;
+    Timer? timer;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          timer ??= Timer.periodic(const Duration(seconds: 1), (t) {
+            if (remainingSeconds <= 1) {
+              t.cancel();
+              setDialogState(() {
+                remainingSeconds = 0;
+              });
+            } else {
+              setDialogState(() {
+                remainingSeconds -= 1;
+              });
+            }
+          });
+
+          return AlertDialog(
+            title: Text(title),
+            content: Text(content),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  timer?.cancel();
+                  Navigator.of(context).pop(false);
+                },
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: remainingSeconds == 0
+                    ? () {
+                        timer?.cancel();
+                        Navigator.of(context).pop(true);
+                      }
+                    : null,
+                child: Text(
+                  remainingSeconds == 0
+                      ? confirmLabel
+                      : '$confirmLabel (${remainingSeconds}s)',
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    timer?.cancel();
+    return confirmed ?? false;
+  }
+
+  Future<void> _addStudentsToTeacher(List<int> studentIds) async {
+    if (_userId == null || studentIds.isEmpty) return;
+    final authService = Provider.of<AuthService>(context, listen: false);
+
+    try {
+      for (final studentId in studentIds) {
+        final response = await http.post(
+          Uri.parse('$_baseUrl/api/teachers/$_userId/students'),
+          headers: {
+            'Authorization': 'Bearer ${authService.token}',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
+            'student_id': studentId,
+          }),
+        );
+
+        if (response.statusCode != 201 && response.statusCode != 200) {
+          if (mounted) {
+            final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error: $error')),
+            );
+          }
+          return;
+        }
+      }
+
+      await _loadTeacherStudents();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Students added successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeStudentFromTeacher(int studentId) async {
+    if (_userId == null) return;
+
+    final confirmed = await _showLockedConfirmationDialog(
+      title: 'Remove student',
+      content: 'Remove this student from your list?',
+      confirmLabel: 'Remove',
+    );
+
+    if (!confirmed) return;
+
+    final authService = Provider.of<AuthService>(context, listen: false);
+
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/api/teachers/$_userId/students/$studentId'),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        await _loadTeacherStudents();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Student removed')),
+          );
+        }
+      } else if (mounted) {
+        final error = jsonDecode(response.body)['error'] ?? 'Failed to remove student';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeTeacherFromStudent(int studentId, int teacherId) async {
+    final confirmed = await _showLockedConfirmationDialog(
+      title: 'Leave teacher',
+      content: 'Are you sure you want to leave this teacher?',
+      confirmLabel: 'Leave',
+    );
+
+    if (!confirmed) return;
+
+    final authService = Provider.of<AuthService>(context, listen: false);
+
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/api/students/$studentId/teachers/$teacherId'),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        if (studentId == _userId) {
+          await _loadStudentTeachers();
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Teacher removed')),
+          );
+        }
+      } else if (mounted) {
+        final error = jsonDecode(response.body)['error'] ?? 'Failed to remove teacher';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error)),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  void _showAddStudentsToTeacherDialog() async {
+    if (_userId == null) return;
+    final studentFilterController = TextEditingController();
+    final selectedStudents = <int>{};
+    String studentFilter = '';
+
+    final students = await _loadStudentsForSelection();
+    if (!mounted) return;
+
+    final existingStudentIds = _teacherStudents
+        .map((student) => student['user_id'])
+        .whereType<int>()
+        .toSet();
+
+    final availableStudents = students
+        .where((student) => !existingStudentIds.contains(student.userId))
+        .toList();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final filteredStudents = studentFilter.isEmpty
+              ? availableStudents
+              : availableStudents
+                  .where((s) =>
+                      s.fullName
+                          .toLowerCase()
+                          .contains(studentFilter.toLowerCase()) ||
+                      s.username
+                          .toLowerCase()
+                          .contains(studentFilter.toLowerCase()))
+                  .toList();
+
+          return AlertDialog(
+            title: const Text('Add Students'),
+            content: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: studentFilterController,
+                    decoration: const InputDecoration(
+                      labelText: 'Search students',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.search),
+                      hintText: 'Type to filter...',
+                    ),
+                    onChanged: (value) {
+                      setDialogState(() {
+                        studentFilter = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: filteredStudents.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: Text('No students available'),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredStudents.length,
+                            itemBuilder: (context, index) {
+                              final student = filteredStudents[index];
+                              return CheckboxListTile(
+                                title: Text(student.fullName),
+                                subtitle: Text(student.username),
+                                value: selectedStudents.contains(student.userId),
+                                onChanged: (checked) {
+                                  setDialogState(() {
+                                    if (checked == true) {
+                                      selectedStudents.add(student.userId);
+                                    } else {
+                                      selectedStudents.remove(student.userId);
+                                    }
+                                  });
+                                },
+                                dense: true,
+                              );
+                            },
+                          ),
+                  ),
+                  if (selectedStudents.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Select at least one student',
+                        style: TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: selectedStudents.isNotEmpty
+                    ? () async {
+                        Navigator.of(context).pop();
+                        await _addStudentsToTeacher(selectedStudents.toList());
+                      }
+                    : null,
+                child: const Text('Add'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _generateStudentRegistrationLinkForTeacher() async {
+    if (_userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('User ID not available'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final token = authService.token;
+
+    if (token == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Not authenticated'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/teachers/$_userId/student-registration-token'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (mounted) Navigator.of(context).pop();
+
+      if (response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        final registrationToken = data['token'];
+        final expiresAt = DateTime.parse(data['expires_at']);
+        final origin = kIsWeb ? Uri.base.origin : _baseUrl;
+        final registrationLink = '$origin/register?token=$registrationToken';
+
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Student Registration Link'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Share this link with your student to register:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[400]!),
+                    ),
+                    child: SelectableText(
+                      registrationLink,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Expires: ${expiresAt.day}/${expiresAt.month}/${expiresAt.year} ${expiresAt.hour}:${expiresAt.minute.toString().padLeft(2, '0')}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'This link is valid for 48 hours.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    final data = ClipboardData(text: registrationLink);
+                    Clipboard.setData(data);
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Link copied to clipboard'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.copy),
+                  label: const Text('Copy Link'),
+                ),
+              ],
+            ),
+          );
+        }
+      } else if (mounted) {
+        final error = jsonDecode(response.body)['error'] ?? 'Failed to generate link';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(error),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.of(context).pop();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating link: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _showStudentProfileDialog(Map<String, dynamic> student) {
+    List<Map<String, dynamic>> studentParents = [];
+    bool isLoadingParents = true;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          if (isLoadingParents) {
+            isLoadingParents = false;
+            final studentId = student['user_id'];
+            if (studentId is int) {
+              _fetchStudentParents(studentId).then((parents) {
+                if (context.mounted) {
+                  setDialogState(() {
+                    studentParents = parents;
+                  });
+                }
+              });
+            }
+          }
+
+          return AlertDialog(
+            title: Text(student['full_name'] ?? 'Student Profile'),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('@${student['username'] ?? ''}'),
+                    const SizedBox(height: 12),
+                    _buildInfoRow(
+                      Icons.cake_outlined,
+                      'Birthday',
+                      student['birthday']?.toString() ?? 'Not set',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(
+                      Icons.home_outlined,
+                      'Address',
+                      student['address']?.toString() ?? 'Not set',
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Parents',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    if (studentParents.isEmpty)
+                      Text(
+                        'No parents available',
+                        style: TextStyle(color: Colors.grey[600]),
+                      )
+                    else
+                      ...studentParents.map((parent) {
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        parent['full_name'] ?? 'Unknown',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text('@${parent['username'] ?? ''}'),
+                                    ],
+                                  ),
+                                ),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.visibility),
+                                  label: const Text('View Profile'),
+                                  onPressed: () => _showParentProfileDialog(parent),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showTeacherProfileDialog(Map<String, dynamic> teacher) {
+    List<Map<String, dynamic>> teacherStudents = [];
+    bool isLoadingStudents = true;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          if (isLoadingStudents) {
+            isLoadingStudents = false;
+            final teacherId = teacher['user_id'];
+            if (teacherId is int) {
+              _fetchTeacherStudents(teacherId).then((students) {
+                if (context.mounted) {
+                  setDialogState(() {
+                    teacherStudents = students;
+                  });
+                }
+              });
+            }
+          }
+
+          return AlertDialog(
+            title: Text(teacher['full_name'] ?? 'Teacher Profile'),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('@${teacher['username'] ?? ''}'),
+                    const SizedBox(height: 12),
+                    if (teacher['email'] != null)
+                      _buildInfoRow(
+                        Icons.email_outlined,
+                        'Email',
+                        teacher['email'].toString(),
+                      ),
+                    if (teacher['phone'] != null) ...[
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        Icons.phone_outlined,
+                        'Phone',
+                        teacher['phone'].toString(),
+                      ),
+                    ],
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Students',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    if (teacherStudents.isEmpty)
+                      Text(
+                        'No students available',
+                        style: TextStyle(color: Colors.grey[600]),
+                      )
+                    else
+                      ...teacherStudents.map((student) {
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        student['full_name'] ?? 'Unknown',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text('@${student['username'] ?? ''}'),
+                                    ],
+                                  ),
+                                ),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.visibility),
+                                  label: const Text('View Profile'),
+                                  onPressed: () => _showStudentProfileDialog(student),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showParentProfileDialog(Map<String, dynamic> parent) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(parent['full_name'] ?? 'Parent Profile'),
+        content: SizedBox(
+          width: 500,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('@${parent['username'] ?? ''}'),
+              const SizedBox(height: 12),
+              if (parent['email'] != null)
+                _buildInfoRow(
+                  Icons.email_outlined,
+                  'Email',
+                  parent['email'].toString(),
+                ),
+              if (parent['phone'] != null) ...[
+                const SizedBox(height: 8),
+                _buildInfoRow(
+                  Icons.phone_outlined,
+                  'Phone',
+                  parent['phone'].toString(),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showChangePasswordDialog() {
     showDialog(
       context: context,
@@ -1333,6 +2177,168 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ),
                         );
                       }).toList(),
+                    ],
+
+                    if (_teacherData != null && !_isEditing) ...[
+                      const Divider(),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Manage Students',
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          OutlinedButton.icon(
+                            icon: const Icon(Icons.person_add_alt_1),
+                            label: const Text('Add Student'),
+                            onPressed: _showAddStudentsToTeacherDialog,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Manage students assigned to you',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_teacherStudents.isEmpty)
+                        Text(
+                          'No students assigned yet',
+                          style: TextStyle(color: Colors.grey[600]),
+                        )
+                      else
+                        ..._teacherStudents.map((student) {
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    student['full_name'] ?? 'Unknown',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text('@${student['username'] ?? ''}'),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      OutlinedButton.icon(
+                                        icon: const Icon(Icons.visibility),
+                                        label: const Text('View Profile'),
+                                        onPressed: () => _showStudentProfileDialog(student),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      TextButton.icon(
+                                        icon: const Icon(Icons.person_remove, color: Colors.red),
+                                        label: const Text(
+                                          'Remove from Students',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                        onPressed: () {
+                                          final studentId = student['user_id'];
+                                          if (studentId is int) {
+                                            _removeStudentFromTeacher(studentId);
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      const SizedBox(height: 16),
+                      OutlinedButton.icon(
+                        onPressed: _generateStudentRegistrationLinkForTeacher,
+                        icon: const Icon(Icons.link),
+                        label: const Text('Generate Student Registration Link'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                        ),
+                      ),
+                    ],
+
+                    if (_studentData != null && !_isEditing) ...[
+                      const Divider(),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Teachers',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Tap to view teacher profile or leave teacher',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_studentTeachers.isEmpty)
+                        Text(
+                          'No teachers assigned yet',
+                          style: TextStyle(color: Colors.grey[600]),
+                        )
+                      else
+                        ..._studentTeachers.map((teacher) {
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    teacher['full_name'] ?? 'Unknown',
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text('@${teacher['username'] ?? ''}'),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      OutlinedButton.icon(
+                                        icon: const Icon(Icons.visibility),
+                                        label: const Text('View Profile'),
+                                        onPressed: () => _showTeacherProfileDialog(teacher),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      TextButton.icon(
+                                        icon: const Icon(Icons.logout, color: Colors.red),
+                                        label: const Text(
+                                          'Leave Teacher',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                        onPressed: () {
+                                          final teacherId = teacher['user_id'];
+                                          final studentId = _userId;
+                                          if (teacherId is int && studentId is int) {
+                                            _removeTeacherFromStudent(studentId, teacherId);
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
                     ],
                     
                     // Edit mode buttons at the bottom of role-specific area
@@ -2152,6 +3158,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (token == null) return [];
 
     try {
+      final listResponse = await http.get(
+        Uri.parse('$_baseUrl/api/students'),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (listResponse.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(listResponse.body);
+        return data
+            .whereType<Map<String, dynamic>>()
+            .map((entry) {
+              final userId = entry['user_id'] ?? entry['id'];
+              final username = entry['username']?.toString() ?? 'unknown';
+              final fullName = entry['full_name']?.toString() ?? username;
+              return StudentInfo(
+                userId: userId is int ? userId : 0,
+                username: username,
+                fullName: fullName,
+              );
+            })
+            .where((student) => student.userId != 0)
+            .toList();
+      }
+
+      if (!authService.isAdmin) {
+        return [];
+      }
+
       final response = await http.get(
         Uri.parse('$_baseUrl/api/admin/users'),
         headers: {
@@ -2436,11 +3472,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final birthdayController = TextEditingController(text: child['birthday']);
     bool isEditing = false;
     bool isSaving = false;
+    List<Map<String, dynamic>> childTeachers = [];
+    bool isLoadingTeachers = true;
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) {
+          if (isLoadingTeachers) {
+            isLoadingTeachers = false;
+            final childId = child['user_id'];
+            if (childId is int) {
+              _fetchStudentTeachers(childId).then((teachers) {
+                if (context.mounted) {
+                  setState(() {
+                    childTeachers = teachers;
+                  });
+                }
+              });
+            }
+          }
+
           return AlertDialog(
             title: Row(
               children: [
@@ -2537,6 +3589,80 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         subtitle: Text(child['username']),
                         contentPadding: EdgeInsets.zero,
                       ),
+                      if (childTeachers.isNotEmpty) ...[
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Teachers',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        ...childTeachers.map((teacher) {
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    teacher['full_name'] ?? 'Unknown',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text('@${teacher['username'] ?? ''}'),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      OutlinedButton.icon(
+                                        icon: const Icon(Icons.visibility),
+                                        label: const Text('View Profile'),
+                                        onPressed: () => _showTeacherProfileDialog(teacher),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      TextButton.icon(
+                                        icon: const Icon(Icons.logout, color: Colors.red),
+                                        label: const Text(
+                                          'Leave Teacher',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                        onPressed: () async {
+                                          final teacherId = teacher['user_id'];
+                                          final studentId = child['user_id'];
+                                          if (teacherId is int && studentId is int) {
+                                            await _removeTeacherFromStudent(studentId, teacherId);
+                                            final updatedTeachers =
+                                                await _fetchStudentTeachers(studentId);
+                                            if (context.mounted) {
+                                              setState(() {
+                                                childTeachers = updatedTeachers;
+                                              });
+                                            }
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ] else ...[
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Teachers',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'No teachers assigned yet',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      ],
                     ],
                   ],
                 ),
