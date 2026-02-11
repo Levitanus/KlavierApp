@@ -8,6 +8,7 @@ pub mod roles;
 pub mod registration_tokens;
 pub mod hometasks;
 pub mod models;
+pub mod storage;
 
 use actix_web::{middleware, web, App};
 use actix_files as fs;
@@ -15,13 +16,15 @@ use actix_cors::Cors;
 use sqlx::postgres::PgPool;
 use std::sync::Arc;
 use std::path::PathBuf;
+use storage::StorageProvider;
 
 #[derive(Clone)]
 pub struct AppState {
     pub db: PgPool,
     pub jwt_secret: String,
     pub email_service: Arc<email::EmailService>,
-    pub upload_dir: PathBuf,
+    pub storage: Arc<dyn StorageProvider>,
+    pub profile_images_dir: PathBuf,
 }
 
 pub fn create_app(app_state: web::Data<AppState>) -> App<
@@ -33,7 +36,7 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
         InitError = (),
     >,
 > {
-    let profile_images_dir = app_state.upload_dir.clone();
+    let profile_images_dir = app_state.profile_images_dir.clone();
     
     println!("=== Creating App ===");
     

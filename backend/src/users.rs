@@ -6,10 +6,9 @@ use sqlx::FromRow;
 use jsonwebtoken::{encode, decode, EncodingKey, DecodingKey, Header, Validation};
 use chrono::{Duration, Utc, NaiveDate};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
-use std::io::Write;
-use uuid::Uuid;
 
 use crate::{AppState, password_reset};
+use crate::storage::{MediaError, MediaService};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
@@ -859,16 +858,18 @@ async fn change_password(
 async fn upload_profile_image(
     app_state: web::Data<AppState>,
     req: HttpRequest,
-    mut payload: Multipart,
+    payload: Multipart,
 ) -> impl Responder {
     let claims = match verify_token(&req, &app_state) {
         Ok(claims) => claims,
         Err(response) => return response,
     };
 
+    let mut payload = payload;
+
     // Get the uploaded file
     while let Some(item) = payload.next().await {
-        let mut field = match item {
+        let field = match item {
             Ok(field) => field,
             Err(e) => {
                 eprintln!("Multipart error: {}", e);
@@ -878,74 +879,52 @@ async fn upload_profile_image(
             }
         };
 
-        let content_disposition = field.content_disposition();
-        if content_disposition.get_name() != Some("image") {
-            continue;
-        }
+        let extension = {
+            let content_disposition = field.content_disposition();
+            if content_disposition.get_name() != Some("image") {
+                continue;
+            }
 
-        // Get filename and extension
-        let filename = content_disposition
-            .get_filename()
-            .unwrap_or("upload.jpg");
-        
-        let extension = std::path::Path::new(filename)
-            .extension()
-            .and_then(|ext| ext.to_str())
-            .unwrap_or("jpg");
+            let filename = content_disposition.get_filename().unwrap_or("upload.jpg");
 
-        // Validate file type
-        if !matches!(extension.to_lowercase().as_str(), "jpg" | "jpeg" | "png" | "gif" | "webp") {
-            return HttpResponse::BadRequest().json(ErrorResponse {
-                error: "Invalid file type. Only images are allowed.".to_string(),
-            });
-        }
+            let extension = std::path::Path::new(filename)
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .unwrap_or("jpg")
+                .to_string();
 
-        // Generate unique filename
-        let unique_filename = format!("{}_{}.{}", claims.sub, Uuid::new_v4(), extension);
-        let filepath = app_state.upload_dir.join(&unique_filename);
+            extension
+        };
 
-        // Create file and write data
-        let mut f = match std::fs::File::create(&filepath) {
-            Ok(file) => file,
-            Err(e) => {
-                eprintln!("Failed to create file: {}", e);
+        let media_service = MediaService::new(app_state.storage.clone());
+        let stream = field.map(|chunk| {
+            chunk.map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
+            })
+        });
+
+        let stored = match media_service
+            .save_profile_image(&claims.sub, &extension, stream)
+            .await
+        {
+            Ok(stored) => stored,
+            Err(MediaError::InvalidFileType) => {
+                return HttpResponse::BadRequest().json(ErrorResponse {
+                    error: "Invalid file type. Only images are allowed.".to_string(),
+                })
+            }
+            Err(MediaError::TooLarge) => {
+                return HttpResponse::BadRequest().json(ErrorResponse {
+                    error: "File too large. Maximum size is 5MB.".to_string(),
+                })
+            }
+            Err(MediaError::Io(e)) => {
+                eprintln!("Failed to save file: {}", e);
                 return HttpResponse::InternalServerError().json(ErrorResponse {
                     error: "Failed to save file".to_string(),
                 });
             }
         };
-
-        // Read and write chunks
-        let mut file_size = 0u64;
-        while let Some(chunk) = field.next().await {
-            let data = match chunk {
-                Ok(data) => data,
-                Err(e) => {
-                    eprintln!("Failed to read chunk: {}", e);
-                    let _ = std::fs::remove_file(&filepath);
-                    return HttpResponse::InternalServerError().json(ErrorResponse {
-                        error: "Failed to read upload".to_string(),
-                    });
-                }
-            };
-
-            file_size += data.len() as u64;
-            if file_size > 5 * 1024 * 1024 {
-                // 5MB limit
-                let _ = std::fs::remove_file(&filepath);
-                return HttpResponse::BadRequest().json(ErrorResponse {
-                    error: "File too large. Maximum size is 5MB.".to_string(),
-                });
-            }
-
-            if let Err(e) = f.write_all(&data) {
-                eprintln!("Failed to write file: {}", e);
-                let _ = std::fs::remove_file(&filepath);
-                return HttpResponse::InternalServerError().json(ErrorResponse {
-                    error: "Failed to save file".to_string(),
-                });
-            }
-        }
 
         // Delete old profile image if exists
         let old_image_result = sqlx::query_scalar::<_, Option<String>>(
@@ -957,8 +936,11 @@ async fn upload_profile_image(
 
         if let Ok(Some(Some(old_filename))) = old_image_result {
             if !old_filename.is_empty() {
-                let old_path = app_state.upload_dir.join(&old_filename);
-                let _ = std::fs::remove_file(old_path);
+                if let Err(e) = media_service.delete_profile_image(&old_filename).await {
+                    if let MediaError::Io(err) = e {
+                        eprintln!("Failed to delete old profile image: {}", err);
+                    }
+                }
             }
         }
 
@@ -966,7 +948,7 @@ async fn upload_profile_image(
         let update_result = sqlx::query(
             "UPDATE users SET profile_image = $1 WHERE username = $2"
         )
-        .bind(&unique_filename)
+        .bind(&stored.key)
         .bind(&claims.sub)
         .execute(&app_state.db)
         .await;
@@ -974,13 +956,13 @@ async fn upload_profile_image(
         match update_result {
             Ok(_) => {
                 return HttpResponse::Ok().json(serde_json::json!({
-                    "filename": unique_filename,
-                    "url": format!("/uploads/profile_images/{}", unique_filename)
+                    "filename": stored.key,
+                    "url": stored.url
                 }));
             }
             Err(e) => {
                 eprintln!("Database error: {}", e);
-                let _ = std::fs::remove_file(&filepath);
+                let _ = media_service.delete_profile_image(&stored.key).await;
                 return HttpResponse::InternalServerError().json(ErrorResponse {
                     error: "Failed to update profile".to_string(),
                 });
@@ -1014,8 +996,12 @@ async fn delete_profile_image(
 
     if let Ok(Some(Some(old_filename))) = old_image_result {
         if !old_filename.is_empty() {
-            let old_path = app_state.upload_dir.join(&old_filename);
-            let _ = std::fs::remove_file(old_path);
+            let media_service = MediaService::new(app_state.storage.clone());
+            if let Err(e) = media_service.delete_profile_image(&old_filename).await {
+                if let MediaError::Io(err) = e {
+                    eprintln!("Failed to delete profile image: {}", err);
+                }
+            }
         }
     }
 

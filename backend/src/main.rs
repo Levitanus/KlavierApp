@@ -1,5 +1,6 @@
 use actix_web::{web, HttpServer};
 use klavierapp_backend::{create_app, init_db, AppState, email::EmailService};
+use klavierapp_backend::storage::LocalStorage;
 use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -75,12 +76,18 @@ async fn main() -> std::io::Result<()> {
     
     println!("Upload directory: {:?}", profile_images_dir);
 
+    let storage = Arc::new(LocalStorage::new(
+        profile_images_dir.clone(),
+        "/uploads/profile_images".to_string(),
+    ));
+
     // Create application state
     let app_state = web::Data::new(AppState {
         db: db_pool,
         jwt_secret,
         email_service,
-        upload_dir: profile_images_dir,
+        storage,
+        profile_images_dir,
     });
 
     println!("Starting server at http://127.0.0.1:8080");
