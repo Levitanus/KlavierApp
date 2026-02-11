@@ -221,7 +221,7 @@ CREATE TRIGGER update_teachers_updated_at
 CREATE TYPE hometask_status AS ENUM ('assigned', 'completed_by_student', 'accomplished_by_teacher');
 
 -- Create hometask type enum
-CREATE TYPE hometask_type AS ENUM ('checklist', 'daily_routine', 'photo_submission', 'text_submission');
+CREATE TYPE hometask_type AS ENUM ('checklist', 'progress', 'simple');
 
 -- Create hometasks table
 CREATE TABLE IF NOT EXISTS hometasks (
@@ -238,7 +238,7 @@ CREATE TABLE IF NOT EXISTS hometasks (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     sort_order INTEGER NOT NULL DEFAULT 0,
     hometask_type hometask_type NOT NULL,
-    content_id INTEGER NOT NULL
+    content_id INTEGER
 );
 
 -- Create hometask_checklists table
@@ -273,18 +273,3 @@ CREATE TRIGGER update_hometasks_updated_at
     BEFORE UPDATE ON hometasks
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
-
--- Add simple hometask type and allow nullable content_id
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_enum
-        WHERE enumlabel = 'simple'
-          AND enumtypid = 'hometask_type'::regtype
-    ) THEN
-        ALTER TYPE hometask_type ADD VALUE 'simple';
-    END IF;
-END $$;
-
-ALTER TABLE hometasks
-    ALTER COLUMN content_id DROP NOT NULL;

@@ -5,6 +5,7 @@ class HometaskWidget extends StatelessWidget {
   final Hometask hometask;
   final VoidCallback? onMarkCompleted;
   final void Function(int index, bool isDone)? onToggleItem;
+  final void Function(int index, int progress)? onChangeProgress;
   final VoidCallback? onMarkAccomplished;
   final VoidCallback? onMarkReopened;
 
@@ -13,6 +14,7 @@ class HometaskWidget extends StatelessWidget {
     required this.hometask,
     this.onMarkCompleted,
     this.onToggleItem,
+    this.onChangeProgress,
     this.onMarkAccomplished,
     this.onMarkReopened,
   });
@@ -62,34 +64,165 @@ class HometaskWidget extends StatelessWidget {
                       .asMap()
                       .entries
                       .map(
-                        (entry) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 2),
-                          child: Row(
-                            children: [
-                              if (onToggleItem != null)
-                                Checkbox(
-                                  value: entry.value.isDone,
-                                  onChanged: (value) {
-                                    if (value != null) {
-                                      onToggleItem!(entry.key, value);
-                                    }
-                                  },
-                                )
-                              else
-                                Icon(
-                                  entry.value.isDone
-                                      ? Icons.check_circle
-                                      : Icons.radio_button_unchecked,
-                                  size: 16,
-                                  color: entry.value.isDone
-                                      ? Colors.green
-                                      : Colors.grey.shade500,
-                                ),
-                              const SizedBox(width: 8),
-                              Expanded(child: Text(entry.value.text)),
-                            ],
-                          ),
-                        ),
+                        (entry) {
+                          final item = entry.value;
+                          final isProgress = hometask.hometaskType == HometaskType.progress;
+                          final isChecklist = hometask.hometaskType == HometaskType.checklist;
+
+                          // For progress hometasks, show progress items
+                          if (isProgress) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 8),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(item.text),
+                                  ),
+                                  if (onChangeProgress != null)
+                                    DropdownButton<int>(
+                                      value: item.progress ?? 0,
+                                      items: [
+                                        DropdownMenuItem(
+                                          value: 0,
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.red,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text('Not started'),
+                                            ],
+                                          ),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 1,
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.orange,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text('In progress'),
+                                            ],
+                                          ),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 2,
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.yellow,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text('Nearly done'),
+                                            ],
+                                          ),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 3,
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.lime,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text('Almost complete'),
+                                            ],
+                                          ),
+                                        ),
+                                        DropdownMenuItem(
+                                          value: 4,
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 12,
+                                                height: 12,
+                                                decoration: BoxDecoration(
+                                                  color: Colors.green,
+                                                  borderRadius: BorderRadius.circular(2),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              const Text('Complete'),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                      onChanged: (value) {
+                                        if (value != null) {
+                                          onChangeProgress!(entry.key, value);
+                                        }
+                                      },
+                                    )
+                                  else
+                                    Container(
+                                      width: 12,
+                                      height: 12,
+                                      decoration: BoxDecoration(
+                                        color: _getProgressColor(item.progress ?? 0),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          // For checklist hometasks, show checklist items
+                          if (isChecklist) {
+                            return Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              child: Row(
+                                children: [
+                                  if (onToggleItem != null)
+                                    Checkbox(
+                                      value: item.isDone,
+                                      onChanged: (value) {
+                                        if (value != null) {
+                                          onToggleItem!(entry.key, value);
+                                        }
+                                      },
+                                    )
+                                  else
+                                    Icon(
+                                      item.isDone
+                                          ? Icons.check_circle
+                                          : Icons.radio_button_unchecked,
+                                      size: 16,
+                                      color: item.isDone
+                                          ? Colors.green
+                                          : Colors.grey.shade500,
+                                    ),
+                                  const SizedBox(width: 8),
+                                  Expanded(child: Text(item.text)),
+                                ],
+                              ),
+                            );
+                          }
+
+                          // Default: show nothing if type is not checklist or progress
+                          return const SizedBox.shrink();
+                        },
                       )
                       .toList(),
                 ),
@@ -176,5 +309,22 @@ class HometaskWidget extends StatelessWidget {
 
   String _twoDigits(int value) {
     return value.toString().padLeft(2, '0');
+  }
+
+  Color _getProgressColor(int progress) {
+    switch (progress) {
+      case 0:
+        return Colors.red;
+      case 1:
+        return Colors.orange;
+      case 2:
+        return Colors.yellow;
+      case 3:
+        return Colors.lime;
+      case 4:
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
   }
 }

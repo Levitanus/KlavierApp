@@ -51,7 +51,8 @@ struct UpdateHometaskOrderRequest {
 #[derive(Deserialize)]
 struct UpdateChecklistItemRequest {
     text: String,
-    is_done: bool,
+    is_done: Option<bool>,
+    progress: Option<i32>,
 }
 
 #[derive(Deserialize)]
@@ -146,7 +147,11 @@ async fn fetch_parent_ids(db: &PgPool, student_id: i32) -> Vec<i32> {
     .unwrap_or_default()
 }
 
-async fn reset_checklist_items(db: &PgPool, content_id: i32) {
+async fn reset_hometask_items(
+    db: &PgPool,
+    content_id: i32,
+    hometask_type: &HometaskType,
+) {
     let items = sqlx::query_scalar::<_, serde_json::Value>(
         "SELECT items FROM hometask_checklists WHERE id = $1",
     )
@@ -168,7 +173,12 @@ async fn reset_checklist_items(db: &PgPool, content_id: i32) {
                 .and_then(|value| value.as_str())
                 .unwrap_or("")
                 .to_string();
-            json!({ "text": text, "is_done": false })
+            
+            match hometask_type {
+                HometaskType::Checklist => json!({ "text": text, "is_done": false }),
+                HometaskType::Progress => json!({ "text": text, "progress": 0 }),
+                _ => json!({ "text": text, "is_done": false }),
+            }
         })
         .collect::<Vec<_>>();
 
@@ -214,10 +224,14 @@ async fn refresh_repeatable_hometasks(db: &PgPool, student_id: i32) {
             next_reset_at = next_reset_at + interval;
         }
 
-        if task.hometask_type == HometaskType::Checklist {
-            if let Some(content_id) = task.content_id {
-                reset_checklist_items(db, content_id).await;
+        // Reset items based on hometask type
+        match task.hometask_type {
+            HometaskType::Checklist | HometaskType::Progress => {
+                if let Some(content_id) = task.content_id {
+                    reset_hometask_items(db, content_id, &task.hometask_type).await;
+                }
             }
+            _ => {}
         }
 
         let _ = sqlx::query(
@@ -351,6 +365,51 @@ async fn create_hometask(
                     let _ = tx.rollback().await;
                     return HttpResponse::InternalServerError().json(json!({
                         "error": "Failed to create checklist"
+                    }));
+                }
+            };
+
+            content_id = Some(checklist_id);
+        }
+        HometaskType::Progress => {
+            let items = match payload.items.as_ref() {
+                Some(items) if !items.is_empty() => items,
+                _ => {
+                    let _ = tx.rollback().await;
+                    return HttpResponse::BadRequest().json(json!({
+                        "error": "Progress items cannot be empty"
+                    }));
+                }
+            };
+
+            let progress_items = items
+                .iter()
+                .map(|item| json!({ "text": item.text, "progress": 0 }))
+                .collect::<Vec<_>>();
+
+            let progress_items_value = match serde_json::to_value(progress_items) {
+                Ok(value) => value,
+                Err(_) => {
+                    let _ = tx.rollback().await;
+                    return HttpResponse::BadRequest().json(json!({
+                        "error": "Invalid progress items"
+                    }));
+                }
+            };
+
+            let checklist_id = match sqlx::query_scalar::<_, i32>(
+                "INSERT INTO hometask_checklists (items) VALUES ($1) RETURNING id",
+            )
+            .bind(&progress_items_value)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(id) => id,
+                Err(e) => {
+                    eprintln!("Failed to create progress items: {}", e);
+                    let _ = tx.rollback().await;
+                    return HttpResponse::InternalServerError().json(json!({
+                        "error": "Failed to create progress items"
                     }));
                 }
             };
@@ -495,7 +554,7 @@ async fn list_student_hometasks(
                  COALESCE(t.full_name, u.username) AS teacher_name
          FROM hometasks h
          LEFT JOIN hometask_checklists c
-            ON h.hometask_type = 'checklist' AND h.content_id = c.id
+            ON (h.hometask_type = 'checklist' OR h.hometask_type = 'progress') AND h.content_id = c.id
             LEFT JOIN teachers t ON h.teacher_id = t.user_id
             LEFT JOIN users u ON h.teacher_id = u.id
             WHERE h.student_id = $1 AND h.status = ANY($2::hometask_status[])
@@ -577,7 +636,7 @@ async fn get_hometask(
                 c.items AS checklist_items
          FROM hometasks h
          LEFT JOIN hometask_checklists c
-            ON h.hometask_type = 'checklist' AND h.content_id = c.id
+            ON (h.hometask_type = 'checklist' OR h.hometask_type = 'progress') AND h.content_id = c.id
          WHERE h.id = $1",
     )
     .bind(hometask_id)
@@ -617,8 +676,8 @@ async fn update_hometask_checklist(
         Err(response) => return response,
     };
 
-    let hometask = match sqlx::query_as::<_, (i32, HometaskStatus, HometaskType, Option<i32>)>(
-        "SELECT student_id, status, hometask_type, content_id FROM hometasks WHERE id = $1",
+    let hometask = match sqlx::query_as::<_, (i32, i32, HometaskStatus, HometaskType, Option<i32>)>(
+        "SELECT student_id, teacher_id, status, hometask_type, content_id FROM hometasks WHERE id = $1",
     )
     .bind(hometask_id)
     .fetch_optional(&app_state.db)
@@ -638,7 +697,7 @@ async fn update_hometask_checklist(
         }
     };
 
-    let (student_id, status, hometask_type, content_id) = hometask;
+    let (student_id, teacher_id, status, hometask_type, content_id) = hometask;
 
     eprintln!(
         "Checklist update: user_id={}, student_id={}, roles={:?}",
@@ -651,8 +710,34 @@ async fn update_hometask_checklist(
         && current_user_id == student_id;
     let is_parent = claims.roles.contains(&"parent".to_string())
         && verify_can_access_student(&req, &app_state, student_id).await.is_ok();
+    let is_teacher = claims.roles.contains(&"teacher".to_string());
 
-    if !is_student && !is_parent {
+    if hometask_type == HometaskType::Progress {
+        if !is_student && !is_parent && !is_teacher {
+            return HttpResponse::Forbidden().json(json!({
+                "error": "Not authorized to update progress items"
+            }));
+        }
+
+        if is_teacher && current_user_id != teacher_id {
+            let has_relation = match verify_teacher_student_relation(
+                current_user_id,
+                student_id,
+                &app_state.db,
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(response) => return response,
+            };
+
+            if !has_relation {
+                return HttpResponse::Forbidden().json(json!({
+                    "error": "Not authorized to update progress items"
+                }));
+            }
+        }
+    } else if !is_student && !is_parent {
         return HttpResponse::Forbidden().json(json!({
             "error": "Only the student can update checklist items"
         }));
@@ -664,9 +749,9 @@ async fn update_hometask_checklist(
         }));
     }
 
-    if hometask_type != HometaskType::Checklist {
+    if hometask_type != HometaskType::Checklist && hometask_type != HometaskType::Progress {
         return HttpResponse::BadRequest().json(json!({
-            "error": "Hometask is not a checklist"
+            "error": "Hometask is not a checklist or progress task"
         }));
     }
 
@@ -685,11 +770,39 @@ async fn update_hometask_checklist(
         }));
     }
 
-    let updated_items = payload
-        .items
-        .iter()
-        .map(|item| json!({ "text": item.text, "is_done": item.is_done }))
-        .collect::<Vec<_>>();
+    let updated_items = if hometask_type == HometaskType::Checklist {
+        let invalid = payload.items.iter().any(|item| item.is_done.is_none());
+        if invalid {
+            return HttpResponse::BadRequest().json(json!({
+                "error": "Checklist items must include is_done"
+            }));
+        }
+
+        payload
+            .items
+            .iter()
+            .map(|item| {
+                json!({
+                    "text": item.text,
+                    "is_done": item.is_done.unwrap_or(false)
+                })
+            })
+            .collect::<Vec<_>>()
+    } else {
+        let mut updated = Vec::with_capacity(payload.items.len());
+        for item in &payload.items {
+            let progress = match item.progress {
+                Some(value) if (0..=4).contains(&value) => value,
+                _ => {
+                    return HttpResponse::BadRequest().json(json!({
+                        "error": "Progress items must be between 0 and 4"
+                    }));
+                }
+            };
+            updated.push(json!({ "text": item.text, "progress": progress }));
+        }
+        updated
+    };
 
     let updated_value = match serde_json::to_value(updated_items) {
         Ok(value) => value,

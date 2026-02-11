@@ -144,6 +144,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final isTeacher = _isTeacher(authService);
     final isParent = _isParent(authService);
     final canComplete = (isStudent || isParent) && !_showArchive;
+    final canToggleItems = (isStudent || isParent || isTeacher) && !_showArchive;
 
     return Padding(
       padding: const EdgeInsets.all(16),
@@ -235,7 +236,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
               hometaskService: hometaskService,
               canComplete: canComplete,
               canReorder: isTeacher && !_showArchive,
-              canToggleItems: canComplete,
+              canToggleItems: canToggleItems,
               canAccomplish: isTeacher && !_showArchive,
               canReopen: isTeacher,
             ),
@@ -332,6 +333,14 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         isDone: value,
                       )
                   : null,
+              onChangeProgress: canToggleItems &&
+                      hometask.hometaskType == HometaskType.progress
+                  ? (index, progress) async => _changeProgressItem(
+                        hometaskId: hometask.id,
+                        itemIndex: index,
+                        progress: progress,
+                      )
+                  : null,
               onMarkAccomplished: canAccomplish
                   ? () async => _markAccomplished(hometask.id)
                   : null,
@@ -377,6 +386,15 @@ class _HometasksScreenState extends State<HometasksScreen> {
                                     hometaskId: hometask.id,
                                     itemIndex: index,
                                     isDone: value,
+                                  )
+                              : null,
+                          onChangeProgress: canToggleItems &&
+                                  hometask.hometaskType ==
+                                      HometaskType.progress
+                              ? (index, progress) async => _changeProgressItem(
+                                    hometaskId: hometask.id,
+                                    itemIndex: index,
+                                    progress: progress,
                                   )
                               : null,
                           onMarkAccomplished: canAccomplish
@@ -433,6 +451,48 @@ class _HometasksScreenState extends State<HometasksScreen> {
       await _loadHometasks();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to update checklist item.')),
+      );
+    }
+  }
+
+  Future<void> _changeProgressItem({
+    required int hometaskId,
+    required int itemIndex,
+    required int progress,
+  }) async {
+    final hometaskService = context.read<HometaskService>();
+    final current = _orderedHometasks.isNotEmpty
+        ? _orderedHometasks
+        : hometaskService.hometasks;
+
+    final taskIndex = current.indexWhere((task) => task.id == hometaskId);
+    if (taskIndex == -1) return;
+
+    final task = current[taskIndex];
+    if (itemIndex < 0 || itemIndex >= task.checklistItems.length) return;
+
+    final updatedItems = List<ChecklistItem>.from(task.checklistItems);
+    final existing = updatedItems[itemIndex];
+    updatedItems[itemIndex] = ChecklistItem(
+      text: existing.text,
+      isDone: false,
+      progress: progress,
+    );
+
+    setState(() {
+      current[taskIndex] = task.copyWith(checklistItems: updatedItems);
+      _orderedHometasks = List<Hometask>.from(current);
+    });
+
+    final success = await hometaskService.updateChecklistItems(
+      hometaskId: hometaskId,
+      items: updatedItems,
+    );
+
+    if (!success && mounted) {
+      await _loadHometasks();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to update progress item.')),
       );
     }
   }

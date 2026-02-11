@@ -17,6 +17,7 @@ pub enum HometaskStatus {
 pub enum HometaskType {
     Simple,
     Checklist,
+    Progress,
     DailyRoutine,
     PhotoSubmission,
     TextSubmission,

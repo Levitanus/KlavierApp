@@ -7,6 +7,7 @@ enum HometaskStatus {
 enum HometaskType {
   simple,
   checklist,
+  progress,
   dailyRoutine,
   photoSubmission,
   textSubmission,
@@ -15,13 +16,15 @@ enum HometaskType {
 class ChecklistItem {
   final String text;
   final bool isDone;
+  final int? progress;
 
-  ChecklistItem({required this.text, required this.isDone});
+  ChecklistItem({required this.text, required this.isDone, this.progress});
 
   factory ChecklistItem.fromJson(Map<String, dynamic> json) {
     return ChecklistItem(
       text: json['text'] ?? '',
       isDone: json['is_done'] ?? false,
+      progress: json['progress'] as int?,
     );
   }
 }
@@ -122,6 +125,8 @@ class Hometask {
         return HometaskType.photoSubmission;
       case 'text_submission':
         return HometaskType.textSubmission;
+      case 'progress':
+        return HometaskType.progress;
       case 'checklist':
       default:
         return HometaskType.checklist;

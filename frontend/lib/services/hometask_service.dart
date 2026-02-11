@@ -191,7 +191,15 @@ class HometaskService extends ChangeNotifier {
         },
         body: jsonEncode({
           'items': items
-              .map((item) => {'text': item.text, 'is_done': item.isDone})
+              .map((item) {
+                final itemMap = <String, dynamic>{'text': item.text};
+                if (item.progress != null) {
+                  itemMap['progress'] = item.progress;
+                } else {
+                  itemMap['is_done'] = item.isDone;
+                }
+                return itemMap;
+              })
               .toList(),
         }),
       );
@@ -251,6 +259,8 @@ class HometaskService extends ChangeNotifier {
         return 'simple';
       case HometaskType.checklist:
         return 'checklist';
+      case HometaskType.progress:
+        return 'progress';
       case HometaskType.dailyRoutine:
         return 'daily_routine';
       case HometaskType.photoSubmission:

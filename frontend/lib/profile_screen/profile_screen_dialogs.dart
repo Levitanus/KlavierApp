@@ -439,6 +439,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                             value: HometaskType.checklist,
                             child: Text('Checklist'),
                           ),
+                          DropdownMenuItem(
+                            value: HometaskType.progress,
+                            child: Text('Progress'),
+                          ),
                         ],
                         onChanged: (value) {
                           if (value == null) return;
@@ -448,9 +452,12 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                         },
                       ),
                       const Divider(),
-                      if (selectedType == HometaskType.checklist) ...[
+                      if (selectedType == HometaskType.checklist ||
+                          selectedType == HometaskType.progress) ...[
                         Text(
-                          'Checklist items',
+                          selectedType == HometaskType.checklist
+                              ? 'Checklist items'
+                              : 'Progress items',
                           style: Theme.of(context).textTheme.titleSmall,
                         ),
                         const SizedBox(height: 8),
@@ -518,18 +525,22 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                           return;
                         }
 
-                        final items = selectedType == HometaskType.checklist
+                        final items = selectedType == HometaskType.checklist ||
+                                selectedType == HometaskType.progress
                             ? itemControllers
                                 .map((controller) => controller.text.trim())
                                 .where((text) => text.isNotEmpty)
                                 .toList()
                             : <String>[];
 
-                        if (selectedType == HometaskType.checklist &&
+                        if ((selectedType == HometaskType.checklist ||
+                                selectedType == HometaskType.progress) &&
                             items.isEmpty) {
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Add at least one checklist item.'),
+                            SnackBar(
+                              content: Text(
+                                'Add at least one ${selectedType == HometaskType.checklist ? 'checklist' : 'progress'} item.',
+                              ),
                             ),
                           );
                           return;
