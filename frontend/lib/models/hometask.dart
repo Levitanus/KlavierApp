@@ -29,6 +29,7 @@ class ChecklistItem {
 class Hometask {
   final int id;
   final int teacherId;
+  final String? teacherName;
   final int studentId;
   final String title;
   final String? description;
@@ -43,6 +44,7 @@ class Hometask {
   Hometask({
     required this.id,
     required this.teacherId,
+    required this.teacherName,
     required this.studentId,
     required this.title,
     required this.description,
@@ -60,6 +62,7 @@ class Hometask {
     return Hometask(
       id: json['id'],
       teacherId: json['teacher_id'],
+      teacherName: json['teacher_name'],
       studentId: json['student_id'],
       title: json['title'] ?? '',
       description: json['description'],
@@ -83,6 +86,7 @@ class Hometask {
     return Hometask(
       id: id,
       teacherId: teacherId,
+      teacherName: teacherName,
       studentId: studentId,
       title: title,
       description: description,

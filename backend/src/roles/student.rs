@@ -620,33 +620,70 @@ pub(crate) async fn remove_student_teacher_relation(
         return response;
     }
 
-    match sqlx::query(
+    let mut tx = match app_state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            eprintln!("Failed to start transaction: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Database error"
+            }));
+        }
+    };
+
+    let delete_result = match sqlx::query(
         "DELETE FROM teacher_student_relations
          WHERE teacher_user_id = $1 AND student_user_id = $2"
     )
     .bind(teacher_id)
     .bind(student_id)
-    .execute(&app_state.db)
+    .execute(&mut *tx)
     .await
     {
-        Ok(result) => {
-            if result.rows_affected() > 0 {
-                HttpResponse::Ok().json(serde_json::json!({
-                    "message": "Relation removed successfully"
-                }))
-            } else {
-                HttpResponse::NotFound().json(serde_json::json!({
-                    "error": "Relation not found"
-                }))
-            }
-        }
+        Ok(result) => result,
         Err(e) => {
             eprintln!("Failed to remove relation: {}", e);
-            HttpResponse::InternalServerError().json(serde_json::json!({
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
-            }))
+            }));
         }
+    };
+
+    if delete_result.rows_affected() == 0 {
+        let _ = tx.rollback().await;
+        return HttpResponse::NotFound().json(serde_json::json!({
+            "error": "Relation not found"
+        }));
     }
+
+    if let Err(e) = sqlx::query(
+        "UPDATE hometasks
+         SET status = 'accomplished_by_teacher', updated_at = NOW()
+         WHERE teacher_id = $1 AND student_id = $2
+           AND status <> 'accomplished_by_teacher'"
+    )
+    .bind(teacher_id)
+    .bind(student_id)
+    .execute(&mut *tx)
+    .await
+    {
+        eprintln!("Failed to archive hometasks: {}", e);
+        let _ = tx.rollback().await;
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Failed to archive hometasks"
+        }));
+    }
+
+    if let Err(e) = tx.commit().await {
+        eprintln!("Failed to commit transaction: {}", e);
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Database error"
+        }));
+    }
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "message": "Relation removed successfully"
+    }))
 }
 
 #[get("/api/students/{student_id}/parents")]

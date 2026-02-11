@@ -332,26 +332,52 @@ class _HometasksScreenState extends State<HometasksScreen> {
       );
     }
 
-    return ListView.builder(
-      itemCount: hometasks.length,
-      itemBuilder: (context, index) {
-        final hometask = hometasks[index];
-        return HometaskWidget(
-          hometask: hometask,
-          onMarkCompleted:
-              canComplete ? () async => _markCompleted(hometask.id) : null,
-          onToggleItem: canToggleItems &&
-                  hometask.hometaskType == HometaskType.checklist
-              ? (index, value) async => _toggleChecklistItem(
-                    hometaskId: hometask.id,
-                    itemIndex: index,
-                    isDone: value,
-                  )
-              : null,
-          onMarkAccomplished:
-              canAccomplish ? () async => _markAccomplished(hometask.id) : null,
-        );
-      },
+    final grouped = <String, List<Hometask>>{};
+    for (final task in hometasks) {
+      final rawName = task.teacherName?.trim() ?? '';
+      final key = rawName.isNotEmpty ? rawName : 'Teacher #${task.teacherId}';
+      grouped.putIfAbsent(key, () => []).add(task);
+    }
+
+    final teacherNames = grouped.keys.toList()..sort();
+
+    return ListView(
+      children: teacherNames
+          .map(
+            (teacherName) => Card(
+              margin: const EdgeInsets.only(bottom: 12),
+              child: ExpansionTile(
+                initiallyExpanded: true,
+                title: Text(teacherName),
+                children: grouped[teacherName]!
+                    .map(
+                      (hometask) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: HometaskWidget(
+                          hometask: hometask,
+                          onMarkCompleted: canComplete
+                              ? () async => _markCompleted(hometask.id)
+                              : null,
+                          onToggleItem: canToggleItems &&
+                                  hometask.hometaskType ==
+                                      HometaskType.checklist
+                              ? (index, value) async => _toggleChecklistItem(
+                                    hometaskId: hometask.id,
+                                    itemIndex: index,
+                                    isDone: value,
+                                  )
+                              : null,
+                          onMarkAccomplished: canAccomplish
+                              ? () async => _markAccomplished(hometask.id)
+                              : null,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+          )
+          .toList(),
     );
   }
 

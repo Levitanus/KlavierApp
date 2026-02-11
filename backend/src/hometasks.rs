@@ -65,6 +65,7 @@ struct HometaskWithChecklist {
     hometask_type: HometaskType,
     content_id: Option<i32>,
     checklist_items: Option<serde_json::Value>,
+    teacher_name: Option<String>,
 }
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
@@ -286,11 +287,14 @@ async fn list_student_hometasks(
 
     let hometasks = sqlx::query_as::<_, HometaskWithChecklist>(
         "SELECT h.id, h.teacher_id, h.student_id, h.title, h.description, h.status, h.due_date,
-                h.created_at, h.updated_at, h.sort_order, h.hometask_type, h.content_id,
-                c.items AS checklist_items
+                 h.created_at, h.updated_at, h.sort_order, h.hometask_type, h.content_id,
+                 c.items AS checklist_items,
+                 COALESCE(t.full_name, u.username) AS teacher_name
          FROM hometasks h
          LEFT JOIN hometask_checklists c
             ON h.hometask_type = 'checklist' AND h.content_id = c.id
+            LEFT JOIN teachers t ON h.teacher_id = t.user_id
+            LEFT JOIN users u ON h.teacher_id = u.id
             WHERE h.student_id = $1 AND h.status = ANY($2::hometask_status[])
               AND ($3::int IS NULL OR h.teacher_id = $3)
          ORDER BY h.sort_order ASC, h.created_at DESC",
