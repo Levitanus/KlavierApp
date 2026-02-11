@@ -1,0 +1,1119 @@
+part of '../profile_screen.dart';
+
+mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
+  Future<bool> _showLockedConfirmationDialog({
+    required String title,
+    required String content,
+    required String confirmLabel,
+  }) async {
+    int remainingSeconds = 5;
+    Timer? timer;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          timer ??= Timer.periodic(const Duration(seconds: 1), (t) {
+            if (remainingSeconds <= 1) {
+              t.cancel();
+              setDialogState(() {
+                remainingSeconds = 0;
+              });
+            } else {
+              setDialogState(() {
+                remainingSeconds -= 1;
+              });
+            }
+          });
+
+          return AlertDialog(
+            title: Text(title),
+            content: Text(content),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  timer?.cancel();
+                  Navigator.of(context).pop(false);
+                },
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: remainingSeconds == 0
+                    ? () {
+                        timer?.cancel();
+                        Navigator.of(context).pop(true);
+                      }
+                    : null,
+                child: Text(
+                  remainingSeconds == 0
+                      ? confirmLabel
+                      : '$confirmLabel (${remainingSeconds}s)',
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    timer?.cancel();
+    return confirmed ?? false;
+  }
+
+  void _showAddStudentsToTeacherDialog() async {
+    if (_userId == null) return;
+    final studentFilterController = TextEditingController();
+    final selectedStudents = <int>{};
+    String studentFilter = '';
+
+    final students = await _loadStudentsForSelection();
+    if (!mounted) return;
+
+    final existingStudentIds = _teacherStudents
+        .map((student) => student['user_id'])
+        .whereType<int>()
+        .toSet();
+
+    final availableStudents = students
+        .where((student) => !existingStudentIds.contains(student.userId))
+        .toList();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final filteredStudents = studentFilter.isEmpty
+              ? availableStudents
+              : availableStudents
+                  .where((s) =>
+                      s.fullName
+                          .toLowerCase()
+                          .contains(studentFilter.toLowerCase()) ||
+                      s.username
+                          .toLowerCase()
+                          .contains(studentFilter.toLowerCase()))
+                  .toList();
+
+          return AlertDialog(
+            title: const Text('Add Students'),
+            content: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: studentFilterController,
+                    decoration: const InputDecoration(
+                      labelText: 'Search students',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.search),
+                      hintText: 'Type to filter...',
+                    ),
+                    onChanged: (value) {
+                      setDialogState(() {
+                        studentFilter = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: filteredStudents.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: Text('No students available'),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredStudents.length,
+                            itemBuilder: (context, index) {
+                              final student = filteredStudents[index];
+                              return CheckboxListTile(
+                                title: Text(student.fullName),
+                                subtitle: Text(student.username),
+                                value: selectedStudents.contains(student.userId),
+                                onChanged: (checked) {
+                                  setDialogState(() {
+                                    if (checked == true) {
+                                      selectedStudents.add(student.userId);
+                                    } else {
+                                      selectedStudents.remove(student.userId);
+                                    }
+                                  });
+                                },
+                                dense: true,
+                              );
+                            },
+                          ),
+                  ),
+                  if (selectedStudents.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Select at least one student',
+                        style: TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: selectedStudents.isNotEmpty
+                    ? () async {
+                        Navigator.of(context).pop();
+                        await _addStudentsToTeacher(selectedStudents.toList());
+                      }
+                    : null,
+                child: const Text('Add'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showStudentProfileDialog(Map<String, dynamic> student) {
+    List<Map<String, dynamic>> studentParents = [];
+    bool isLoadingParents = true;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          if (isLoadingParents) {
+            isLoadingParents = false;
+            final studentId = student['user_id'];
+            if (studentId is int) {
+              _fetchStudentParents(studentId).then((parents) {
+                if (context.mounted) {
+                  setDialogState(() {
+                    studentParents = parents;
+                  });
+                }
+              });
+            }
+          }
+
+          return AlertDialog(
+            title: Text(student['full_name'] ?? 'Student Profile'),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('@${student['username'] ?? ''}'),
+                    const SizedBox(height: 12),
+                    _buildInfoRow(
+                      Icons.cake_outlined,
+                      'Birthday',
+                      student['birthday']?.toString() ?? 'Not set',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildInfoRow(
+                      Icons.home_outlined,
+                      'Address',
+                      student['address']?.toString() ?? 'Not set',
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Parents',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    if (studentParents.isEmpty)
+                      Text(
+                        'No parents available',
+                        style: TextStyle(color: Colors.grey[600]),
+                      )
+                    else
+                      ...studentParents.map((parent) {
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        parent['full_name'] ?? 'Unknown',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text('@${parent['username'] ?? ''}'),
+                                    ],
+                                  ),
+                                ),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.visibility),
+                                  label: const Text('View Profile'),
+                                  onPressed: () => _showParentProfileDialog(parent),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showTeacherProfileDialog(Map<String, dynamic> teacher) {
+    List<Map<String, dynamic>> teacherStudents = [];
+    bool isLoadingStudents = true;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          if (isLoadingStudents) {
+            isLoadingStudents = false;
+            final teacherId = teacher['user_id'];
+            if (teacherId is int) {
+              _fetchTeacherStudents(teacherId).then((students) {
+                if (context.mounted) {
+                  setDialogState(() {
+                    teacherStudents = students;
+                  });
+                }
+              });
+            }
+          }
+
+          return AlertDialog(
+            title: Text(teacher['full_name'] ?? 'Teacher Profile'),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('@${teacher['username'] ?? ''}'),
+                    const SizedBox(height: 12),
+                    if (teacher['email'] != null)
+                      _buildInfoRow(
+                        Icons.email_outlined,
+                        'Email',
+                        teacher['email'].toString(),
+                      ),
+                    if (teacher['phone'] != null) ...[
+                      const SizedBox(height: 8),
+                      _buildInfoRow(
+                        Icons.phone_outlined,
+                        'Phone',
+                        teacher['phone'].toString(),
+                      ),
+                    ],
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Students',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    if (teacherStudents.isEmpty)
+                      Text(
+                        'No students available',
+                        style: TextStyle(color: Colors.grey[600]),
+                      )
+                    else
+                      ...teacherStudents.map((student) {
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12.0),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        student['full_name'] ?? 'Unknown',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text('@${student['username'] ?? ''}'),
+                                    ],
+                                  ),
+                                ),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.visibility),
+                                  label: const Text('View Profile'),
+                                  onPressed: () => _showStudentProfileDialog(student),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showParentProfileDialog(Map<String, dynamic> parent) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(parent['full_name'] ?? 'Parent Profile'),
+        content: SizedBox(
+          width: 500,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('@${parent['username'] ?? ''}'),
+              const SizedBox(height: 12),
+              if (parent['email'] != null)
+                _buildInfoRow(
+                  Icons.email_outlined,
+                  'Email',
+                  parent['email'].toString(),
+                ),
+              if (parent['phone'] != null) ...[
+                const SizedBox(height: 8),
+                _buildInfoRow(
+                  Icons.phone_outlined,
+                  'Phone',
+                  parent['phone'].toString(),
+                ),
+              ],
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showChangePasswordDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => ChangePasswordDialog(
+        onPasswordChanged: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Password changed successfully'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  void _showMakeStudentDialog() {
+    final fullNameController = TextEditingController();
+    final addressController = TextEditingController();
+    final birthdayController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Make $_username a Student'),
+        content: Form(
+          key: formKey,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: fullNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Full Name',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Required' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: addressController,
+                  decoration: const InputDecoration(
+                    labelText: 'Address',
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) =>
+                      value?.isEmpty ?? true ? 'Required' : null,
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: birthdayController,
+                  decoration: const InputDecoration(
+                    labelText: 'Birthday (YYYY-MM-DD)',
+                    border: OutlineInputBorder(),
+                    hintText: '2010-01-15',
+                  ),
+                  validator: (value) {
+                    if (value?.isEmpty ?? true) return 'Required';
+                    final regex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
+                    if (!regex.hasMatch(value!)) {
+                      return 'Format: YYYY-MM-DD';
+                    }
+                    return null;
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                Navigator.of(context).pop();
+                await _makeUserStudent(
+                  fullNameController.text,
+                  addressController.text,
+                  birthdayController.text,
+                );
+              }
+            },
+            child: const Text('Convert'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMakeParentDialog() async {
+    final fullNameController = TextEditingController();
+    final studentFilterController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final selectedStudents = <int>{};
+    String studentFilter = '';
+
+    final students = await _loadStudentsForSelection();
+    if (!mounted) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Make $_username a Parent'),
+        content: StatefulBuilder(
+          builder: (context, setDialogState) {
+            final filteredStudents = studentFilter.isEmpty
+                ? students
+                : students
+                    .where((s) =>
+                        s.fullName
+                            .toLowerCase()
+                            .contains(studentFilter.toLowerCase()) ||
+                        s.username
+                            .toLowerCase()
+                            .contains(studentFilter.toLowerCase()))
+                    .toList();
+
+            return Form(
+              key: formKey,
+              child: SizedBox(
+                width: 500,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextFormField(
+                      controller: fullNameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Full Name',
+                        border: OutlineInputBorder(),
+                      ),
+                      validator: (value) =>
+                          value?.isEmpty ?? true ? 'Required' : null,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Select Students (at least one):',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: studentFilterController,
+                      decoration: const InputDecoration(
+                        labelText: 'Search students',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.search),
+                        hintText: 'Type to filter...',
+                      ),
+                      onChanged: (value) {
+                        setDialogState(() {
+                          studentFilter = value;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      constraints: const BoxConstraints(maxHeight: 300),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: filteredStudents.isEmpty
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(16.0),
+                                child: Text('No students found'),
+                              ),
+                            )
+                          : ListView.builder(
+                              shrinkWrap: true,
+                              itemCount: filteredStudents.length,
+                              itemBuilder: (context, index) {
+                                final student = filteredStudents[index];
+                                return CheckboxListTile(
+                                  title: Text(student.fullName),
+                                  subtitle: Text(student.username),
+                                  value: selectedStudents
+                                      .contains(student.userId),
+                                  onChanged: (checked) {
+                                    setDialogState(() {
+                                      if (checked == true) {
+                                        selectedStudents.add(student.userId);
+                                      } else {
+                                        selectedStudents.remove(student.userId);
+                                      }
+                                    });
+                                  },
+                                  dense: true,
+                                );
+                              },
+                            ),
+                    ),
+                    if (selectedStudents.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Text(
+                          'At least one student required',
+                          style: TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate() &&
+                  selectedStudents.isNotEmpty) {
+                Navigator.of(context).pop();
+                await _makeUserParent(
+                  fullNameController.text,
+                  selectedStudents.toList(),
+                );
+              }
+            },
+            child: const Text('Convert'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMakeTeacherDialog() {
+    final fullNameController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Make $_username a Teacher'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: fullNameController,
+            decoration: const InputDecoration(
+              labelText: 'Full Name',
+              border: OutlineInputBorder(),
+            ),
+            validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (formKey.currentState!.validate()) {
+                Navigator.of(context).pop();
+                await _makeUserTeacher(fullNameController.text);
+              }
+            },
+            child: const Text('Convert'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddChildrenDialog() async {
+    if (_userId == null) return;
+    final studentFilterController = TextEditingController();
+    final selectedStudents = <int>{};
+    String studentFilter = '';
+
+    final students = await _loadStudentsForSelection();
+    if (!mounted) return;
+
+    final existingChildIds = <int>{};
+    final children = _parentData?['children'];
+    if (children is List) {
+      for (final child in children) {
+        if (child is Map<String, dynamic>) {
+          final id = child['user_id'] ?? child['id'];
+          if (id is int) {
+            existingChildIds.add(id);
+          }
+        }
+      }
+    }
+
+    final availableStudents = students
+        .where((student) => !existingChildIds.contains(student.userId))
+        .toList();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final filteredStudents = studentFilter.isEmpty
+              ? availableStudents
+              : availableStudents
+                  .where((s) =>
+                      s.fullName
+                          .toLowerCase()
+                          .contains(studentFilter.toLowerCase()) ||
+                      s.username
+                          .toLowerCase()
+                          .contains(studentFilter.toLowerCase()))
+                  .toList();
+
+          return AlertDialog(
+            title: const Text('Add Children'),
+            content: SizedBox(
+              width: 500,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: studentFilterController,
+                    decoration: const InputDecoration(
+                      labelText: 'Search students',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.search),
+                      hintText: 'Type to filter...',
+                    ),
+                    onChanged: (value) {
+                      setDialogState(() {
+                        studentFilter = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 300),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.grey.shade300),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: filteredStudents.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: Text('No students available'),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredStudents.length,
+                            itemBuilder: (context, index) {
+                              final student = filteredStudents[index];
+                              return CheckboxListTile(
+                                title: Text(student.fullName),
+                                subtitle: Text(student.username),
+                                value: selectedStudents
+                                    .contains(student.userId),
+                                onChanged: (checked) {
+                                  setDialogState(() {
+                                    if (checked == true) {
+                                      selectedStudents.add(student.userId);
+                                    } else {
+                                      selectedStudents.remove(student.userId);
+                                    }
+                                  });
+                                },
+                                dense: true,
+                              );
+                            },
+                          ),
+                  ),
+                  if (selectedStudents.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Select at least one student',
+                        style: TextStyle(color: Colors.red, fontSize: 12),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: selectedStudents.isNotEmpty
+                    ? () async {
+                        Navigator.of(context).pop();
+                        await _addChildrenToParent(selectedStudents.toList());
+                      }
+                    : null,
+                child: const Text('Add'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showChildDetailsDialog(Map<String, dynamic> child) {
+    final fullNameController = TextEditingController(text: child['full_name']);
+    final addressController = TextEditingController(text: child['address']);
+    final birthdayController = TextEditingController(text: child['birthday']);
+    bool isEditing = false;
+    bool isSaving = false;
+    List<Map<String, dynamic>> childTeachers = [];
+    bool isLoadingTeachers = true;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          if (isLoadingTeachers) {
+            isLoadingTeachers = false;
+            final childId = child['user_id'];
+            if (childId is int) {
+              _fetchStudentTeachers(childId).then((teachers) {
+                if (context.mounted) {
+                  setState(() {
+                    childTeachers = teachers;
+                  });
+                }
+              });
+            }
+          }
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                _buildChildAvatar(
+                  child['profile_image'],
+                  child['full_name'],
+                  20,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        child['full_name'],
+                        style: const TextStyle(fontSize: 20),
+                      ),
+                      Text(
+                        '@${child['username']}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: 500,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (isEditing) ...[
+                      TextField(
+                        controller: fullNameController,
+                        decoration: const InputDecoration(
+                          labelText: 'Full Name',
+                          prefixIcon: Icon(Icons.badge),
+                          border: OutlineInputBorder(),
+                        ),
+                        enabled: !isSaving,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: addressController,
+                        decoration: const InputDecoration(
+                          labelText: 'Address',
+                          prefixIcon: Icon(Icons.home),
+                          border: OutlineInputBorder(),
+                        ),
+                        enabled: !isSaving,
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: birthdayController,
+                        decoration: const InputDecoration(
+                          labelText: 'Birthday (YYYY-MM-DD)',
+                          prefixIcon: Icon(Icons.cake),
+                          border: OutlineInputBorder(),
+                          hintText: '2010-01-31',
+                        ),
+                        enabled: !isSaving,
+                      ),
+                    ] else ...[
+                      ListTile(
+                        leading: const Icon(Icons.badge),
+                        title: const Text('Full Name'),
+                        subtitle: Text(child['full_name']),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      const Divider(),
+                      ListTile(
+                        leading: const Icon(Icons.home),
+                        title: const Text('Address'),
+                        subtitle: Text(child['address']),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      const Divider(),
+                      ListTile(
+                        leading: const Icon(Icons.cake),
+                        title: const Text('Birthday'),
+                        subtitle: Text(child['birthday']),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      const Divider(),
+                      ListTile(
+                        leading: const Icon(Icons.person),
+                        title: const Text('Username'),
+                        subtitle: Text(child['username']),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                      if (childTeachers.isNotEmpty) ...[
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Teachers',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        ...childTeachers.map((teacher) {
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12.0),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    teacher['full_name'] ?? 'Unknown',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text('@${teacher['username'] ?? ''}'),
+                                  const SizedBox(height: 8),
+                                  Row(
+                                    children: [
+                                      OutlinedButton.icon(
+                                        icon: const Icon(Icons.visibility),
+                                        label: const Text('View Profile'),
+                                        onPressed: () => _showTeacherProfileDialog(teacher),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      TextButton.icon(
+                                        icon: const Icon(Icons.logout, color: Colors.red),
+                                        label: const Text(
+                                          'Leave Teacher',
+                                          style: TextStyle(color: Colors.red),
+                                        ),
+                                        onPressed: () async {
+                                          final teacherId = teacher['user_id'];
+                                          final studentId = child['user_id'];
+                                          if (teacherId is int && studentId is int) {
+                                            await _removeTeacherFromStudent(studentId, teacherId);
+                                            final updatedTeachers =
+                                                await _fetchStudentTeachers(studentId);
+                                            if (context.mounted) {
+                                              setState(() {
+                                                childTeachers = updatedTeachers;
+                                              });
+                                            }
+                                          }
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ] else ...[
+                        const Divider(),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Teachers',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'No teachers assigned yet',
+                          style: TextStyle(color: Colors.grey[600]),
+                        ),
+                      ],
+                    ],
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              if (isEditing) ...[
+                TextButton(
+                  onPressed: isSaving
+                      ? null
+                      : () {
+                          setState(() {
+                            isEditing = false;
+                            fullNameController.text = child['full_name'];
+                            addressController.text = child['address'];
+                            birthdayController.text = child['birthday'];
+                          });
+                        },
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: isSaving
+                      ? null
+                      : () async {
+                          setState(() {
+                            isSaving = true;
+                          });
+
+                          await _updateChildData(
+                            child['user_id'],
+                            fullNameController.text,
+                            addressController.text,
+                            birthdayController.text,
+                          );
+
+                          setState(() {
+                            isSaving = false;
+                          });
+
+                          if (context.mounted) {
+                            Navigator.of(context).pop();
+                            _loadProfile();
+                          }
+                        },
+                  child: isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save'),
+                ),
+              ] else ...[
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Close'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      isEditing = true;
+                    });
+                  },
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Edit'),
+                ),
+              ],
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
