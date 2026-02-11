@@ -19,6 +19,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
   int? _selectedStudentId;
   List<StudentSummary> _students = [];
   List<Hometask> _orderedHometasks = [];
+  String _lastRoleSignature = '';
 
   @override
   void initState() {
@@ -28,15 +29,31 @@ class _HometasksScreenState extends State<HometasksScreen> {
     });
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    final authService = context.read<AuthService>();
+    final roleSignature = authService.roles.join('|');
+    if (roleSignature != _lastRoleSignature) {
+      _lastRoleSignature = roleSignature;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _initScreen();
+        }
+      });
+    }
+  }
+
   Future<void> _initScreen() async {
     final authService = context.read<AuthService>();
-    if (_isStudent(authService)) {
-      await _loadHometasks();
+    if (_isParent(authService) || _isTeacher(authService)) {
+      await _loadStudents();
       return;
     }
 
-    if (_isParent(authService) || _isTeacher(authService)) {
-      await _loadStudents();
+    if (_isStudent(authService)) {
+      await _loadHometasks();
     }
   }
 
@@ -54,6 +71,11 @@ class _HometasksScreenState extends State<HometasksScreen> {
     List<StudentSummary> students = [];
     if (_isParent(authService)) {
       students = await hometaskService.fetchStudentsForParent();
+      final selfSummary = await hometaskService.getCurrentStudentSummary();
+      if (selfSummary != null &&
+          !students.any((student) => student.userId == selfSummary.userId)) {
+        students = [selfSummary, ...students];
+      }
     } else if (_isTeacher(authService)) {
       students = await hometaskService.fetchStudentsForTeacher();
     }
@@ -81,7 +103,14 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final authService = context.read<AuthService>();
     final hometaskService = context.read<HometaskService>();
 
-    if (_isStudent(authService)) {
+    if (_isParent(authService) || _isTeacher(authService)) {
+      final studentId = _selectedStudentId;
+      if (studentId == null) return;
+      await hometaskService.fetchHometasksForStudent(
+        studentId: studentId,
+        status: _showArchive ? 'archived' : 'active',
+      );
+    } else if (_isStudent(authService)) {
       if (_showArchive) {
         final studentId = await hometaskService.getCurrentUserId();
         if (studentId == null) return;
@@ -92,13 +121,6 @@ class _HometasksScreenState extends State<HometasksScreen> {
       } else {
         await hometaskService.fetchActiveForCurrentStudent();
       }
-    } else {
-      final studentId = _selectedStudentId;
-      if (studentId == null) return;
-      await hometaskService.fetchHometasksForStudent(
-        studentId: studentId,
-        status: _showArchive ? 'archived' : 'active',
-      );
     }
 
     if (!mounted) return;

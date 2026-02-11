@@ -12,6 +12,8 @@ class HometaskService extends ChangeNotifier {
   bool _isLoading = false;
   String? _errorMessage;
   int? _currentUserId;
+  String? _currentUsername;
+  String? _currentFullName;
   String? _lastToken;
 
   HometaskService({
@@ -30,6 +32,8 @@ class HometaskService extends ChangeNotifier {
     if (token != _lastToken) {
       _lastToken = token;
       _currentUserId = null;
+      _currentUsername = null;
+      _currentFullName = null;
       _hometasks = [];
       _errorMessage = null;
       _isLoading = false;
@@ -318,6 +322,24 @@ class HometaskService extends ChangeNotifier {
     return _ensureCurrentUserId();
   }
 
+  Future<StudentSummary?> getCurrentStudentSummary() async {
+    if (!_hasRole('student')) return null;
+
+    final userId = await _ensureCurrentUserId();
+    if (userId == null) return null;
+
+    final username = _currentUsername ?? '';
+    final fullName = (_currentFullName ?? '').isNotEmpty
+        ? _currentFullName!
+        : username;
+
+    return StudentSummary(
+      userId: userId,
+      username: username,
+      fullName: fullName.isNotEmpty ? fullName : 'Student',
+    );
+  }
+
   Future<int?> _ensureCurrentUserId() async {
     if (_currentUserId != null) return _currentUserId;
     if (authService.token == null) return null;
@@ -334,6 +356,13 @@ class HometaskService extends ChangeNotifier {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         _currentUserId = data['id'];
+        _currentUsername = data['username'];
+        final studentData = data['student_data'];
+        if (studentData is Map<String, dynamic>) {
+          _currentFullName = studentData['full_name'];
+        } else {
+          _currentFullName = null;
+        }
         return _currentUserId;
       }
     } catch (_) {}
