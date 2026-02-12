@@ -92,6 +92,7 @@ class MyApp extends StatelessWidget {
               wsService: wsService,
             );
             service.updateToken(authService.token ?? '');
+            service.updateCurrentUserId(authService.userId);
             return service;
           },
         ),

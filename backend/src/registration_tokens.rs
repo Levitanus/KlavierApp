@@ -6,6 +6,7 @@ use sha2::{Sha256, Digest};
 use uuid::Uuid;
 use argon2::{Argon2, PasswordHasher};
 use argon2::password_hash::{SaltString, rand_core::OsRng};
+use log::{error};
 
 use crate::AppState;
 use crate::users::verify_token;
@@ -183,7 +184,7 @@ async fn create_registration_token(
             })
         }
         Err(e) => {
-            eprintln!("Failed to create registration token: {}", e);
+            error!("Failed to create registration token: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to create registration token"
             }))
@@ -273,7 +274,7 @@ async fn create_parent_token_from_student(
             })
         }
         Err(e) => {
-            eprintln!("Failed to create parent registration token: {}", e);
+            error!("Failed to create parent registration token: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to create registration token"
             }))
@@ -351,7 +352,7 @@ async fn create_student_token_from_teacher(
             expires_at,
         }),
         Err(e) => {
-            eprintln!("Failed to create student registration token: {}", e);
+            error!("Failed to create student registration token: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to create registration token"
             }))
@@ -388,7 +389,7 @@ async fn get_token_info(
             });
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -494,7 +495,7 @@ async fn register_with_token(
             }));
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -540,7 +541,7 @@ async fn register_with_token(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -561,7 +562,7 @@ async fn register_with_token(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to create user: {}", e);
+            error!("Failed to create user: {}", e);
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "Username already exists or database error"
             }));
@@ -578,7 +579,7 @@ async fn register_with_token(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to get role: {}", e);
+            error!("Failed to get role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Role not found"
@@ -595,7 +596,7 @@ async fn register_with_token(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to assign role: {}", e);
+        error!("Failed to assign role: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to assign role"
@@ -629,7 +630,7 @@ async fn register_with_token(
             .execute(&mut *tx)
             .await
             {
-                eprintln!("Failed to create student entry: {}", e);
+                error!("Failed to create student entry: {}", e);
                 let _ = tx.rollback().await;
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to create student"
@@ -653,7 +654,7 @@ async fn register_with_token(
                 .execute(&mut *tx)
                 .await
                 {
-                    eprintln!("Failed to create teacher-student relation: {}", e);
+                    error!("Failed to create teacher-student relation: {}", e);
                     let _ = tx.rollback().await;
                     return HttpResponse::InternalServerError().json(serde_json::json!({
                         "error": "Failed to create teacher-student relation"
@@ -670,7 +671,7 @@ async fn register_with_token(
             .execute(&mut *tx)
             .await
             {
-                eprintln!("Failed to create parent entry: {}", e);
+                error!("Failed to create parent entry: {}", e);
                 let _ = tx.rollback().await;
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to create parent"
@@ -696,7 +697,7 @@ async fn register_with_token(
                 .execute(&mut *tx)
                 .await
                 {
-                    eprintln!("Failed to create parent-student relation: {}", e);
+                    error!("Failed to create parent-student relation: {}", e);
                     let _ = tx.rollback().await;
                     return HttpResponse::InternalServerError().json(serde_json::json!({
                         "error": "Failed to create parent-student relation"
@@ -713,7 +714,7 @@ async fn register_with_token(
             .execute(&mut *tx)
             .await
             {
-                eprintln!("Failed to create teacher entry: {}", e);
+                error!("Failed to create teacher entry: {}", e);
                 let _ = tx.rollback().await;
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to create teacher"
@@ -738,13 +739,13 @@ async fn register_with_token(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to mark token as used: {}", e);
+        error!("Failed to mark token as used: {}", e);
         // Don't rollback, just log the error
     }
     
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -776,7 +777,7 @@ async fn list_registration_tokens(
     {
         Ok(tokens) => HttpResponse::Ok().json(tokens),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }))

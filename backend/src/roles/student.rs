@@ -1,5 +1,6 @@
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
 use chrono::NaiveDate;
+use log::{error};
 
 use super::helpers::{
     check_and_archive_parents, check_and_unarchive_parents, verify_admin_role,
@@ -34,7 +35,7 @@ pub(crate) async fn archive_student_role(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to start transaction"
             }));
@@ -50,7 +51,7 @@ pub(crate) async fn archive_student_role(
     .await {
         Ok(result) => result,
         Err(e) => {
-            eprintln!("Failed to get admin user ID: {}", e);
+            error!("Failed to get admin user ID: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to get admin user information"
             }));
@@ -85,7 +86,7 @@ pub(crate) async fn archive_student_role(
             }
             // Cascade to parents
             if let Err(e) = check_and_archive_parents(user_id, admin_user_id, &mut tx).await {
-                eprintln!("Failed to archive parents: {}", e);
+                error!("Failed to archive parents: {}", e);
                 let _ = tx.rollback().await;
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to update parent status"
@@ -97,7 +98,7 @@ pub(crate) async fn archive_student_role(
                     "message": "Student role archived successfully"
                 })),
                 Err(e) => {
-                    eprintln!("Failed to commit transaction: {}", e);
+                    error!("Failed to commit transaction: {}", e);
                     HttpResponse::InternalServerError().json(serde_json::json!({
                         "error": "Failed to archive student role"
                     }))
@@ -106,7 +107,7 @@ pub(crate) async fn archive_student_role(
         }
         Err(e) => {
             let _ = tx.rollback().await;
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to archive student role"
             }))
@@ -129,7 +130,7 @@ pub(crate) async fn unarchive_student_role(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to start transaction"
             }));
@@ -154,7 +155,7 @@ pub(crate) async fn unarchive_student_role(
             }
             // Cascade to parents
             if let Err(e) = check_and_unarchive_parents(user_id, &mut tx).await {
-                eprintln!("Failed to unarchive parents: {}", e);
+                error!("Failed to unarchive parents: {}", e);
                 let _ = tx.rollback().await;
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to update parent status"
@@ -166,7 +167,7 @@ pub(crate) async fn unarchive_student_role(
                     "message": "Student role unarchived successfully"
                 })),
                 Err(e) => {
-                    eprintln!("Failed to commit transaction: {}", e);
+                    error!("Failed to commit transaction: {}", e);
                     HttpResponse::InternalServerError().json(serde_json::json!({
                         "error": "Failed to unarchive student role"
                     }))
@@ -175,7 +176,7 @@ pub(crate) async fn unarchive_student_role(
         }
         Err(e) => {
             let _ = tx.rollback().await;
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to unarchive student role"
             }))
@@ -226,7 +227,7 @@ pub(crate) async fn create_student(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -247,7 +248,7 @@ pub(crate) async fn create_student(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to create user: {}", e);
+            error!("Failed to create user: {}", e);
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "Username already exists or database error"
             }));
@@ -263,7 +264,7 @@ pub(crate) async fn create_student(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to get student role: {}", e);
+            error!("Failed to get student role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Student role not found"
@@ -280,7 +281,7 @@ pub(crate) async fn create_student(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to assign role: {}", e);
+        error!("Failed to assign role: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to assign role"
@@ -299,7 +300,7 @@ pub(crate) async fn create_student(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to create student entry: {}", e);
+        error!("Failed to create student entry: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to create student"
@@ -308,7 +309,7 @@ pub(crate) async fn create_student(
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -361,7 +362,7 @@ pub(crate) async fn get_student(
             "error": "Student not found"
         })),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }))
@@ -431,7 +432,7 @@ pub(crate) async fn update_student(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -470,7 +471,7 @@ pub(crate) async fn update_student(
         q = q.bind(user_id);
 
         if let Err(e) = q.execute(&mut *tx).await {
-            eprintln!("Failed to update user: {}", e);
+            error!("Failed to update user: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to update user info"
@@ -533,7 +534,7 @@ pub(crate) async fn update_student(
         q = q.bind(user_id);
 
         if let Err(e) = q.execute(&mut *tx).await {
-            eprintln!("Failed to update student: {}", e);
+            error!("Failed to update student: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to update student info"
@@ -558,7 +559,7 @@ pub(crate) async fn update_student(
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -623,7 +624,7 @@ pub(crate) async fn remove_student_teacher_relation(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -641,7 +642,7 @@ pub(crate) async fn remove_student_teacher_relation(
     {
         Ok(result) => result,
         Err(e) => {
-            eprintln!("Failed to remove relation: {}", e);
+            error!("Failed to remove relation: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
@@ -667,7 +668,7 @@ pub(crate) async fn remove_student_teacher_relation(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to archive hometasks: {}", e);
+        error!("Failed to archive hometasks: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to archive hometasks"
@@ -675,7 +676,7 @@ pub(crate) async fn remove_student_teacher_relation(
     }
 
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Database error"
         }));

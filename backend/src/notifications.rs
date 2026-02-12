@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use chrono::{DateTime, Utc};
 use serde_json::Value as JsonValue;
+use log::{error};
 
 use crate::AppState;
 use crate::users::verify_token;
@@ -140,7 +141,7 @@ pub async fn get_notifications(
         .fetch_all(&app_state.db)
         .await
         .map_err(|e| {
-            eprintln!("Database error fetching notifications: {:?}", e);
+            error!("Database error fetching notifications: {:?}", e);
             actix_web::error::ErrorInternalServerError("Failed to fetch notifications")
         })?;
     
@@ -167,7 +168,7 @@ pub async fn mark_as_read(
     .execute(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error marking notifications as read: {:?}", e);
+        error!("Database error marking notifications as read: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to mark notifications as read")
     })?;
     
@@ -190,7 +191,7 @@ pub async fn get_unread_count(
     .fetch_one(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error getting unread count: {:?}", e);
+        error!("Database error getting unread count: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to get unread count")
     })?;
     
@@ -221,7 +222,7 @@ pub async fn create_notification(
     .fetch_one(db.get_ref())
     .await
     .map_err(|e| {
-        eprintln!("Database error checking role status: {:?}", e);
+        error!("Database error checking role status: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to verify user")
     })?;
 
@@ -239,7 +240,7 @@ pub async fn create_notification(
 
     let body_json = serde_json::to_value(&payload.body)
         .map_err(|e| {
-            eprintln!("Failed to serialize notification body: {:?}", e);
+            error!("Failed to serialize notification body: {:?}", e);
             actix_web::error::ErrorBadRequest("Invalid notification body format")
         })?;
     
@@ -258,7 +259,7 @@ pub async fn create_notification(
     .fetch_one(db.get_ref())
     .await
     .map_err(|e| {
-        eprintln!("Database error creating notification: {:?}", e);
+        error!("Database error creating notification: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to create notification")
     })?;
     
@@ -281,7 +282,7 @@ pub async fn delete_notification(
     .execute(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error deleting notification: {:?}", e);
+        error!("Database error deleting notification: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to delete notification")
     })?;
     
@@ -308,7 +309,7 @@ async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> 
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error getting user_id: {:?}", e);
+        error!("Database error getting user_id: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to get user information")
     })?
     .ok_or_else(|| actix_web::error::ErrorUnauthorized("User not found"))?;

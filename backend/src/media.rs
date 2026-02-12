@@ -2,6 +2,7 @@ use actix_multipart::Multipart;
 use actix_web::{post, web, HttpRequest, HttpResponse, Responder};
 use futures_util::StreamExt as _;
 use serde::Deserialize;
+use log::{error};
 
 use crate::storage::{MediaError, MediaKind, MediaService};
 use crate::users::verify_token;
@@ -36,7 +37,7 @@ async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> 
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error getting user_id: {:?}", e);
+        error!("Database error getting user_id: {:?}", e);
         HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to get user information"
         }))
@@ -76,7 +77,7 @@ pub async fn upload_media(
         let field = match item {
             Ok(field) => field,
             Err(e) => {
-                eprintln!("Multipart error: {}", e);
+                error!("Multipart error: {}", e);
                 return HttpResponse::BadRequest().json(serde_json::json!({
                     "error": "Failed to read upload"
                 }));
@@ -121,7 +122,7 @@ pub async fn upload_media(
                 }))
             }
             Err(MediaError::Io(e)) => {
-                eprintln!("Failed to save file: {}", e);
+                error!("Failed to save file: {}", e);
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to save file"
                 }));
@@ -151,7 +152,7 @@ pub async fn upload_media(
         {
             Ok(id) => id,
             Err(e) => {
-                eprintln!("Database error saving media record: {:?}", e);
+                error!("Database error saving media record: {:?}", e);
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to save media record"
                 }));

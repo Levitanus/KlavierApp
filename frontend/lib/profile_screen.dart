@@ -109,7 +109,6 @@ abstract class _ProfileScreenStateBase extends State<ProfileScreen> {
   void _showMakeParentDialog();
   void _showMakeTeacherDialog();
   void _showAddChildrenDialog();
-  Future<void> _startChatWithUser(int userId, String userName);
   Widget _buildInfoRow(IconData icon, String label, String value);
   Widget _buildChildAvatar(String? profileImage, String fullName, double radius);
   bool _isRoleArchived(String role);

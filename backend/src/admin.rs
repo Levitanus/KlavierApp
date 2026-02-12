@@ -4,6 +4,7 @@ use sqlx::FromRow;
 use argon2::{Argon2, PasswordHasher};
 use argon2::password_hash::{SaltString, rand_core::OsRng};
 use chrono::{DateTime, Utc, NaiveDate};
+use log::{debug, error};
 
 use crate::AppState;
 use crate::users::verify_token;
@@ -82,7 +83,7 @@ async fn get_users(
     let mut users = match users_result {
         Ok(users) => users,
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to fetch users"
             }));
@@ -158,7 +159,7 @@ async fn create_user(
     let password_hash = match argon2.hash_password(user_data.password.as_bytes(), &salt) {
         Ok(hash) => hash.to_string(),
         Err(e) => {
-            eprintln!("Password hashing error: {}", e);
+            error!("Password hashing error: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to hash password"
             }));
@@ -179,7 +180,7 @@ async fn create_user(
     let user_id = match user_result {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to create user"
             }));
@@ -353,7 +354,7 @@ async fn delete_user(
             "message": "User deleted successfully"
         })),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to delete user"
             }))
@@ -412,7 +413,7 @@ async fn generate_reset_link(
             })
         }
         Err(e) => {
-            eprintln!("Failed to generate reset token: {}", e);
+            error!("Failed to generate reset token: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to generate reset link"
             }))
@@ -454,7 +455,7 @@ async fn get_password_reset_requests(
             HttpResponse::Ok().json(responses)
         }
         Err(e) => {
-            eprintln!("Failed to fetch password reset requests: {}", e);
+            error!("Failed to fetch password reset requests: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to fetch password reset requests"
             }))
@@ -498,7 +499,7 @@ async fn resolve_password_reset_request(
             }))
         }
         Err(e) => {
-            eprintln!("Failed to resolve password reset request: {}", e);
+            error!("Failed to resolve password reset request: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to resolve password reset request"
             }))
@@ -552,7 +553,7 @@ async fn make_student(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -596,7 +597,7 @@ async fn make_student(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to get student role: {}", e);
+            error!("Failed to get student role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Student role not found"
@@ -624,7 +625,7 @@ async fn make_student(
         .execute(&mut *tx)
         .await
         {
-            eprintln!("Failed to assign role: {}", e);
+            error!("Failed to assign role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to assign role"
@@ -644,7 +645,7 @@ async fn make_student(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to create student entry: {}", e);
+        error!("Failed to create student entry: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to create student"
@@ -666,7 +667,7 @@ async fn make_student(
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -709,7 +710,7 @@ async fn make_parent(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -753,7 +754,7 @@ async fn make_parent(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to get parent role: {}", e);
+            error!("Failed to get parent role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Parent role not found"
@@ -781,7 +782,7 @@ async fn make_parent(
         .execute(&mut *tx)
         .await
         {
-            eprintln!("Failed to assign role: {}", e);
+            error!("Failed to assign role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to assign role"
@@ -798,7 +799,7 @@ async fn make_parent(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to create parent entry: {}", e);
+        error!("Failed to create parent entry: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to create parent"
@@ -844,7 +845,7 @@ async fn make_parent(
         .execute(&mut *tx)
         .await
         {
-            eprintln!("Failed to create relation: {}", e);
+            error!("Failed to create relation: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to create parent-student relation"
@@ -854,7 +855,7 @@ async fn make_parent(
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -883,7 +884,7 @@ async fn make_teacher(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -927,7 +928,7 @@ async fn make_teacher(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to get teacher role: {}", e);
+            error!("Failed to get teacher role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Teacher role not found"
@@ -955,7 +956,7 @@ async fn make_teacher(
         .execute(&mut *tx)
         .await
         {
-            eprintln!("Failed to assign role: {}", e);
+            error!("Failed to assign role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to assign role"
@@ -972,7 +973,7 @@ async fn make_teacher(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to create teacher entry: {}", e);
+        error!("Failed to create teacher entry: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to create teacher"
@@ -994,7 +995,7 @@ async fn make_teacher(
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -1006,7 +1007,7 @@ async fn make_teacher(
 }
 
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    println!("=== ADMIN CONFIGURE CALLED ===");
+    debug!("=== ADMIN CONFIGURE CALLED ===");
     cfg.service(test_route)
         .service(get_users)
         .service(create_user)

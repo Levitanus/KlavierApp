@@ -1,5 +1,6 @@
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use chrono::{DateTime, Utc};
+use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::{FromRow, PgPool};
@@ -25,12 +26,28 @@ async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> 
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error getting user_id: {:?}", e);
+        error!("Database error getting user_id: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to get user information")
     })?
     .ok_or_else(|| actix_web::error::ErrorUnauthorized("User not found"))?;
 
     Ok(user_id)
+}
+
+async fn fetch_user_display_name(db: &PgPool, user_id: i32) -> String {
+    sqlx::query_scalar::<_, String>(
+        "SELECT COALESCE(
+            (SELECT full_name FROM students WHERE user_id = $1),
+            (SELECT full_name FROM parents WHERE user_id = $1),
+            (SELECT full_name FROM teachers WHERE user_id = $1),
+            (SELECT username FROM users WHERE id = $1)
+        )"
+    )
+    .bind(user_id)
+    .fetch_optional(db)
+    .await
+    .unwrap_or(None)
+    .unwrap_or_else(|| "Unknown".to_string())
 }
 
 // ============================================================================
@@ -728,10 +745,12 @@ async fn send_message(
         .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
     // Broadcast message via WebSocket
+    let sender_name = fetch_user_display_name(&app_state.db, user_id).await;
     let message_data = serde_json::json!({
         "message_id": message_id,
         "thread_id": thread_id,
         "sender_id": user_id,
+        "sender_name": sender_name,
         "body": payload.body,
         "created_at": chrono::Utc::now().to_rfc3339(),
     });
@@ -830,10 +849,12 @@ async fn send_admin_message(
         .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
     // Broadcast message via WebSocket
+    let sender_name = fetch_user_display_name(&app_state.db, user_id).await;
     let message_data = serde_json::json!({
         "message_id": message_id,
         "thread_id": thread_id,
         "sender_id": user_id,
+        "sender_name": sender_name,
         "body": payload.body,
         "created_at": chrono::Utc::now().to_rfc3339(),
     });
@@ -864,6 +885,18 @@ async fn update_receipt(
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     let message_id = message_id.into_inner();
 
+    if payload.state != "delivered" && payload.state != "read" {
+        warn!(
+            "receipt update invalid state: message_id={}, recipient_id={}, state={}",
+            message_id,
+            user_id,
+            payload.state
+        );
+        return Ok(HttpResponse::BadRequest().json(json!({
+            "error": "Invalid receipt state"
+        })));
+    }
+
     // Get thread_id for broadcasting
     let thread_id = sqlx::query_scalar::<_, i32>(
         "SELECT thread_id FROM chat_messages WHERE id = $1",
@@ -877,7 +910,7 @@ async fn update_receipt(
     // Update receipt
     let rows = sqlx::query(
         "UPDATE message_receipts
-         SET state = $1, updated_at = NOW()
+            SET state = $1::chat_message_state, updated_at = NOW()
          WHERE message_id = $2 AND recipient_id = $3",
     )
     .bind(&payload.state)
@@ -887,7 +920,20 @@ async fn update_receipt(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
+    debug!(
+        "receipt update: message_id={}, recipient_id={}, state={}, rows_affected={}",
+        message_id,
+        user_id,
+        payload.state,
+        rows.rows_affected()
+    );
+
     if rows.rows_affected() == 0 {
+        warn!(
+            "receipt update not found: message_id={}, recipient_id={} (no receipt row)",
+            message_id,
+            user_id
+        );
         return Ok(HttpResponse::NotFound().json(json!({
             "error": "Receipt not found"
         })));

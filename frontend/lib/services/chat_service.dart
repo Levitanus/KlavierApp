@@ -9,6 +9,7 @@ const String _baseUrl = 'http://localhost:8080/chat';
 
 class ChatService extends ChangeNotifier {
   String _token;
+  int? _currentUserId;
   final WebSocketService wsService;
   
   List<ChatThread> threads = [];
@@ -39,6 +40,10 @@ class ChatService extends ChangeNotifier {
     subscribedThreads.clear();
   }
 
+  void updateCurrentUserId(int? userId) {
+    _currentUserId = userId;
+  }
+
   Future<void> loadThreads({String mode = 'personal'}) async {
     isLoading = true;
     errorMessage = null;
@@ -66,7 +71,12 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> loadThreadMessages(int threadId, {int limit = 50, int offset = 0}) async {
+  Future<int> loadThreadMessages(
+    int threadId, {
+    int limit = 50,
+    int offset = 0,
+    bool append = false,
+  }) async {
     isLoading = true;
     errorMessage = null;
     notifyListeners();
@@ -79,13 +89,29 @@ class ChatService extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        messagesByThread[threadId] = data
+        final newMessages = data
             .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
             .toList();
+        if (append && messagesByThread.containsKey(threadId)) {
+          final existing = messagesByThread[threadId] ?? [];
+          final existingIds = existing.map((m) => m.id).toSet();
+          final merged = List<ChatMessage>.from(existing);
+          for (final message in newMessages) {
+            if (!existingIds.contains(message.id)) {
+              merged.add(message);
+            }
+          }
+          messagesByThread[threadId] = merged;
+        } else {
+          messagesByThread[threadId] = newMessages;
+        }
         errorMessage = null;
-        
+
         // Subscribe to thread for real-time updates
         _subscribeToThread(threadId);
+        isLoading = false;
+        notifyListeners();
+        return newMessages.length;
       } else {
         errorMessage = 'Failed to load messages: ${response.statusCode}';
       }
@@ -95,6 +121,7 @@ class ChatService extends ChangeNotifier {
 
     isLoading = false;
     notifyListeners();
+    return 0;
   }
 
   void _subscribeToThread(int threadId) {
@@ -152,8 +179,15 @@ class ChatService extends ChangeNotifier {
         receipts: const [],
       );
       
-      // Add to the thread's message list
-      messagesByThread[threadId]!.add(newMessage);
+      if (_currentUserId != null && newMessage.senderId != _currentUserId) {
+        updateMessageReceipt(newMessage.id, 'delivered');
+      }
+
+      final existing = messagesByThread[threadId]!;
+      final alreadyExists = existing.any((message) => message.id == newMessage.id);
+      if (!alreadyExists) {
+        existing.insert(0, newMessage);
+      }
       notifyListeners();
     } catch (e) {
       print('Error handling new message: $e');
@@ -233,9 +267,6 @@ class ChatService extends ChangeNotifier {
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
-        final threadId = data['thread_id'] as int;
-        
         // Reload threads to show the new one
         await loadThreads(mode: currentMode);
         return true;

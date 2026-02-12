@@ -1,6 +1,7 @@
 use actix::{
     Actor, ActorContext, AsyncContext, Handler, Message, Recipient, StreamHandler,
 };
+use log::debug;
 use actix_web_actors::ws::{self, WebsocketContext};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -47,13 +48,13 @@ impl WsServerActor {
     ) {
         let mut connections = self.connections.write().await;
         connections.insert(user_id, recipient);
-        println!("[ws] user {} connected", user_id);
+        debug!("[ws] user {} connected", user_id);
     }
 
     pub async fn unregister_connection(&self, user_id: i32) {
         let mut connections = self.connections.write().await;
         connections.remove(&user_id);
-        println!("[ws] user {} disconnected", user_id);
+        debug!("[ws] user {} disconnected", user_id);
 
         let mut user_threads = self.user_threads.write().await;
         if let Some(threads) = user_threads.remove(&user_id) {
@@ -80,7 +81,7 @@ impl WsServerActor {
             .entry(user_id)
             .or_insert_with(HashSet::new)
             .insert(thread_id);
-        println!("[ws] user {} subscribed to thread {}", user_id, thread_id);
+        debug!("[ws] user {} subscribed to thread {}", user_id, thread_id);
     }
 
     pub async fn subscribe_to_post(&self, user_id: i32, post_id: i32) {
@@ -89,13 +90,13 @@ impl WsServerActor {
             .entry(post_id)
             .or_insert_with(HashSet::new)
             .insert(user_id);
-        println!("[ws] user {} subscribed to post {}", user_id, post_id);
+        debug!("[ws] user {} subscribed to post {}", user_id, post_id);
     }
 
     pub async fn broadcast_to_thread(&self, thread_id: i32, message: WsMessage) {
         let thread_watchers = self.thread_watchers.read().await;
         if let Some(watchers) = thread_watchers.get(&thread_id) {
-            println!(
+            debug!(
                 "[ws] broadcast {} to thread {} ({} watchers)",
                 message.msg_type,
                 thread_id,
@@ -206,28 +207,28 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 // Pong received
             }
             Ok(ws::Message::Text(text)) => {
-                println!("[ws] received text: {}", text);
+                debug!("[ws] received text: {}", text);
                 let server = self.server.clone();
                 let user_id = self.user_id;
 
                 // Parse incoming message
                 match serde_json::from_str::<WsMessage>(&text) {
                     Ok(ws_msg) => {
-                        println!("[ws] parsed msg_type={}", ws_msg.msg_type);
+                        debug!("[ws] parsed msg_type={}", ws_msg.msg_type);
                         actix::spawn(async move {
                             match ws_msg.msg_type.as_str() {
                                 "subscribe_thread" => {
                                     if let Some(thread_id) = ws_msg.thread_id {
                                         server.subscribe_to_thread(user_id, thread_id).await;
                                     } else {
-                                        println!("[ws] subscribe_thread missing thread_id");
+                                        debug!("[ws] subscribe_thread missing thread_id");
                                     }
                                 }
                                 "subscribe_post" => {
                                     if let Some(post_id) = ws_msg.post_id {
                                         server.subscribe_to_post(user_id, post_id).await;
                                     } else {
-                                        println!("[ws] subscribe_post missing post_id");
+                                        debug!("[ws] subscribe_post missing post_id");
                                     }
                                 }
                                 "typing" => {
@@ -239,22 +240,22 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                                             .broadcast_typing(thread_id, user_id, is_typing)
                                             .await;
                                     } else {
-                                        println!("[ws] typing missing thread_id");
+                                        debug!("[ws] typing missing thread_id");
                                     }
                                 }
                                 _ => {
-                                    println!("[ws] unhandled msg_type={}", ws_msg.msg_type);
+                                    debug!("[ws] unhandled msg_type={}", ws_msg.msg_type);
                                 }
                             }
                         });
                     }
                     Err(err) => {
-                        println!("[ws] failed to parse ws message: {}", err);
+                        debug!("[ws] failed to parse ws message: {}", err);
                     }
                 }
             }
             Ok(ws::Message::Binary(_bin)) => {
-                println!("Unexpected binary message");
+                debug!("Unexpected binary message");
             }
             Ok(ws::Message::Close(reason)) => {
                 ctx.close(reason);
@@ -266,7 +267,7 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for WsSession {
                 // No operation
             }
             Err(e) => {
-                println!("WebSocket error: {:?}", e);
+                debug!("WebSocket error: {:?}", e);
                 ctx.stop();
             }
         }

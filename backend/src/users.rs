@@ -6,6 +6,7 @@ use sqlx::FromRow;
 use jsonwebtoken::{encode, decode, EncodingKey, DecodingKey, Header, Validation};
 use chrono::{Duration, Utc, NaiveDate};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use log::{error};
 
 use crate::{AppState, password_reset};
 use crate::storage::{MediaError, MediaService};
@@ -101,7 +102,7 @@ async fn login(
             });
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -112,7 +113,7 @@ async fn login(
     let parsed_hash = match PasswordHash::new(&user.password_hash) {
         Ok(hash) => hash,
         Err(e) => {
-            eprintln!("Failed to parse password hash: {}", e);
+            error!("Failed to parse password hash: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -142,7 +143,7 @@ async fn login(
     let roles = match roles_result {
         Ok(roles) => roles,
         Err(e) => {
-            eprintln!("Failed to fetch user roles: {}", e);
+            error!("Failed to fetch user roles: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -227,7 +228,7 @@ async fn login(
     ) {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("JWT encoding error: {}", e);
+            error!("JWT encoding error: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Could not generate token".to_string(),
             });
@@ -264,7 +265,7 @@ async fn validate_token_endpoint(
             "error": "User not found",
         })),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Internal server error",
             }))
@@ -305,7 +306,7 @@ async fn forgot_password(
             })
         }
         Err(e) => {
-            eprintln!("Password reset request error: {}", e);
+            error!("Password reset request error: {}", e);
             // Always return success to prevent username enumeration
             HttpResponse::Ok().json(ForgotPasswordResponse {
                 message: "If your username exists and has an email, you will receive a password reset link. Otherwise, an admin will be notified.".to_string(),
@@ -364,7 +365,7 @@ async fn reset_password(
             }))
         }
         Err(e) => {
-            eprintln!("Password reset error: {}", e);
+            error!("Password reset error: {}", e);
             HttpResponse::BadRequest().json(ErrorResponse {
                 error: format!("Failed to reset password: {}", e),
             })
@@ -469,7 +470,7 @@ async fn get_profile(
             });
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -594,7 +595,7 @@ async fn update_profile(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Database error".to_string(),
             });
@@ -611,7 +612,7 @@ async fn update_profile(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to update user: {}", e);
+        error!("Failed to update user: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(ErrorResponse {
             error: "Failed to update profile".to_string(),
@@ -681,7 +682,7 @@ async fn update_profile(
                 q = q.bind(user_id);
 
                 if let Err(e) = q.execute(&mut *tx).await {
-                    eprintln!("Failed to update student data: {}", e);
+                    error!("Failed to update student data: {}", e);
                     let _ = tx.rollback().await;
                     return HttpResponse::InternalServerError().json(ErrorResponse {
                         error: "Failed to update student data".to_string(),
@@ -724,7 +725,7 @@ async fn update_profile(
                 .execute(&mut *tx)
                 .await
                 {
-                    eprintln!("Failed to update parent data: {}", e);
+                    error!("Failed to update parent data: {}", e);
                 }
 
                 // Sync to other role tables
@@ -761,7 +762,7 @@ async fn update_profile(
                 .execute(&mut *tx)
                 .await
                 {
-                    eprintln!("Failed to update teacher data: {}", e);
+                    error!("Failed to update teacher data: {}", e);
                 }
 
                 // Sync to other role tables
@@ -782,7 +783,7 @@ async fn update_profile(
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(ErrorResponse {
             error: "Failed to save changes".to_string(),
         });
@@ -821,7 +822,7 @@ async fn change_password(
             });
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -832,7 +833,7 @@ async fn change_password(
     let parsed_hash = match PasswordHash::new(&user.password_hash) {
         Ok(hash) => hash,
         Err(e) => {
-            eprintln!("Failed to parse password hash: {}", e);
+            error!("Failed to parse password hash: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -859,7 +860,7 @@ async fn change_password(
     let new_hash = match Argon2::default().hash_password(change_req.new_password.as_bytes(), &salt) {
         Ok(hash) => hash.to_string(),
         Err(e) => {
-            eprintln!("Failed to hash password: {}", e);
+            error!("Failed to hash password: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Failed to hash password".to_string(),
             });
@@ -880,7 +881,7 @@ async fn change_password(
             "message": "Password changed successfully"
         })),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Failed to change password".to_string(),
             })
@@ -907,7 +908,7 @@ async fn upload_profile_image(
         let field = match item {
             Ok(field) => field,
             Err(e) => {
-                eprintln!("Multipart error: {}", e);
+                error!("Multipart error: {}", e);
                 return HttpResponse::BadRequest().json(ErrorResponse {
                     error: "Failed to read upload".to_string(),
                 });
@@ -954,7 +955,7 @@ async fn upload_profile_image(
                 })
             }
             Err(MediaError::Io(e)) => {
-                eprintln!("Failed to save file: {}", e);
+                error!("Failed to save file: {}", e);
                 return HttpResponse::InternalServerError().json(ErrorResponse {
                     error: "Failed to save file".to_string(),
                 });
@@ -973,7 +974,7 @@ async fn upload_profile_image(
             if !old_filename.is_empty() {
                 if let Err(e) = media_service.delete_profile_image(&old_filename).await {
                     if let MediaError::Io(err) = e {
-                        eprintln!("Failed to delete old profile image: {}", err);
+                        error!("Failed to delete old profile image: {}", err);
                     }
                 }
             }
@@ -996,7 +997,7 @@ async fn upload_profile_image(
                 }));
             }
             Err(e) => {
-                eprintln!("Database error: {}", e);
+                error!("Database error: {}", e);
                 let _ = media_service.delete_profile_image(&stored.key).await;
                 return HttpResponse::InternalServerError().json(ErrorResponse {
                     error: "Failed to update profile".to_string(),
@@ -1034,7 +1035,7 @@ async fn delete_profile_image(
             let media_service = MediaService::new(app_state.storage.clone());
             if let Err(e) = media_service.delete_profile_image(&old_filename).await {
                 if let MediaError::Io(err) = e {
-                    eprintln!("Failed to delete profile image: {}", err);
+                    error!("Failed to delete profile image: {}", err);
                 }
             }
         }
@@ -1053,7 +1054,7 @@ async fn delete_profile_image(
             "message": "Profile image deleted"
         })),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Failed to delete image".to_string(),
             })

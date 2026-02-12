@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sqlx::{FromRow, PgPool};
 use std::collections::HashSet;
+use log::{error};
 
 use crate::users::verify_token;
 use crate::notification_builders::{
@@ -116,7 +117,7 @@ async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> 
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error getting user_id: {:?}", e);
+        error!("Database error getting user_id: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to get user information")
     })?
     .ok_or_else(|| actix_web::error::ErrorUnauthorized("User not found"))?;
@@ -155,7 +156,7 @@ async fn fetch_feed(app_state: &AppState, feed_id: i32) -> Result<Feed> {
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching feed: {:?}", e);
+        error!("Database error fetching feed: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to fetch feed")
     })?
     .ok_or_else(|| actix_web::error::ErrorNotFound("Feed not found"))
@@ -194,7 +195,7 @@ async fn ensure_feed_access(app_state: &AppState, feed: &Feed, user_id: i32, cla
         .fetch_one(&app_state.db)
         .await
         .map_err(|e| {
-            eprintln!("Database error checking feed access: {:?}", e);
+            error!("Database error checking feed access: {:?}", e);
             actix_web::error::ErrorInternalServerError("Failed to check access")
         })?;
 
@@ -231,7 +232,7 @@ pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Res
     .fetch_all(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching school feeds: {:?}", e);
+        error!("Database error fetching school feeds: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to fetch feeds")
     })?;
     feeds.extend(school_feeds);
@@ -244,7 +245,7 @@ pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Res
         .fetch_all(&app_state.db)
         .await
         .map_err(|e| {
-            eprintln!("Database error fetching teacher feeds: {:?}", e);
+            error!("Database error fetching teacher feeds: {:?}", e);
             actix_web::error::ErrorInternalServerError("Failed to fetch feeds")
         })?;
         feeds.extend(teacher_feeds);
@@ -263,7 +264,7 @@ pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Res
         .fetch_all(&app_state.db)
         .await
         .map_err(|e| {
-            eprintln!("Database error fetching student feeds: {:?}", e);
+            error!("Database error fetching student feeds: {:?}", e);
             actix_web::error::ErrorInternalServerError("Failed to fetch feeds")
         })?;
         feeds.extend(student_feeds);
@@ -284,7 +285,7 @@ pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Res
         .fetch_all(&app_state.db)
         .await
         .map_err(|e| {
-            eprintln!("Database error fetching parent feeds: {:?}", e);
+            error!("Database error fetching parent feeds: {:?}", e);
             actix_web::error::ErrorInternalServerError("Failed to fetch feeds")
         })?;
         feeds.extend(parent_feeds);
@@ -319,7 +320,7 @@ pub async fn get_feed_settings(
     .fetch_one(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching feed settings: {:?}", e);
+        error!("Database error fetching feed settings: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to fetch feed settings")
     })?;
 
@@ -351,7 +352,7 @@ pub async fn update_feed_settings(
     .fetch_one(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error updating feed settings: {:?}", e);
+        error!("Database error updating feed settings: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to update feed settings")
     })?;
 
@@ -382,7 +383,7 @@ pub async fn get_feed_user_settings(
     .fetch_one(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching feed user settings: {:?}", e);
+        error!("Database error fetching feed user settings: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to fetch feed user settings")
     })?;
 
@@ -418,7 +419,7 @@ pub async fn update_feed_user_settings(
     .fetch_one(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error updating feed user settings: {:?}", e);
+        error!("Database error updating feed user settings: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to update feed user settings")
     })?;
 
@@ -469,7 +470,7 @@ pub async fn list_posts(
         .fetch_all(&app_state.db)
         .await
         .map_err(|e| {
-            eprintln!("Database error fetching posts: {:?}", e);
+            error!("Database error fetching posts: {:?}", e);
             actix_web::error::ErrorInternalServerError("Failed to fetch posts")
         })?;
 
@@ -493,7 +494,7 @@ pub async fn get_post(
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching post: {:?}", e);
+        error!("Database error fetching post: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to fetch post")
     })?
     .ok_or_else(|| actix_web::error::ErrorNotFound("Post not found"))?;
@@ -525,7 +526,7 @@ pub async fn mark_post_read(
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching feed for read mark: {:?}", e);
+        error!("Database error fetching feed for read mark: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to mark post as read")
     })?
     .ok_or_else(|| actix_web::error::ErrorNotFound("Post not found"))?;
@@ -544,7 +545,7 @@ pub async fn mark_post_read(
     .execute(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error marking post read: {:?}", e);
+        error!("Database error marking post read: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to mark post as read")
     })?;
 
@@ -578,7 +579,7 @@ pub async fn mark_feed_read(
     .execute(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error marking feed read: {:?}", e);
+        error!("Database error marking feed read: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to mark feed as read")
     })?;
 
@@ -611,7 +612,7 @@ pub async fn create_post(
     .fetch_one(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching feed settings: {:?}", e);
+        error!("Database error fetching feed settings: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to fetch feed settings")
     })?;
 
@@ -628,7 +629,7 @@ pub async fn create_post(
     let allow_comments = payload.allow_comments.unwrap_or(true);
 
     let mut tx = app_state.db.begin().await.map_err(|e| {
-        eprintln!("Database error starting transaction: {:?}", e);
+        error!("Database error starting transaction: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to create post")
     })?;
 
@@ -649,7 +650,7 @@ pub async fn create_post(
     .fetch_one(&mut *tx)
     .await
     .map_err(|e| {
-        eprintln!("Database error creating post: {:?}", e);
+        error!("Database error creating post: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to create post")
     })?;
 
@@ -665,7 +666,7 @@ pub async fn create_post(
     .execute(&mut *tx)
     .await
     .map_err(|e| {
-        eprintln!("Database error marking post as read: {:?}", e);
+        error!("Database error marking post as read: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to mark post as read")
     })?;
 
@@ -680,7 +681,7 @@ pub async fn create_post(
             .execute(&mut *tx)
             .await
             .map_err(|e| {
-                eprintln!("Database error linking post media: {:?}", e);
+                error!("Database error linking post media: {:?}", e);
                 actix_web::error::ErrorInternalServerError("Failed to attach media")
             })?;
         }
@@ -698,7 +699,7 @@ pub async fn create_post(
     .execute(&mut *tx)
     .await
     .map_err(|e| {
-        eprintln!("Database error creating author subscription: {:?}", e);
+        error!("Database error creating author subscription: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to create subscriptions")
     })?;
 
@@ -716,12 +717,12 @@ pub async fn create_post(
     .execute(&mut *tx)
     .await
     .map_err(|e| {
-        eprintln!("Database error auto-subscribing users: {:?}", e);
+        error!("Database error auto-subscribing users: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to create subscriptions")
     })?;
 
     tx.commit().await.map_err(|e| {
-        eprintln!("Database error committing post: {:?}", e);
+        error!("Database error committing post: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to create post")
     })?;
 
@@ -771,7 +772,7 @@ pub async fn list_comments(
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching feed for comments: {:?}", e);
+        error!("Database error fetching feed for comments: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to fetch comments")
     })?
     .ok_or_else(|| actix_web::error::ErrorNotFound("Post not found"))?;
@@ -785,7 +786,7 @@ pub async fn list_comments(
     .fetch_all(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching comments: {:?}", e);
+        error!("Database error fetching comments: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to fetch comments")
     })?;
 
@@ -810,7 +811,7 @@ pub async fn create_comment(
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching post: {:?}", e);
+        error!("Database error fetching post: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to fetch post")
     })?
     .ok_or_else(|| actix_web::error::ErrorNotFound("Post not found"))?;
@@ -823,7 +824,7 @@ pub async fn create_comment(
     ensure_feed_access(&app_state, &feed, user_id, &claims).await?;
 
     let mut tx = app_state.db.begin().await.map_err(|e| {
-        eprintln!("Database error starting transaction: {:?}", e);
+        error!("Database error starting transaction: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to create comment")
     })?;
 
@@ -841,7 +842,7 @@ pub async fn create_comment(
     .fetch_one(&mut *tx)
     .await
     .map_err(|e| {
-        eprintln!("Database error creating comment: {:?}", e);
+        error!("Database error creating comment: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to create comment")
     })?;
 
@@ -856,7 +857,7 @@ pub async fn create_comment(
             .execute(&mut *tx)
             .await
             .map_err(|e| {
-                eprintln!("Database error linking comment media: {:?}", e);
+                error!("Database error linking comment media: {:?}", e);
                 actix_web::error::ErrorInternalServerError("Failed to attach media")
             })?;
         }
@@ -874,12 +875,12 @@ pub async fn create_comment(
     .execute(&mut *tx)
     .await
     .map_err(|e| {
-        eprintln!("Database error creating comment subscription: {:?}", e);
+        error!("Database error creating comment subscription: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to subscribe")
     })?;
 
     tx.commit().await.map_err(|e| {
-        eprintln!("Database error committing comment: {:?}", e);
+        error!("Database error committing comment: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to create comment")
     })?;
 
@@ -942,7 +943,7 @@ pub async fn update_post_subscription(
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching feed for subscription: {:?}", e);
+        error!("Database error fetching feed for subscription: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to update subscription")
     })?
     .ok_or_else(|| actix_web::error::ErrorNotFound("Post not found"))?;
@@ -963,7 +964,7 @@ pub async fn update_post_subscription(
     .execute(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error updating subscription: {:?}", e);
+        error!("Database error updating subscription: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to update subscription")
     })?;
 
@@ -993,7 +994,7 @@ pub async fn get_post_subscription(
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching feed for subscription: {:?}", e);
+        error!("Database error fetching feed for subscription: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to fetch subscription")
     })?
     .ok_or_else(|| actix_web::error::ErrorNotFound("Post not found"))?;
@@ -1008,7 +1009,7 @@ pub async fn get_post_subscription(
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching subscription: {:?}", e);
+        error!("Database error fetching subscription: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to fetch subscription")
     })?;
 
@@ -1039,7 +1040,7 @@ pub async fn delete_post_subscription(
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching feed for subscription removal: {:?}", e);
+        error!("Database error fetching feed for subscription removal: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to update subscription")
     })?
     .ok_or_else(|| actix_web::error::ErrorNotFound("Post not found"))?;
@@ -1054,7 +1055,7 @@ pub async fn delete_post_subscription(
     .execute(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error deleting subscription: {:?}", e);
+        error!("Database error deleting subscription: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to delete subscription")
     })?;
 
@@ -1081,7 +1082,7 @@ pub async fn delete_post(
     .fetch_optional(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error fetching post: {:?}", e);
+        error!("Database error fetching post: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to delete post")
     })?
     .ok_or_else(|| actix_web::error::ErrorNotFound("Post not found"))?;
@@ -1100,7 +1101,7 @@ pub async fn delete_post(
     .execute(&app_state.db)
     .await
     .map_err(|e| {
-        eprintln!("Database error deleting post: {:?}", e);
+        error!("Database error deleting post: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to delete post")
     })?;
 

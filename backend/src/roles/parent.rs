@@ -1,5 +1,6 @@
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
 use chrono::NaiveDate;
+use log::{error};
 
 use super::helpers::verify_admin_role;
 use super::models::{
@@ -49,7 +50,7 @@ pub(crate) async fn create_parent(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -70,7 +71,7 @@ pub(crate) async fn create_parent(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to create user: {}", e);
+            error!("Failed to create user: {}", e);
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "Username already exists or database error"
             }));
@@ -86,7 +87,7 @@ pub(crate) async fn create_parent(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to get parent role: {}", e);
+            error!("Failed to get parent role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Parent role not found"
@@ -103,7 +104,7 @@ pub(crate) async fn create_parent(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to assign role: {}", e);
+        error!("Failed to assign role: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to assign role"
@@ -119,7 +120,7 @@ pub(crate) async fn create_parent(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to create parent entry: {}", e);
+        error!("Failed to create parent entry: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to create parent"
@@ -152,7 +153,7 @@ pub(crate) async fn create_parent(
         .execute(&mut *tx)
         .await
         {
-            eprintln!("Failed to create relation: {}", e);
+            error!("Failed to create relation: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to create parent-student relation"
@@ -162,7 +163,7 @@ pub(crate) async fn create_parent(
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -241,7 +242,7 @@ pub(crate) async fn get_parent(
             "error": "Parent not found"
         })),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }))
@@ -289,7 +290,7 @@ pub(crate) async fn update_parent(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -328,7 +329,7 @@ pub(crate) async fn update_parent(
         q = q.bind(user_id);
 
         if let Err(e) = q.execute(&mut *tx).await {
-            eprintln!("Failed to update user: {}", e);
+            error!("Failed to update user: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to update user info"
@@ -346,7 +347,7 @@ pub(crate) async fn update_parent(
         .execute(&mut *tx)
         .await
         {
-            eprintln!("Failed to update parent: {}", e);
+            error!("Failed to update parent: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to update parent info"
@@ -369,7 +370,7 @@ pub(crate) async fn update_parent(
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -443,7 +444,7 @@ pub(crate) async fn add_parent_student_relation(
             "message": "Relation created successfully"
         })),
         Err(e) => {
-            eprintln!("Failed to create relation: {}", e);
+            error!("Failed to create relation: {}", e);
             HttpResponse::Conflict().json(serde_json::json!({
                 "error": "Relation already exists or database error"
             }))
@@ -485,7 +486,7 @@ pub(crate) async fn remove_parent_student_relation(
             }
         }
         Err(e) => {
-            eprintln!("Failed to remove relation: {}", e);
+            error!("Failed to remove relation: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }))
@@ -553,7 +554,7 @@ pub(crate) async fn archive_parent_role(
             }))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to archive parent role"
             }))
@@ -593,7 +594,7 @@ pub(crate) async fn unarchive_parent_role(
             }))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to unarchive parent role"
             }))

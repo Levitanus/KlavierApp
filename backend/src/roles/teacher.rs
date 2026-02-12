@@ -1,5 +1,6 @@
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
 use chrono::NaiveDate;
+use log::{error};
 
 use super::helpers::verify_admin_role;
 use super::models::{
@@ -42,7 +43,7 @@ pub(crate) async fn create_teacher(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -63,7 +64,7 @@ pub(crate) async fn create_teacher(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to create user: {}", e);
+            error!("Failed to create user: {}", e);
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "Username already exists or database error"
             }));
@@ -79,7 +80,7 @@ pub(crate) async fn create_teacher(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to get teacher role: {}", e);
+            error!("Failed to get teacher role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Teacher role not found"
@@ -96,7 +97,7 @@ pub(crate) async fn create_teacher(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to assign role: {}", e);
+        error!("Failed to assign role: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to assign role"
@@ -112,7 +113,7 @@ pub(crate) async fn create_teacher(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to create teacher entry: {}", e);
+        error!("Failed to create teacher entry: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to create teacher"
@@ -128,7 +129,7 @@ pub(crate) async fn create_teacher(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to create teacher feed: {}", e);
+        error!("Failed to create teacher feed: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to create teacher feed"
@@ -137,7 +138,7 @@ pub(crate) async fn create_teacher(
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -188,7 +189,7 @@ pub(crate) async fn get_teacher(
             "error": "Teacher not found"
         })),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }))
@@ -236,7 +237,7 @@ pub(crate) async fn update_teacher(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -275,7 +276,7 @@ pub(crate) async fn update_teacher(
         q = q.bind(user_id);
 
         if let Err(e) = q.execute(&mut *tx).await {
-            eprintln!("Failed to update user: {}", e);
+            error!("Failed to update user: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to update user info"
@@ -293,7 +294,7 @@ pub(crate) async fn update_teacher(
         .execute(&mut *tx)
         .await
         {
-            eprintln!("Failed to update teacher: {}", e);
+            error!("Failed to update teacher: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to update teacher info"
@@ -316,7 +317,7 @@ pub(crate) async fn update_teacher(
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -501,7 +502,7 @@ pub(crate) async fn add_teacher_student_relation(
             "message": "Relation created successfully"
         })),
         Err(e) => {
-            eprintln!("Failed to create relation: {}", e);
+            error!("Failed to create relation: {}", e);
             HttpResponse::Conflict().json(serde_json::json!({
                 "error": "Relation already exists or database error"
             }))
@@ -546,7 +547,7 @@ pub(crate) async fn remove_teacher_student_relation(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -564,7 +565,7 @@ pub(crate) async fn remove_teacher_student_relation(
     {
         Ok(result) => result,
         Err(e) => {
-            eprintln!("Failed to remove relation: {}", e);
+            error!("Failed to remove relation: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
@@ -590,7 +591,7 @@ pub(crate) async fn remove_teacher_student_relation(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to archive hometasks: {}", e);
+        error!("Failed to archive hometasks: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to archive hometasks"
@@ -598,7 +599,7 @@ pub(crate) async fn remove_teacher_student_relation(
     }
 
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Database error"
         }));
@@ -669,7 +670,7 @@ pub(crate) async fn archive_teacher_role(
             }))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to archive teacher role"
             }))
@@ -709,7 +710,7 @@ pub(crate) async fn unarchive_teacher_role(
             }))
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to unarchive teacher role"
             }))

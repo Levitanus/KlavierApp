@@ -1,3 +1,4 @@
+use log::{debug};
 pub mod users;
 pub mod admin;
 pub mod email;
@@ -83,7 +84,7 @@ async fn ws_endpoint(
             .await
             {
                 Ok(Some(user_id)) => {
-                    println!("[ws] authenticated user {}", user_id);
+                    debug!("[ws] authenticated user {}", user_id);
                     let ws_session = websockets::WsSession {
                         user_id,
                         server: app_state.ws_server.clone(),
@@ -92,14 +93,14 @@ async fn ws_endpoint(
                     return ws::start(ws_session, &req, stream);
                 }
                 _ => {
-                    println!("[ws] user not found for username {}", username);
+                    debug!("[ws] user not found for username {}", username);
                     return Err(actix_web::error::ErrorNotFound("User not found"));
                 }
             }
         }
     }
     
-    println!("[ws] missing or invalid token");
+    debug!("[ws] missing or invalid token");
     Err(actix_web::error::ErrorUnauthorized("Missing or invalid token"))
 }
 
@@ -115,7 +116,7 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
     let profile_images_dir = app_state.profile_images_dir.clone();
     let media_dir = app_state.media_dir.clone();
     
-    println!("=== Creating App ===");
+    debug!("=== Creating App ===");
     
     App::new()
         .app_data(app_state)
