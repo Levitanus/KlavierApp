@@ -7,6 +7,8 @@ import 'auth.dart';
 import 'services/notification_service.dart';
 import 'services/hometask_service.dart';
 import 'services/feed_service.dart';
+import 'services/chat_service.dart';
+import 'services/websocket_service.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 import 'reset_password_screen.dart';
@@ -43,13 +45,53 @@ class MyApp extends StatelessWidget {
             return service;
           },
         ),
-        ChangeNotifierProxyProvider<AuthService, FeedService>(
-          create: (context) => FeedService(
+        ChangeNotifierProxyProvider<AuthService, WebSocketService>(
+          create: (context) => WebSocketService(
             authService: context.read<AuthService>(),
+            token: context.read<AuthService>().token ?? '',
+            serverUrl: 'http://localhost:8080',
           ),
           update: (context, authService, previous) {
-            final service = previous ?? FeedService(authService: authService);
+            final token = authService.token ?? '';
+            final service = (previous == null || previous.token != token)
+                ? WebSocketService(
+                    authService: authService,
+                    token: token,
+                    serverUrl: 'http://localhost:8080',
+                  )
+                : previous;
+            // Connect if token is available and not already connected
+            if (token.isNotEmpty && !service.isConnected) {
+              service.connect();
+            }
+            return service;
+          },
+        ),
+        ChangeNotifierProxyProvider2<AuthService, WebSocketService, FeedService>(
+          create: (context) => FeedService(
+            authService: context.read<AuthService>(),
+            wsService: context.read<WebSocketService>(),
+          ),
+          update: (context, authService, wsService, previous) {
+            final service = previous ?? FeedService(
+              authService: authService,
+              wsService: wsService,
+            );
             service.syncAuth();
+            return service;
+          },
+        ),
+        ChangeNotifierProxyProvider2<AuthService, WebSocketService, ChatService>(
+          create: (context) => ChatService(
+            token: context.read<AuthService>().token ?? '',
+            wsService: context.read<WebSocketService>(),
+          ),
+          update: (context, authService, wsService, previous) {
+            final service = previous ?? ChatService(
+              token: authService.token ?? '',
+              wsService: wsService,
+            );
+            service.updateToken(authService.token ?? '');
             return service;
           },
         ),

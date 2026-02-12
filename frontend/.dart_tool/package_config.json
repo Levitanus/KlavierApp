@@ -50,6 +50,12 @@
       "languageVersion": "3.8"
     },
     {
+      "name": "crypto",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/crypto-3.0.7",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
       "name": "csslib",
       "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/csslib-1.0.2",
       "packageUri": "lib/",
@@ -480,6 +486,18 @@
       "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/web-1.1.1",
       "packageUri": "lib/",
       "languageVersion": "3.4"
+    },
+    {
+      "name": "web_socket",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/web_socket-1.0.1",
+      "packageUri": "lib/",
+      "languageVersion": "3.4"
+    },
+    {
+      "name": "web_socket_channel",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/web_socket_channel-3.0.3",
+      "packageUri": "lib/",
+      "languageVersion": "3.3"
     },
     {
       "name": "win32",

@@ -560,15 +560,27 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   bool _isDeleting = false;
   bool _loadingSubscription = true;
   bool _isSubscribed = false;
+  late FeedService _feedService;
 
   @override
   void initState() {
     super.initState();
+    _feedService = context.read<FeedService>();
+    _feedService.addListener(_handleFeedUpdate);
+    _feedService.subscribeToPostComments(widget.post.id);
     _loadComments();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<FeedService>().markPostRead(widget.post.id);
+      _feedService.markPostRead(widget.post.id);
     });
     _loadSubscription();
+  }
+
+  void _handleFeedUpdate() {
+    if (!mounted) return;
+    final updated = _feedService.commentsForPost(widget.post.id);
+    setState(() {
+      _comments = updated;
+    });
   }
 
   Future<void> _loadSubscription() async {
@@ -612,13 +624,18 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     setState(() {
       _loading = true;
     });
-    final service = context.read<FeedService>();
-    final comments = await service.fetchComments(widget.post.id);
+    final comments = await _feedService.fetchComments(widget.post.id);
     if (!mounted) return;
     setState(() {
       _comments = comments;
       _loading = false;
     });
+  }
+
+  @override
+  void dispose() {
+    _feedService.removeListener(_handleFeedUpdate);
+    super.dispose();
   }
 
   Future<void> _deletePost() async {

@@ -8,6 +8,7 @@ import 'hometasks_screen.dart';
 import 'dashboard_screen.dart';
 import 'widgets/notification_widget.dart';
 import 'feeds_screen.dart';
+import 'chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? adminUsername;
@@ -163,6 +164,12 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('Profile'),
               selected: _selectedIndex == 3,
               onTap: () => _navigateTo(const ProfileScreen(), 3),
+            ),
+            ListTile(
+              leading: const Icon(Icons.mail),
+              title: const Text('Messages'),
+              selected: _selectedIndex == 4,
+              onTap: () => _navigateTo(const ChatScreen(), 4),
             ),
             const Divider(),
             if (authService.isAdmin) ...[

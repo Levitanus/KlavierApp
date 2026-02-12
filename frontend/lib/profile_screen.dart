@@ -8,7 +8,9 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'auth.dart';
 import 'services/hometask_service.dart';
+import 'services/chat_service.dart';
 import 'models/hometask.dart';
+import 'screens/chat_conversation.dart';
 
 part 'profile_screen/profile_screen_data.dart';
 part 'profile_screen/profile_screen_dialogs.dart';
@@ -107,6 +109,7 @@ abstract class _ProfileScreenStateBase extends State<ProfileScreen> {
   void _showMakeParentDialog();
   void _showMakeTeacherDialog();
   void _showAddChildrenDialog();
+  Future<void> _startChatWithUser(int userId, String userName);
   Widget _buildInfoRow(IconData icon, String label, String value);
   Widget _buildChildAvatar(String? profileImage, String fullName, double radius);
   bool _isRoleArchived(String role);
@@ -518,6 +521,21 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                     'Address',
                                     child['address'],
                                   ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed: () => _startChatWithUser(
+                                            child['user_id'] as int,
+                                            child['full_name'] as String,
+                                          ),
+                                          icon: const Icon(Icons.message),
+                                          label: const Text('Message'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),
@@ -589,6 +607,15 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                         icon: const Icon(Icons.assignment_add),
                                         label: const Text('Assign Hometask'),
                                         onPressed: () => _showAssignHometaskDialog(student),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton.icon(
+                                        icon: const Icon(Icons.message),
+                                        label: const Text('Message'),
+                                        onPressed: () => _startChatWithUser(
+                                          student['user_id'] as int,
+                                          student['full_name'] as String,
+                                        ),
                                       ),
                                       const SizedBox(width: 8),
                                       TextButton.icon(
@@ -669,6 +696,15 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                         icon: const Icon(Icons.visibility),
                                         label: const Text('View Profile'),
                                         onPressed: () => _showTeacherProfileDialog(teacher),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton.icon(
+                                        icon: const Icon(Icons.message),
+                                        label: const Text('Message'),
+                                        onPressed: () => _startChatWithUser(
+                                          teacher['user_id'] as int,
+                                          teacher['full_name'] as String,
+                                        ),
                                       ),
                                       const SizedBox(width: 8),
                                       TextButton.icon(

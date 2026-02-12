@@ -295,20 +295,75 @@ CREATE INDEX IF NOT EXISTS idx_media_files_created_by ON media_files(created_by_
 CREATE INDEX IF NOT EXISTS idx_media_files_type ON media_files(media_type);
 
 -- ============================================================================
--- Chat (Matrix mapping)
+-- Chat System
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS matrix_accounts (
-    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    matrix_user_id TEXT NOT NULL UNIQUE,
-    access_token TEXT,
-    device_id TEXT,
+-- Create message delivery state enum
+CREATE TYPE chat_message_state AS ENUM ('sent', 'delivered', 'read');
+
+-- Create chat_threads table
+-- For peer-to-peer chats: participant_a_id and participant_b_id are the two users
+-- For admin chats: participant_a_id is the user, participant_b_id is NULL (admin is abstract concept)
+CREATE TABLE IF NOT EXISTS chat_threads (
+    id SERIAL PRIMARY KEY,
+    participant_a_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    participant_b_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    is_admin_chat BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Ensure admin chats have participant_b_id as NULL
+    CONSTRAINT admin_chat_no_participant_b CHECK (
+        (is_admin_chat = FALSE AND participant_b_id IS NOT NULL) OR
+        (is_admin_chat = TRUE AND participant_b_id IS NULL)
+    ),
+    -- Ensure no self-messaging in peer chats
+    CONSTRAINT no_self_peer_chat CHECK (
+        (is_admin_chat = TRUE) OR (participant_a_id != participant_b_id)
+    )
 );
 
-CREATE TRIGGER update_matrix_accounts_updated_at
-    BEFORE UPDATE ON matrix_accounts
+-- Create chat_messages table
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id SERIAL PRIMARY KEY,
+    thread_id INTEGER NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+    sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body JSONB NOT NULL, -- Quill document JSON
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Create message_receipts table for 3-state delivery tracking
+CREATE TABLE IF NOT EXISTS message_receipts (
+    id SERIAL PRIMARY KEY,
+    message_id INTEGER NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+    recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    state chat_message_state NOT NULL DEFAULT 'sent',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (message_id, recipient_id)
+);
+
+-- Create chat_presence table for online/offline status
+CREATE TABLE IF NOT EXISTS chat_presence (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    is_online BOOLEAN NOT NULL DEFAULT FALSE,
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Create indexes for chat tables
+CREATE INDEX IF NOT EXISTS idx_chat_threads_participant_a ON chat_threads(participant_a_id);
+CREATE INDEX IF NOT EXISTS idx_chat_threads_participant_b ON chat_threads(participant_b_id);
+CREATE INDEX IF NOT EXISTS idx_chat_threads_is_admin ON chat_threads(is_admin_chat);
+CREATE INDEX IF NOT EXISTS idx_chat_threads_updated_at ON chat_threads(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages(thread_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_sender ON chat_messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_message_receipts_message ON message_receipts(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_receipts_recipient ON message_receipts(recipient_id);
+CREATE INDEX IF NOT EXISTS idx_message_receipts_state ON message_receipts(state);
+CREATE INDEX IF NOT EXISTS idx_chat_presence_is_online ON chat_presence(is_online);
+
+-- Trigger for chat_threads updated_at
+CREATE TRIGGER update_chat_threads_updated_at
+    BEFORE UPDATE ON chat_threads
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 

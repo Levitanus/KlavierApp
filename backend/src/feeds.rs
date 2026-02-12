@@ -11,6 +11,7 @@ use crate::notification_builders::{
     build_feed_post_notification,
 };
 use crate::notifications::NotificationBody;
+use crate::websockets;
 use crate::AppState;
 
 #[derive(Debug, Serialize, FromRow, Clone)]
@@ -205,7 +206,7 @@ async fn ensure_feed_access(app_state: &AppState, feed: &Feed, user_id: i32, cla
     Err(actix_web::error::ErrorForbidden("Access denied"))
 }
 
-async fn ensure_feed_owner(app_state: &AppState, feed: &Feed, user_id: i32, claims: &crate::users::Claims) -> Result<()> {
+async fn ensure_feed_owner(_app_state: &AppState, feed: &Feed, user_id: i32, claims: &crate::users::Claims) -> Result<()> {
     if is_admin(claims) && feed.owner_type == "school" {
         return Ok(());
     }
@@ -902,6 +903,19 @@ pub async fn create_comment(
             insert_notification(&app_state.db, recipient_id, &body, "normal").await;
         }
     }
+
+    let comment_data = serde_json::to_value(&comment).unwrap_or_else(|_| serde_json::json!({}));
+    let ws_message = websockets::WsMessage {
+        msg_type: "comment".to_string(),
+        user_id: Some(user_id),
+        thread_id: None,
+        post_id: Some(*post_id),
+        data: comment_data,
+    };
+    app_state
+        .ws_server
+        .broadcast_to_post(*post_id, ws_message)
+        .await;
 
     Ok(HttpResponse::Created().json(comment))
 }

@@ -237,6 +237,41 @@ async fn login(
     HttpResponse::Ok().json(LoginResponse { token })
 }
 
+#[get("/validate")]
+async fn validate_token_endpoint(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+) -> impl Responder {
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let user_exists = sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM users WHERE username = $1",
+    )
+    .bind(&claims.sub)
+    .fetch_optional(&app_state.db)
+    .await;
+
+    match user_exists {
+        Ok(Some(_)) => HttpResponse::Ok().json(serde_json::json!({
+            "valid": true,
+            "username": claims.sub,
+            "roles": claims.roles,
+        })),
+        Ok(None) => HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "User not found",
+        })),
+        Err(e) => {
+            eprintln!("Database error: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Internal server error",
+            }))
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ForgotPasswordRequest {
     pub username: String,
@@ -1030,6 +1065,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/auth")
             .service(login)
+            .service(validate_token_endpoint)
             .service(forgot_password)
             .service(validate_reset_token)
             .service(reset_password)

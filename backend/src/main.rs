@@ -1,5 +1,5 @@
 use actix_web::{web, HttpServer};
-use klavierapp_backend::{create_app, init_db, AppState, email::EmailService};
+use klavierapp_backend::{create_app, init_db, AppState, email::EmailService, websockets};
 use klavierapp_backend::storage::LocalStorage;
 use std::env;
 use std::path::PathBuf;
@@ -102,6 +102,7 @@ async fn main() -> std::io::Result<()> {
         profile_images_dir,
         media_storage,
         media_dir,
+        ws_server: websockets::WsServerActor::new(),
     });
 
     println!("Starting server at http://127.0.0.1:8080");

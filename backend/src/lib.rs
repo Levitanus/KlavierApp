@@ -11,10 +11,14 @@ pub mod models;
 pub mod storage;
 pub mod feeds;
 pub mod media;
+pub mod chats;
+pub mod websockets;
 
 use actix_web::{middleware, web, App};
 use actix_files as fs;
 use actix_cors::Cors;
+use actix_web_actors::ws;
+use serde::Deserialize;
 use sqlx::postgres::PgPool;
 use std::sync::Arc;
 use std::path::PathBuf;
@@ -29,6 +33,74 @@ pub struct AppState {
     pub profile_images_dir: PathBuf,
     pub media_storage: Arc<dyn StorageProvider>,
     pub media_dir: PathBuf,
+    pub ws_server: websockets::WsServerActor,
+}
+
+async fn ws_endpoint(
+    req: actix_web::HttpRequest,
+    stream: web::Payload,
+    app_state: web::Data<AppState>,
+) -> Result<actix_web::HttpResponse, actix_web::Error> {
+    #[derive(Deserialize)]
+    struct WsQuery {
+        token: Option<String>,
+    }
+
+    // Extract user_id from JWT token
+    let mut token: Option<String> = None;
+
+    if let Some(auth_header) = req.headers().get("Authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(value) = auth_str.strip_prefix("Bearer ") {
+                token = Some(value.to_string());
+            }
+        }
+    }
+
+    if token.is_none() {
+        if let Ok(query) = web::Query::<WsQuery>::from_query(req.query_string()) {
+            token = query.into_inner().token;
+        }
+    }
+
+    if let Some(token) = token {
+        // Verify token and get user_id
+        use jsonwebtoken::{decode, DecodingKey, Validation};
+        let decoding_key = DecodingKey::from_secret(app_state.jwt_secret.as_bytes());
+        
+        if let Ok(token_data) = decode::<users::Claims>(
+            &token,
+            &decoding_key,
+            &Validation::default(),
+        ) {
+            // Query database to get user_id from username
+            let username = &token_data.claims.sub;
+            match sqlx::query_scalar::<_, i32>(
+                "SELECT id FROM users WHERE username = $1"
+            )
+            .bind(username)
+            .fetch_optional(&app_state.db)
+            .await
+            {
+                Ok(Some(user_id)) => {
+                    println!("[ws] authenticated user {}", user_id);
+                    let ws_session = websockets::WsSession {
+                        user_id,
+                        server: app_state.ws_server.clone(),
+                    };
+                    
+                    return ws::start(ws_session, &req, stream);
+                }
+                _ => {
+                    println!("[ws] user not found for username {}", username);
+                    return Err(actix_web::error::ErrorNotFound("User not found"));
+                }
+            }
+        }
+    }
+    
+    println!("[ws] missing or invalid token");
+    Err(actix_web::error::ErrorUnauthorized("Missing or invalid token"))
 }
 
 pub fn create_app(app_state: web::Data<AppState>) -> App<
@@ -64,6 +136,8 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
         .configure(hometasks::init_routes)
         .configure(feeds::configure)
         .configure(media::configure)
+        .configure(chats::configure)
+        .route("/ws", web::get().to(ws_endpoint))
         .service(fs::Files::new("/uploads/profile_images", profile_images_dir).show_files_listing())
         .service(fs::Files::new("/uploads/media", media_dir).show_files_listing())
 }

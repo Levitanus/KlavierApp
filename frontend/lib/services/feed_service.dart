@@ -3,14 +3,17 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../auth.dart';
 import '../models/feed.dart';
+import 'websocket_service.dart';
 
 class FeedService extends ChangeNotifier {
   final AuthService authService;
+  final WebSocketService wsService;
   final String baseUrl;
   String? _lastToken;
 
   FeedService({
     required this.authService,
+    required this.wsService,
     this.baseUrl = 'http://localhost:8080',
   }) {
     _lastToken = authService.token;
@@ -18,9 +21,14 @@ class FeedService extends ChangeNotifier {
 
   List<Feed> _feeds = [];
   bool _isLoadingFeeds = false;
+  final Map<int, List<FeedComment>> _commentsByPost = {};
+  final Set<int> _subscribedPosts = {};
+  bool _wsListenersRegistered = false;
+  late final WsMessageCallback _commentCallback = _handleCommentMessage;
 
   List<Feed> get feeds => _feeds;
   bool get isLoadingFeeds => _isLoadingFeeds;
+  List<FeedComment> commentsForPost(int postId) => _commentsByPost[postId] ?? [];
 
   void syncAuth() {
     final token = authService.token;
@@ -311,13 +319,47 @@ class FeedService extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        return data.map((json) => FeedComment.fromJson(json)).toList();
+        final comments = data.map((json) => FeedComment.fromJson(json)).toList();
+        _commentsByPost[postId] = comments;
+        notifyListeners();
+        return comments;
       }
     } catch (e) {
       debugPrint('Error fetching comments: $e');
     }
 
     return [];
+  }
+
+  void subscribeToPostComments(int postId) {
+    if (_subscribedPosts.contains(postId)) return;
+    _subscribedPosts.add(postId);
+    _ensureWsListeners();
+    wsService.subscribeToPost(postId);
+  }
+
+  void _ensureWsListeners() {
+    if (_wsListenersRegistered) return;
+    _wsListenersRegistered = true;
+    wsService.on('comment', _commentCallback);
+  }
+
+  void _handleCommentMessage(WsMessage wsMessage) {
+    final postId = wsMessage.postId;
+    if (postId == null) return;
+
+    try {
+      final comment = FeedComment.fromJson(wsMessage.data);
+      final existing = _commentsByPost[postId] ?? [];
+      if (existing.any((item) => item.id == comment.id)) return;
+
+      final updated = [...existing, comment];
+      updated.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      _commentsByPost[postId] = updated;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Error handling comment update: $e');
+    }
   }
 
   Future<FeedComment?> createComment(
@@ -343,7 +385,14 @@ class FeedService extends ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
-        return FeedComment.fromJson(json.decode(response.body));
+        final comment = FeedComment.fromJson(json.decode(response.body));
+        final existing = _commentsByPost[postId] ?? [];
+        if (!existing.any((item) => item.id == comment.id)) {
+          _commentsByPost[postId] = [...existing, comment]
+            ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          notifyListeners();
+        }
+        return comment;
       }
     } catch (e) {
       debugPrint('Error creating comment: $e');

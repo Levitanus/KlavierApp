@@ -1,6 +1,39 @@
 part of '../profile_screen.dart';
 
 mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
+  @override
+  Future<void> _startChatWithUser(int userId, String userName) async {
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    
+    try {
+      final success = await chatService.startThread(userId);
+      if (success && mounted) {
+        final thread = chatService.threads.firstWhere(
+          (t) => (t.participantBId != null &&
+                  ((t.participantAId == _userId && t.participantBId == userId) ||
+                   (t.participantAId == userId && t.participantBId == _userId))),
+          orElse: () => throw Exception('Thread not found'),
+        );
+        
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (context) => ChatConversationScreen(thread: thread, toAdmin: false),
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start chat: ${chatService.errorMessage}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting chat: $e')),
+        );
+      }
+    }
+  }
+
   Future<bool> _showLockedConfirmationDialog({
     required String title,
     required String content,
@@ -265,6 +298,15 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                     ],
                                   ),
                                 ),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.message),
+                                  label: const Text('Message'),
+                                  onPressed: () => _startChatWithUser(
+                                    parent['user_id'] as int,
+                                    parent['full_name'] as String,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
                                 OutlinedButton.icon(
                                   icon: const Icon(Icons.visibility),
                                   label: const Text('View Profile'),
@@ -702,6 +744,15 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                   ),
                                 ),
                                 OutlinedButton.icon(
+                                  icon: const Icon(Icons.message),
+                                  label: const Text('Message'),
+                                  onPressed: () => _startChatWithUser(
+                                    student['user_id'] as int,
+                                    student['full_name'] as String,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
                                   icon: const Icon(Icons.visibility),
                                   label: const Text('View Profile'),
                                   onPressed: () => _showStudentProfileDialog(student),
@@ -766,6 +817,14 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           ),
         ),
         actions: [
+          ElevatedButton.icon(
+            onPressed: () => _startChatWithUser(
+              parent['user_id'] as int,
+              parent['full_name'] as String,
+            ),
+            icon: const Icon(Icons.message),
+            label: const Text('Send Message'),
+          ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Close'),
@@ -1333,6 +1392,15 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                   Row(
                                     children: [
                                       OutlinedButton.icon(
+                                        icon: const Icon(Icons.message),
+                                        label: const Text('Message'),
+                                        onPressed: () => _startChatWithUser(
+                                          teacher['user_id'] as int,
+                                          teacher['full_name'] as String,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      OutlinedButton.icon(
                                         icon: const Icon(Icons.visibility),
                                         label: const Text('View Profile'),
                                         onPressed: () => _showTeacherProfileDialog(teacher),
@@ -1435,6 +1503,14 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Close'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _startChatWithUser(
+                    child['user_id'] as int,
+                    child['full_name'] as String,
+                  ),
+                  icon: const Icon(Icons.message),
+                  label: const Text('Message'),
                 ),
                 ElevatedButton.icon(
                   onPressed: () {
