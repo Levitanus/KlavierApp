@@ -15,10 +15,13 @@ class ChatService extends ChangeNotifier {
   List<ChatThread> threads = [];
   Map<int, List<ChatMessage>> messagesByThread = {};
   List<RelatedTeacher> relatedTeachers = [];
+  List<ChatUserOption> availableUsers = [];
   bool isLoading = false;
   bool isLoadingRelatedTeachers = false;
+  bool isLoadingAvailableUsers = false;
   String? errorMessage;
   String currentMode = 'personal'; // 'personal' or 'admin'
+  bool _threadsLoaded = false;
   
   // Track subscribed threads and listening state
   Set<int> subscribedThreads = {};
@@ -27,6 +30,8 @@ class ChatService extends ChangeNotifier {
   late final WsMessageCallback _receiptCallback = _handleReceiptUpdate;
   late final WsMessageCallback _typingCallback = _handleTyping;
   late final WsConnectionCallback _connectionCallback = _handleConnectionChange;
+  Timer? _threadRefreshTimer;
+  Timer? _threadPollTimer;
 
   ChatService({required String token, required this.wsService}) : _token = token {
     wsService.onConnectionStateChanged(_connectionCallback);
@@ -38,10 +43,25 @@ class ChatService extends ChangeNotifier {
     if (token == _token) return;
     _token = token;
     subscribedThreads.clear();
+    _threadsLoaded = false;
   }
 
   void updateCurrentUserId(int? userId) {
     _currentUserId = userId;
+  }
+
+  Future<void> ensureThreadsLoaded({String mode = 'personal'}) async {
+    if (_threadsLoaded) return;
+    await loadThreads(mode: mode);
+    _threadsLoaded = true;
+    _startThreadPolling();
+  }
+
+  void _startThreadPolling() {
+    _threadPollTimer?.cancel();
+    _threadPollTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      loadThreads(mode: currentMode);
+    });
   }
 
   Future<void> loadThreads({String mode = 'personal'}) async {
@@ -60,6 +80,9 @@ class ChatService extends ChangeNotifier {
         final List<dynamic> data = json.decode(response.body);
         threads = data.map((t) => ChatThread.fromJson(t as Map<String, dynamic>)).toList();
         errorMessage = null;
+        for (final thread in threads) {
+          _subscribeToThread(thread.id);
+        }
       } else {
         errorMessage = 'Failed to load threads: ${response.statusCode}';
       }
@@ -92,7 +115,28 @@ class ChatService extends ChangeNotifier {
         final newMessages = data
             .map((m) => ChatMessage.fromJson(m as Map<String, dynamic>))
             .toList();
-        if (append && messagesByThread.containsKey(threadId)) {
+        if (!append && messagesByThread.containsKey(threadId)) {
+          final existing = messagesByThread[threadId] ?? [];
+          final existingById = {for (final message in existing) message.id: message};
+          final mergedMessages = <ChatMessage>[];
+          for (final message in newMessages) {
+            final local = existingById[message.id];
+            if (local == null) {
+              mergedMessages.add(message);
+              continue;
+            }
+            final mergedReceipts = _mergeReceipts(message.receipts, local.receipts);
+            mergedMessages.add(ChatMessage(
+              id: message.id,
+              senderId: message.senderId,
+              senderName: message.senderName,
+              bodyJson: message.bodyJson,
+              createdAt: message.createdAt,
+              receipts: mergedReceipts,
+            ));
+          }
+          messagesByThread[threadId] = mergedMessages;
+        } else if (append && messagesByThread.containsKey(threadId)) {
           final existing = messagesByThread[threadId] ?? [];
           final existingIds = existing.map((m) => m.id).toSet();
           final merged = List<ChatMessage>.from(existing);
@@ -162,7 +206,7 @@ class ChatService extends ChangeNotifier {
 
   void _handleNewMessage(WsMessage wsMessage) {
     final threadId = wsMessage.threadId;
-    if (threadId == null || !messagesByThread.containsKey(threadId)) return;
+    if (threadId == null) return;
     
     try {
       final messageData = wsMessage.data;
@@ -178,20 +222,60 @@ class ChatService extends ChangeNotifier {
         createdAt: DateTime.parse(messageData['created_at'] as String),
         receipts: const [],
       );
+
+      final isOwn = _currentUserId != null && newMessage.senderId == _currentUserId;
       
-      if (_currentUserId != null && newMessage.senderId != _currentUserId) {
+      if (!isOwn) {
         updateMessageReceipt(newMessage.id, 'delivered');
       }
 
-      final existing = messagesByThread[threadId]!;
-      final alreadyExists = existing.any((message) => message.id == newMessage.id);
-      if (!alreadyExists) {
-        existing.insert(0, newMessage);
+      final existing = messagesByThread[threadId];
+      if (existing != null) {
+        final alreadyExists = existing.any((message) => message.id == newMessage.id);
+        if (!alreadyExists) {
+          existing.insert(0, newMessage);
+        }
       }
+
+      _updateThreadPreview(threadId, newMessage, incrementUnread: !isOwn);
       notifyListeners();
     } catch (e) {
       print('Error handling new message: $e');
     }
+  }
+
+  void _updateThreadPreview(
+    int threadId,
+    ChatMessage newMessage, {
+    required bool incrementUnread,
+  }) {
+    final index = threads.indexWhere((thread) => thread.id == threadId);
+    if (index == -1) {
+      _scheduleThreadRefresh();
+      return;
+    }
+
+    final thread = threads[index];
+    final updatedThread = ChatThread(
+      id: thread.id,
+      participantAId: thread.participantAId,
+      participantBId: thread.participantBId,
+      peerUserId: thread.peerUserId,
+      peerName: thread.peerName,
+      isAdminChat: thread.isAdminChat,
+      lastMessage: newMessage,
+      updatedAt: newMessage.createdAt,
+      unreadCount: incrementUnread ? thread.unreadCount + 1 : thread.unreadCount,
+    );
+
+    threads[index] = updatedThread;
+  }
+
+  void _scheduleThreadRefresh() {
+    _threadRefreshTimer?.cancel();
+    _threadRefreshTimer = Timer(const Duration(milliseconds: 400), () {
+      loadThreads(mode: currentMode);
+    });
   }
 
   void _handleReceiptUpdate(WsMessage wsMessage) {
@@ -247,6 +331,47 @@ class ChatService extends ChangeNotifier {
     }
   }
 
+  List<MessageReceipt> _mergeReceipts(
+    List<MessageReceipt> serverReceipts,
+    List<MessageReceipt> localReceipts,
+  ) {
+    if (localReceipts.isEmpty) return serverReceipts;
+    if (serverReceipts.isEmpty) return localReceipts;
+
+    final merged = <int, MessageReceipt>{
+      for (final receipt in serverReceipts) receipt.recipientId: receipt,
+    };
+
+    for (final local in localReceipts) {
+      final current = merged[local.recipientId];
+      if (current == null) {
+        merged[local.recipientId] = local;
+        continue;
+      }
+
+      final currentRank = _receiptRank(current.state);
+      final localRank = _receiptRank(local.state);
+      if (localRank > currentRank) {
+        merged[local.recipientId] = local;
+      } else if (localRank == currentRank && local.updatedAt.isAfter(current.updatedAt)) {
+        merged[local.recipientId] = local;
+      }
+    }
+
+    return merged.values.toList();
+  }
+
+  int _receiptRank(String state) {
+    switch (state) {
+      case 'read':
+        return 2;
+      case 'delivered':
+        return 1;
+      default:
+        return 0;
+    }
+  }
+
   void _handleTyping(WsMessage wsMessage) {
     // TODO: Implement typing indicator UI
     // final userId = wsMessage.data['user_id'] as int;
@@ -294,9 +419,9 @@ class ChatService extends ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
-        // Reload messages to show the new one
-        await loadThreadMessages(threadId);
-        notifyListeners();
+        if (!messagesByThread.containsKey(threadId)) {
+          await loadThreadMessages(threadId);
+        }
         return true;
       } else {
         errorMessage = 'Failed to send message: ${response.statusCode}';
@@ -382,6 +507,36 @@ class ChatService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> loadAvailableUsers() async {
+    if (_token.isEmpty) return;
+
+    isLoadingAvailableUsers = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/available-users'),
+        headers: {'Authorization': 'Bearer $_token'},
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = json.decode(response.body);
+        availableUsers = data
+            .map((u) => ChatUserOption.fromJson(u as Map<String, dynamic>))
+            .toList();
+        errorMessage = null;
+      } else {
+        errorMessage = 'Failed to load users: ${response.statusCode}';
+      }
+    } catch (e) {
+      errorMessage = 'Error loading users: $e';
+    }
+
+    isLoadingAvailableUsers = false;
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     // Clean up WebSocket subscriptions
@@ -392,6 +547,8 @@ class ChatService extends ChangeNotifier {
     }
     wsService.removeConnectionListener(_connectionCallback);
     subscribedThreads.clear();
+    _threadRefreshTimer?.cancel();
+    _threadPollTimer?.cancel();
     super.dispose();
   }
 }

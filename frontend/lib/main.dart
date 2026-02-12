@@ -15,6 +15,7 @@ import 'reset_password_screen.dart';
 import 'register_screen.dart';
 
 void main() {
+  WidgetsFlutterBinding.ensureInitialized();
   // Use path-based URL strategy instead of hash-based
   usePathUrlStrategy();
   runApp(const MyApp());
@@ -93,6 +94,9 @@ class MyApp extends StatelessWidget {
             );
             service.updateToken(authService.token ?? '');
             service.updateCurrentUserId(authService.userId);
+            if (authService.isAuthenticated) {
+              service.ensureThreadsLoaded();
+            }
             return service;
           },
         ),

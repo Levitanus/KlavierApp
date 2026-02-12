@@ -193,11 +193,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
       if (success) {
         _editorController.clear();
-        
-        // Reload messages
-        if (widget.thread != null && !widget.toAdmin) {
-          await _loadMessages();
-        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(chatService.errorMessage ?? 'Failed to send message')),

@@ -278,8 +278,20 @@ class _NewChatDialog extends StatefulWidget {
 
 class _NewChatDialogState extends State<_NewChatDialog> {
   final _searchController = TextEditingController();
-  List<Map<String, dynamic>> _searchResults = [];
-  bool _isSearching = false;
+  List<ChatUserOption> _allUsers = [];
+  List<ChatUserOption> _filteredUsers = [];
+  bool _isLoading = false;
+  String? _errorMessage;
+  static const String _baseUrl = 'http://localhost:8080';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _loadUsers();
+    });
+  }
 
   @override
   void dispose() {
@@ -287,24 +299,88 @@ class _NewChatDialogState extends State<_NewChatDialog> {
     super.dispose();
   }
 
+  Future<void> _loadUsers() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    final chatService = context.read<ChatService>();
+    await chatService.loadAvailableUsers();
+
+    if (!mounted) return;
+    setState(() {
+      _allUsers = List<ChatUserOption>.from(chatService.availableUsers);
+      _filteredUsers = List<ChatUserOption>.from(_allUsers);
+      _errorMessage = chatService.errorMessage;
+      _isLoading = false;
+    });
+  }
+
   void _searchUsers(String query) {
-    if (query.isEmpty) {
+    final trimmed = query.trim().toLowerCase();
+    if (trimmed.isEmpty) {
       setState(() {
-        _searchResults = [];
+        _filteredUsers = List<ChatUserOption>.from(_allUsers);
       });
       return;
     }
 
     setState(() {
-      _isSearching = true;
+      _filteredUsers = _allUsers.where((user) {
+        return user.fullName.toLowerCase().contains(trimmed) ||
+            user.username.toLowerCase().contains(trimmed);
+      }).toList();
     });
+  }
 
-    // TODO: Implement user search from backend
-    // For now, just show a placeholder
-    setState(() {
-      _searchResults = [];
-      _isSearching = false;
-    });
+  Future<void> _startChat(ChatUserOption user) async {
+    final chatService = context.read<ChatService>();
+    final success = await chatService.startThread(user.userId);
+
+    if (!mounted) return;
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to start chat')),
+      );
+      return;
+    }
+
+    final thread = chatService.threads.firstWhere(
+      (t) => t.peerUserId == user.userId,
+      orElse: () => ChatThread(
+        id: -1,
+        participantAId: 0,
+        participantBId: null,
+        peerUserId: null,
+        peerName: null,
+        isAdminChat: false,
+        lastMessage: null,
+        updatedAt: DateTime.now(),
+        unreadCount: 0,
+      ),
+    );
+
+    if (thread.id == -1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Chat created, but thread not found')),
+      );
+      return;
+    }
+
+    Navigator.of(context).pop();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ChatConversationScreen(thread: thread),
+      ),
+    );
+  }
+
+  ImageProvider? _avatarImage(ChatUserOption user) {
+    final profileImage = user.profileImage;
+    if (profileImage == null || profileImage.isEmpty) return null;
+    return NetworkImage('$_baseUrl/uploads/profile_images/$profileImage');
   }
 
   @override
@@ -325,9 +401,17 @@ class _NewChatDialogState extends State<_NewChatDialog> {
               onChanged: _searchUsers,
             ),
             const SizedBox(height: 16),
-            if (_isSearching)
+            if (_isLoading)
               const CircularProgressIndicator()
-            else if (_searchResults.isEmpty)
+            else if (_errorMessage != null)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  _errorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              )
+            else if (_filteredUsers.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: Text('No results found'),
@@ -335,15 +419,24 @@ class _NewChatDialogState extends State<_NewChatDialog> {
             else
               Expanded(
                 child: ListView.builder(
-                  itemCount: _searchResults.length,
+                  itemCount: _filteredUsers.length,
                   itemBuilder: (context, index) {
-                    final user = _searchResults[index];
+                    final user = _filteredUsers[index];
+                    final initials = user.fullName.isNotEmpty
+                        ? user.fullName.trim().split(' ').map((part) => part[0]).take(2).join()
+                        : user.username.isNotEmpty
+                            ? user.username[0]
+                            : '?';
                     return ListTile(
-                      title: Text(user['name'] ?? 'Unknown'),
-                      onTap: () {
-                        Navigator.pop(context);
-                        // Start chat with this user
-                      },
+                      leading: CircleAvatar(
+                        backgroundImage: _avatarImage(user),
+                        child: _avatarImage(user) == null
+                            ? Text(initials.toUpperCase())
+                            : null,
+                      ),
+                      title: Text(user.fullName),
+                      subtitle: Text(user.username),
+                      onTap: () => _startChat(user),
                     );
                   },
                 ),

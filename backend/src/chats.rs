@@ -4,6 +4,7 @@ use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::{FromRow, PgPool};
+use std::collections::HashSet;
 
 use crate::users::verify_token;
 use crate::websockets;
@@ -118,6 +119,14 @@ pub struct ReceiptResponse {
     pub recipient_id: i32,
     pub state: String,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Clone, FromRow)]
+pub struct AvailableChatUser {
+    pub user_id: i32,
+    pub username: String,
+    pub full_name: String,
+    pub profile_image: Option<String>,
 }
 
 // Request DTOs
@@ -249,6 +258,154 @@ pub async fn can_message_user(
     .await?;
 
     Ok(teacher_of_student_of_parent)
+}
+
+async fn fetch_available_user_ids(
+    pool: &PgPool,
+    user_id: i32,
+    roles: &[String],
+) -> Result<HashSet<i32>, sqlx::Error> {
+    let mut user_ids: HashSet<i32> = HashSet::new();
+
+    if roles.iter().any(|role| role == "admin") {
+        let ids = sqlx::query_scalar::<_, i32>("SELECT id FROM users WHERE id <> $1")
+            .bind(user_id)
+            .fetch_all(pool)
+            .await?;
+        user_ids.extend(ids);
+    } else if roles.iter().any(|role| role == "teacher") {
+        let student_ids = sqlx::query_scalar::<_, i32>(
+            "SELECT student_user_id FROM teacher_student_relations WHERE teacher_user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
+
+        user_ids.extend(student_ids.iter().copied());
+
+        if !student_ids.is_empty() {
+            let parent_ids = sqlx::query_scalar::<_, i32>(
+                "SELECT DISTINCT parent_user_id
+                 FROM parent_student_relations
+                 WHERE student_user_id = ANY($1)",
+            )
+            .bind(&student_ids)
+            .fetch_all(pool)
+            .await?;
+            user_ids.extend(parent_ids);
+        }
+
+        let teacher_ids = sqlx::query_scalar::<_, i32>(
+            "SELECT user_id FROM teachers WHERE user_id <> $1",
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
+        user_ids.extend(teacher_ids);
+
+        let admin_ids = sqlx::query_scalar::<_, i32>(
+            "SELECT DISTINCT ur.user_id
+             FROM user_roles ur
+             JOIN roles r ON ur.role_id = r.id
+             WHERE r.name = 'admin'",
+        )
+        .fetch_all(pool)
+        .await?;
+        user_ids.extend(admin_ids);
+    } else if roles.iter().any(|role| role == "student") {
+        let parent_ids = sqlx::query_scalar::<_, i32>(
+            "SELECT parent_user_id
+             FROM parent_student_relations
+             WHERE student_user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
+        user_ids.extend(parent_ids);
+
+        let teacher_ids = sqlx::query_scalar::<_, i32>(
+            "SELECT teacher_user_id
+             FROM teacher_student_relations
+             WHERE student_user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
+        user_ids.extend(teacher_ids.iter().copied());
+
+        if !teacher_ids.is_empty() {
+            let related_student_ids = sqlx::query_scalar::<_, i32>(
+                "SELECT DISTINCT student_user_id
+                 FROM teacher_student_relations
+                 WHERE teacher_user_id = ANY($1)",
+            )
+            .bind(&teacher_ids)
+            .fetch_all(pool)
+            .await?;
+            user_ids.extend(related_student_ids.iter().copied());
+
+            if !related_student_ids.is_empty() {
+                let related_parent_ids = sqlx::query_scalar::<_, i32>(
+                    "SELECT DISTINCT parent_user_id
+                     FROM parent_student_relations
+                     WHERE student_user_id = ANY($1)",
+                )
+                .bind(&related_student_ids)
+                .fetch_all(pool)
+                .await?;
+                user_ids.extend(related_parent_ids);
+            }
+        }
+    } else if roles.iter().any(|role| role == "parent") {
+        let child_ids = sqlx::query_scalar::<_, i32>(
+            "SELECT student_user_id
+             FROM parent_student_relations
+             WHERE parent_user_id = $1",
+        )
+        .bind(user_id)
+        .fetch_all(pool)
+        .await?;
+        user_ids.extend(child_ids.iter().copied());
+
+        if !child_ids.is_empty() {
+            let teacher_ids = sqlx::query_scalar::<_, i32>(
+                "SELECT DISTINCT teacher_user_id
+                 FROM teacher_student_relations
+                 WHERE student_user_id = ANY($1)",
+            )
+            .bind(&child_ids)
+            .fetch_all(pool)
+            .await?;
+            user_ids.extend(teacher_ids.iter().copied());
+
+            if !teacher_ids.is_empty() {
+                let related_student_ids = sqlx::query_scalar::<_, i32>(
+                    "SELECT DISTINCT student_user_id
+                     FROM teacher_student_relations
+                     WHERE teacher_user_id = ANY($1)",
+                )
+                .bind(&teacher_ids)
+                .fetch_all(pool)
+                .await?;
+                user_ids.extend(related_student_ids.iter().copied());
+
+                if !related_student_ids.is_empty() {
+                    let related_parent_ids = sqlx::query_scalar::<_, i32>(
+                        "SELECT DISTINCT parent_user_id
+                         FROM parent_student_relations
+                         WHERE student_user_id = ANY($1)",
+                    )
+                    .bind(&related_student_ids)
+                    .fetch_all(pool)
+                    .await?;
+                    user_ids.extend(related_parent_ids);
+                }
+            }
+        }
+    }
+
+    user_ids.remove(&user_id);
+    Ok(user_ids)
 }
 
 /// Get all teachers related to a user (for toolbar shortcuts)
@@ -494,7 +651,7 @@ async fn list_threads(
              JOIN chat_messages cm ON mr.message_id = cm.id
              WHERE cm.thread_id = $1
              AND mr.recipient_id = $2
-             AND mr.state = 'sent'",
+               AND mr.state <> 'read'::chat_message_state",
         )
         .bind(thread.id)
         .bind(user_id)
@@ -611,15 +768,20 @@ async fn start_thread(
     app_state: web::Data<AppState>,
     payload: web::Json<StartThreadRequest>,
 ) -> Result<HttpResponse> {
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(_response) => {
+            return Err(actix_web::error::ErrorUnauthorized("Invalid or missing token"))
+        }
+    };
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     let target_id = payload.target_user_id;
 
-    // Check if users can message each other
-    let can_message = can_message_user(&app_state.db, user_id, target_id)
+    let available_user_ids = fetch_available_user_ids(&app_state.db, user_id, &claims.roles)
         .await
         .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
-    if !can_message {
+    if !available_user_ids.contains(&target_id) {
         return Ok(HttpResponse::Forbidden().json(json!({
             "error": "Cannot message this user"
         })));
@@ -971,6 +1133,46 @@ async fn get_related_teachers_handler(
     Ok(HttpResponse::Ok().json(teachers))
 }
 
+/// List available chat users based on role relationships
+async fn list_available_chat_users(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+) -> Result<HttpResponse> {
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(_response) => {
+            return Err(actix_web::error::ErrorUnauthorized("Invalid or missing token"))
+        }
+    };
+    let user_id = extract_user_id_from_token(&req, &app_state).await?;
+    let user_ids = fetch_available_user_ids(&app_state.db, user_id, &claims.roles)
+        .await
+        .unwrap_or_default();
+    if user_ids.is_empty() {
+        return Ok(HttpResponse::Ok().json(Vec::<AvailableChatUser>::new()));
+    }
+
+    let ids: Vec<i32> = user_ids.into_iter().collect();
+    let users = sqlx::query_as::<_, AvailableChatUser>(
+        "SELECT u.id as user_id,
+                u.username,
+                COALESCE(s.full_name, p.full_name, t.full_name, u.username) as full_name,
+                u.profile_image
+         FROM users u
+         LEFT JOIN students s ON u.id = s.user_id
+         LEFT JOIN parents p ON u.id = p.user_id
+         LEFT JOIN teachers t ON u.id = t.user_id
+         WHERE u.id = ANY($1)
+         ORDER BY full_name",
+    )
+    .bind(&ids)
+    .fetch_all(&app_state.db)
+    .await
+    .unwrap_or_default();
+
+    Ok(HttpResponse::Ok().json(users))
+}
+
 // ============================================================================
 // Route Configuration
 // ============================================================================
@@ -984,6 +1186,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/threads/{thread_id}/messages", web::post().to(send_message))
             .route("/messages/{message_id}/receipt", web::patch().to(update_receipt))
             .route("/admin/message", web::post().to(send_admin_message))
-            .route("/related-teachers", web::get().to(get_related_teachers_handler)),
+            .route("/related-teachers", web::get().to(get_related_teachers_handler))
+            .route("/available-users", web::get().to(list_available_chat_users)),
     );
 }

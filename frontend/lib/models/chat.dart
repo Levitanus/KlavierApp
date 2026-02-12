@@ -186,3 +186,26 @@ class RelatedTeacher {
     };
   }
 }
+
+class ChatUserOption {
+  final int userId;
+  final String username;
+  final String fullName;
+  final String? profileImage;
+
+  ChatUserOption({
+    required this.userId,
+    required this.username,
+    required this.fullName,
+    required this.profileImage,
+  });
+
+  factory ChatUserOption.fromJson(Map<String, dynamic> json) {
+    return ChatUserOption(
+      userId: json['user_id'] as int,
+      username: json['username'] as String,
+      fullName: json['full_name'] as String? ?? json['username'] as String,
+      profileImage: json['profile_image'] as String?,
+    );
+  }
+}
