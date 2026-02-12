@@ -14,6 +14,7 @@ use crate::password_reset;
 pub struct UserResponse {
     pub id: i32,
     pub username: String,
+    pub full_name: String,
     pub email: Option<String>,
     pub phone: Option<String>,
     #[sqlx(skip)]
@@ -31,6 +32,7 @@ pub struct CreateUserRequest {
     pub username: String,
     pub password: String,
     pub roles: Vec<String>,
+    pub full_name: String,
     pub email: Option<String>,
     pub phone: Option<String>,
 }
@@ -39,6 +41,7 @@ pub struct CreateUserRequest {
 pub struct UpdateUserRequest {
     pub username: Option<String>,
     pub password: Option<String>,
+    pub full_name: Option<String>,
     pub email: Option<String>,
     pub phone: Option<String>,
     pub roles: Option<Vec<String>>,
@@ -75,7 +78,7 @@ async fn get_users(
 
     // Get all users
     let users_result = sqlx::query_as::<_, UserResponse>(
-        "SELECT id, username, email, phone FROM users ORDER BY username"
+        "SELECT id, username, full_name, email, phone FROM users ORDER BY username"
     )
     .fetch_all(&app_state.db)
     .await;
@@ -168,9 +171,10 @@ async fn create_user(
 
     // Insert user
     let user_result = sqlx::query_scalar::<_, i32>(
-        "INSERT INTO users (username, password_hash, email, phone) VALUES ($1, $2, $3, $4) RETURNING id"
+        "INSERT INTO users (username, full_name, password_hash, email, phone) VALUES ($1, $2, $3, $4, $5) RETURNING id"
     )
     .bind(&user_data.username)
+    .bind(&user_data.full_name)
     .bind(&password_hash)
     .bind(&user_data.email)
     .bind(&user_data.phone)
@@ -284,6 +288,20 @@ async fn update_user(
     }
 
     // Update phone if provided
+        // Update full name if provided
+        if let Some(full_name) = &user_data.full_name {
+            let result = sqlx::query("UPDATE users SET full_name = $1 WHERE id = $2")
+                .bind(full_name)
+                .bind(user_id)
+                .execute(&app_state.db)
+                .await;
+
+            if result.is_err() {
+                return HttpResponse::InternalServerError().json(serde_json::json!({
+                    "error": "Failed to update full name"
+                }));
+            }
+        }
     if let Some(phone) = &user_data.phone {
         let result = sqlx::query("UPDATE users SET phone = $1 WHERE id = $2")
             .bind(phone)
@@ -509,20 +527,17 @@ async fn resolve_password_reset_request(
 
 #[derive(Debug, Deserialize)]
 pub struct MakeStudentRequest {
-    pub full_name: String,
     pub address: String,
     pub birthday: String, // YYYY-MM-DD format
 }
 
 #[derive(Debug, Deserialize)]
 pub struct MakeParentRequest {
-    pub full_name: String,
     pub student_ids: Vec<i32>, // At least one required
 }
 
 #[derive(Debug, Deserialize)]
 pub struct MakeTeacherRequest {
-    pub full_name: String,
 }
 
 /// Convert an existing user to a student
@@ -635,11 +650,10 @@ async fn make_student(
 
     // Create student entry
     if let Err(e) = sqlx::query(
-        "INSERT INTO students (user_id, full_name, address, birthday) 
-         VALUES ($1, $2, $3, $4)"
+        "INSERT INTO students (user_id, address, birthday) 
+         VALUES ($1, $2, $3)"
     )
     .bind(user_id)
-    .bind(&student_data.full_name)
     .bind(&student_data.address)
     .bind(birthday)
     .execute(&mut *tx)
@@ -651,19 +665,6 @@ async fn make_student(
             "error": "Failed to create student"
         }));
     }
-
-    // Update other role tables if they exist with the same full_name
-    let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
-        .bind(&student_data.full_name)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await;
-
-    let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
-        .bind(&student_data.full_name)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await;
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
@@ -792,10 +793,9 @@ async fn make_parent(
 
     // Create parent entry
     if let Err(e) = sqlx::query(
-        "INSERT INTO parents (user_id, full_name) VALUES ($1, $2)"
+        "INSERT INTO parents (user_id) VALUES ($1)"
     )
     .bind(user_id)
-    .bind(&parent_data.full_name)
     .execute(&mut *tx)
     .await
     {
@@ -805,19 +805,6 @@ async fn make_parent(
             "error": "Failed to create parent"
         }));
     }
-
-    // Update other role tables if they exist with the same full_name
-    let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
-        .bind(&parent_data.full_name)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await;
-
-    let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
-        .bind(&parent_data.full_name)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await;
 
     // Create parent-student relations
     for student_id in &parent_data.student_ids {
@@ -872,7 +859,7 @@ async fn make_teacher(
     req: HttpRequest,
     app_state: web::Data<AppState>,
     user_id: web::Path<i32>,
-    teacher_data: web::Json<MakeTeacherRequest>,
+    _teacher_data: web::Json<MakeTeacherRequest>,
 ) -> impl Responder {
     if let Err(response) = verify_admin_role(&req, &app_state) {
         return response;
@@ -966,10 +953,9 @@ async fn make_teacher(
 
     // Create teacher entry
     if let Err(e) = sqlx::query(
-        "INSERT INTO teachers (user_id, full_name) VALUES ($1, $2)"
+        "INSERT INTO teachers (user_id) VALUES ($1)"
     )
     .bind(user_id)
-    .bind(&teacher_data.full_name)
     .execute(&mut *tx)
     .await
     {
@@ -979,19 +965,6 @@ async fn make_teacher(
             "error": "Failed to create teacher"
         }));
     }
-
-    // Update other role tables if they exist with the same full_name
-    let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
-        .bind(&teacher_data.full_name)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await;
-
-    let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
-        .bind(&teacher_data.full_name)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await;
 
     // Commit transaction
     if let Err(e) = tx.commit().await {

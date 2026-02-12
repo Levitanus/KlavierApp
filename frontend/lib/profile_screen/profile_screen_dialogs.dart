@@ -17,7 +17,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
         
         Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (context) => ChatConversationScreen(thread: thread, toAdmin: false),
+            builder: (context) => ChatConversationScreen(thread: thread),
           ),
         );
       } else if (mounted) {
@@ -851,7 +851,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
   }
 
   void _showMakeStudentDialog() {
-    final fullNameController = TextEditingController();
     final addressController = TextEditingController();
     final birthdayController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -866,16 +865,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  controller: fullNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Full Name',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: addressController,
                   decoration: const InputDecoration(
@@ -916,7 +905,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
               if (formKey.currentState!.validate()) {
                 Navigator.of(context).pop();
                 await _makeUserStudent(
-                  fullNameController.text,
                   addressController.text,
                   birthdayController.text,
                 );
@@ -930,7 +918,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
   }
 
   void _showMakeParentDialog() async {
-    final fullNameController = TextEditingController();
     final studentFilterController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final selectedStudents = <int>{};
@@ -965,16 +952,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextFormField(
-                      controller: fullNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Full Name',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value?.isEmpty ?? true ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 16),
                     const Text(
                       'Select Students (at least one):',
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -1057,7 +1034,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                   selectedStudents.isNotEmpty) {
                 Navigator.of(context).pop();
                 await _makeUserParent(
-                  fullNameController.text,
                   selectedStudents.toList(),
                 );
               }
@@ -1070,24 +1046,11 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
   }
 
   void _showMakeTeacherDialog() {
-    final fullNameController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Make $_username a Teacher'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: fullNameController,
-            decoration: const InputDecoration(
-              labelText: 'Full Name',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-          ),
-        ),
+        content: const Text('This will grant teacher privileges to the user.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -1095,10 +1058,8 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                Navigator.of(context).pop();
-                await _makeUserTeacher(fullNameController.text);
-              }
+              Navigator.of(context).pop();
+              await _makeUserTeacher();
             },
             child: const Text('Convert'),
           ),

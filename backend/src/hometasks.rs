@@ -112,9 +112,8 @@ async fn insert_notification(
 
 async fn fetch_teacher_name(db: &PgPool, teacher_id: i32) -> String {
     sqlx::query_scalar::<_, String>(
-        "SELECT COALESCE(t.full_name, u.username)
+        "SELECT COALESCE(u.full_name, u.username)
          FROM users u
-         LEFT JOIN teachers t ON u.id = t.user_id
          WHERE u.id = $1",
     )
     .bind(teacher_id)
@@ -126,9 +125,8 @@ async fn fetch_teacher_name(db: &PgPool, teacher_id: i32) -> String {
 
 async fn fetch_student_name(db: &PgPool, student_id: i32) -> String {
     sqlx::query_scalar::<_, String>(
-        "SELECT COALESCE(s.full_name, u.username)
+        "SELECT COALESCE(u.full_name, u.username)
          FROM users u
-         LEFT JOIN students s ON u.id = s.user_id
          WHERE u.id = $1",
     )
     .bind(student_id)
@@ -552,11 +550,10 @@ async fn list_student_hometasks(
         "SELECT h.id, h.teacher_id, h.student_id, h.title, h.description, h.status, h.due_date,
                  h.created_at, h.updated_at, h.sort_order, h.hometask_type, h.content_id,
                  c.items AS checklist_items,
-                 COALESCE(t.full_name, u.username) AS teacher_name
+                 COALESCE(u.full_name, u.username) AS teacher_name
          FROM hometasks h
          LEFT JOIN hometask_checklists c
             ON (h.hometask_type = 'checklist' OR h.hometask_type = 'progress') AND h.content_id = c.id
-            LEFT JOIN teachers t ON h.teacher_id = t.user_id
             LEFT JOIN users u ON h.teacher_id = u.id
             WHERE h.student_id = $1 AND h.status = ANY($2::hometask_status[])
               AND ($3::int IS NULL OR h.teacher_id = $3)

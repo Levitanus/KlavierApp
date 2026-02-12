@@ -4,6 +4,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
   Future<void> _saveUser({
     int? userId,
     required String username,
+    required String fullName,
     required String password,
     String? email,
     String? phone,
@@ -15,6 +16,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
 
       final body = {
         'username': username,
+        'full_name': fullName,
         if (password.isNotEmpty) 'password': password,
         if (email != null && email.isNotEmpty) 'email': email,
         if (phone != null && phone.isNotEmpty) 'phone': phone,
@@ -143,7 +145,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
   }
 
   Future<void> _makeUserStudent(
-      int userId, String fullName, String address, String birthday) async {
+      int userId, String address, String birthday) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
@@ -153,7 +155,6 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'full_name': fullName,
           'address': address,
           'birthday': birthday,
         }),
@@ -184,7 +185,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
   }
 
   Future<void> _makeUserParent(
-      int userId, String fullName, List<int> studentIds) async {
+      int userId, List<int> studentIds) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
@@ -194,7 +195,6 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'full_name': fullName,
           'student_ids': studentIds,
         }),
       );
@@ -223,7 +223,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     }
   }
 
-  Future<void> _makeUserTeacher(int userId, String fullName) async {
+  Future<void> _makeUserTeacher(int userId) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
@@ -232,9 +232,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'full_name': fullName,
-        }),
+        body: jsonEncode({}),
       );
 
       if (response.statusCode == 200) {

@@ -410,6 +410,7 @@ pub struct TeacherData {
 pub struct UserProfile {
     pub id: i32,
     pub username: String,
+    pub full_name: String,
     pub email: Option<String>,
     pub phone: Option<String>,
     pub profile_image: Option<String>,
@@ -457,7 +458,7 @@ async fn get_profile(
     };
 
     let mut profile = match sqlx::query_as::<_, UserProfile>(
-        "SELECT id, username, email, phone, profile_image, created_at FROM users WHERE username = $1"
+        "SELECT id, username, full_name, email, phone, profile_image, created_at FROM users WHERE username = $1"
     )
     .bind(&claims.sub)
     .fetch_optional(&app_state.db)
@@ -491,7 +492,10 @@ async fn get_profile(
     // Get student data if user is a student
     if profile.roles.contains(&"student".to_string()) {
         if let Ok(Some((full_name, address, birthday, status))) = sqlx::query_as::<_, (String, String, NaiveDate, String)>(
-            "SELECT full_name, address, birthday, status::text FROM students WHERE user_id = $1"
+            "SELECT u.full_name, s.address, s.birthday, s.status::text
+             FROM students s
+             INNER JOIN users u ON u.id = s.user_id
+             WHERE s.user_id = $1"
         )
         .bind(profile.id)
         .fetch_optional(&app_state.db)
@@ -509,7 +513,10 @@ async fn get_profile(
     // Get parent data if user is a parent
     if profile.roles.contains(&"parent".to_string()) {
         if let Ok(Some((full_name, status))) = sqlx::query_as::<_, (String, String)>(
-            "SELECT full_name, status::text FROM parents WHERE user_id = $1"
+            "SELECT u.full_name, p.status::text
+             FROM parents p
+             INNER JOIN users u ON u.id = p.user_id
+             WHERE p.user_id = $1"
         )
         .bind(profile.id)
         .fetch_optional(&app_state.db)
@@ -517,9 +524,9 @@ async fn get_profile(
         {
             // Get children
             let children: Vec<_> = sqlx::query_as::<_, (i32, String, String, String, NaiveDate, Option<String>, String)>(
-                "SELECT u.id, u.username, s.full_name, s.address, s.birthday, u.profile_image, s.status::text
-                 FROM users u
-                 INNER JOIN students s ON u.id = s.user_id
+                 "SELECT u.id, u.username, u.full_name, s.address, s.birthday, u.profile_image, s.status::text
+                  FROM users u
+                  INNER JOIN students s ON u.id = s.user_id
                  INNER JOIN parent_student_relations psr ON s.user_id = psr.student_user_id
                  WHERE psr.parent_user_id = $1"
             )
@@ -550,7 +557,10 @@ async fn get_profile(
     // Get teacher data if user is a teacher
     if profile.roles.contains(&"teacher".to_string()) {
         if let Ok(Some((full_name, status))) = sqlx::query_as::<_, (String, String)>(
-            "SELECT full_name, status::text FROM teachers WHERE user_id = $1"
+            "SELECT u.full_name, t.status::text
+             FROM teachers t
+             INNER JOIN users u ON u.id = t.user_id
+             WHERE t.user_id = $1"
         )
         .bind(profile.id)
         .fetch_optional(&app_state.db)
@@ -619,8 +629,23 @@ async fn update_profile(
         });
     }
 
+    if let Some(ref full_name) = update_req.full_name {
+        if let Err(e) = sqlx::query("UPDATE users SET full_name = $1 WHERE id = $2")
+            .bind(full_name)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await
+        {
+            error!("Failed to update user full name: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to update profile".to_string(),
+            });
+        }
+    }
+
     // Update role-specific data if provided
-    if update_req.full_name.is_some() || update_req.address.is_some() || update_req.birthday.is_some() {
+    if update_req.address.is_some() || update_req.birthday.is_some() {
         // Check if user is a student
         let is_student = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
@@ -648,10 +673,6 @@ async fn update_profile(
                 None
             };
 
-            if update_req.full_name.is_some() {
-                updates.push(format!("full_name = ${}", bind_count));
-                bind_count += 1;
-            }
             if update_req.address.is_some() {
                 updates.push(format!("address = ${}", bind_count));
                 bind_count += 1;
@@ -670,9 +691,6 @@ async fn update_profile(
 
                 let mut q = sqlx::query(&query);
                 
-                if let Some(ref full_name) = update_req.full_name {
-                    q = q.bind(full_name);
-                }
                 if let Some(ref address) = update_req.address {
                     q = q.bind(address);
                 }
@@ -689,94 +707,6 @@ async fn update_profile(
                     });
                 }
 
-                // Sync full_name to other role tables
-                if let Some(ref full_name) = update_req.full_name {
-                    let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
-                        .bind(full_name)
-                        .bind(user_id)
-                        .execute(&mut *tx)
-                        .await;
-                    
-                    let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
-                        .bind(full_name)
-                        .bind(user_id)
-                        .execute(&mut *tx)
-                        .await;
-                }
-            }
-        }
-
-        // Update parent data if user is a parent and full_name provided
-        if let Some(ref full_name) = update_req.full_name {
-            let is_parent = sqlx::query_scalar::<_, bool>(
-                "SELECT EXISTS(SELECT 1 FROM parents WHERE user_id = $1)"
-            )
-            .bind(user_id)
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap_or(false);
-
-            if is_parent {
-                if let Err(e) = sqlx::query(
-                    "UPDATE parents SET full_name = $1 WHERE user_id = $2"
-                )
-                .bind(full_name)
-                .bind(user_id)
-                .execute(&mut *tx)
-                .await
-                {
-                    error!("Failed to update parent data: {}", e);
-                }
-
-                // Sync to other role tables
-                let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
-                    .bind(full_name)
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await;
-                
-                let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
-                    .bind(full_name)
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await;
-            }
-        }
-
-        // Update teacher data if user is a teacher and full_name provided
-        if let Some(ref full_name) = update_req.full_name {
-            let is_teacher = sqlx::query_scalar::<_, bool>(
-                "SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1)"
-            )
-            .bind(user_id)
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap_or(false);
-
-            if is_teacher {
-                if let Err(e) = sqlx::query(
-                    "UPDATE teachers SET full_name = $1 WHERE user_id = $2"
-                )
-                .bind(full_name)
-                .bind(user_id)
-                .execute(&mut *tx)
-                .await
-                {
-                    error!("Failed to update teacher data: {}", e);
-                }
-
-                // Sync to other role tables
-                let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
-                    .bind(full_name)
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await;
-                
-                let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
-                    .bind(full_name)
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await;
             }
         }
     }

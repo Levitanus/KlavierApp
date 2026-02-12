@@ -12,6 +12,8 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
   void _showEditUserDialog(User? user) {
     final usernameController =
         TextEditingController(text: user?.username ?? '');
+    final fullNameController =
+      TextEditingController(text: user?.fullName ?? '');
     final passwordController = TextEditingController();
     final emailController = TextEditingController(text: user?.email ?? '');
     final phoneController = TextEditingController(text: user?.phone ?? '');
@@ -40,6 +42,20 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                     validator: (value) {
                       if (value == null || value.isEmpty) {
                         return 'Please enter a username';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: fullNameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Full Name',
+                      border: OutlineInputBorder(),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a full name';
                       }
                       return null;
                     },
@@ -203,6 +219,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 await _saveUser(
                   userId: user?.id,
                   username: usernameController.text,
+                  fullName: fullNameController.text,
                   password: passwordController.text,
                   email: emailController.text.isEmpty ? null : emailController.text,
                   phone: phoneController.text.isEmpty ? null : phoneController.text,
@@ -218,7 +235,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
   }
 
   void _showMakeStudentDialog(User user) {
-    final fullNameController = TextEditingController();
     final addressController = TextEditingController();
     final birthdayController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -233,16 +249,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  controller: fullNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Full Name',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: addressController,
                   decoration: const InputDecoration(
@@ -284,7 +290,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 Navigator.of(context).pop();
                 await _makeUserStudent(
                   user.id,
-                  fullNameController.text,
                   addressController.text,
                   birthdayController.text,
                 );
@@ -298,7 +303,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
   }
 
   void _showMakeParentDialog(User user) async {
-    final fullNameController = TextEditingController();
     final studentFilterController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final selectedStudents = <int>{};
@@ -353,16 +357,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextFormField(
-                      controller: fullNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Full Name',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value?.isEmpty ?? true ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 16),
                     const Text(
                       'Select Students (at least one):',
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -445,7 +439,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 Navigator.of(context).pop();
                 await _makeUserParent(
                   user.id,
-                  fullNameController.text,
                   selectedStudents.toList(),
                 );
               }
@@ -458,24 +451,11 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
   }
 
   void _showMakeTeacherDialog(User user) {
-    final fullNameController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Make ${user.username} a Teacher'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: fullNameController,
-            decoration: const InputDecoration(
-              labelText: 'Full Name',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-          ),
-        ),
+        content: const Text('This will grant teacher privileges to the user.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -483,10 +463,8 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                Navigator.of(context).pop();
-                await _makeUserTeacher(user.id, fullNameController.text);
-              }
+              Navigator.of(context).pop();
+              await _makeUserTeacher(user.id);
             },
             child: const Text('Convert'),
           ),

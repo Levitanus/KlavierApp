@@ -59,10 +59,11 @@ pub(crate) async fn create_parent(
 
     // Create user
     let user_id = match sqlx::query_scalar::<_, i32>(
-        "INSERT INTO users (username, password_hash, email, phone) 
-         VALUES ($1, $2, $3, $4) RETURNING id"
+        "INSERT INTO users (username, full_name, password_hash, email, phone) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING id"
     )
     .bind(&parent_req.username)
+    .bind(&parent_req.full_name)
     .bind(&password_hash)
     .bind(&parent_req.email)
     .bind(&parent_req.phone)
@@ -113,10 +114,9 @@ pub(crate) async fn create_parent(
 
     // Create parent entry
     if let Err(e) = sqlx::query(
-        "INSERT INTO parents (user_id, full_name) VALUES ($1, $2)"
+        "INSERT INTO parents (user_id) VALUES ($1)"
     )
     .bind(user_id)
-    .bind(&parent_req.full_name)
     .execute(&mut *tx)
     .await
     {
@@ -190,7 +190,7 @@ pub(crate) async fn get_parent(
 
     // Get parent with user info
     let parent = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, p.full_name, p.status::text
+        "SELECT u.id, u.username, u.email, u.phone, u.full_name, p.status::text
          FROM users u
          INNER JOIN parents p ON u.id = p.user_id
          WHERE u.id = $1"
@@ -203,7 +203,7 @@ pub(crate) async fn get_parent(
         Ok(Some((user_id, username, email, phone, full_name, status))) => {
             // Get children
             let children = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
-                "SELECT u.id, u.username, u.email, u.phone, s.full_name, s.address, s.birthday, s.status::text
+                "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.address, s.birthday, s.status::text
                  FROM users u
                  INNER JOIN students s ON u.id = s.user_id
                  INNER JOIN parent_student_relations psr ON s.user_id = psr.student_user_id
@@ -298,10 +298,15 @@ pub(crate) async fn update_parent(
     };
 
     // Update user table if email or phone changed
-    if update_req.email.is_some() || update_req.phone.is_some() {
+    if update_req.email.is_some() || update_req.phone.is_some() || update_req.full_name.is_some() {
         let mut query = String::from("UPDATE users SET ");
         let mut updates = Vec::new();
         let mut bind_count = 1;
+
+        if update_req.full_name.is_some() {
+            updates.push(format!("full_name = ${}", bind_count));
+            bind_count += 1;
+        }
 
         if update_req.email.is_some() {
             updates.push(format!("email = ${}", bind_count));
@@ -317,6 +322,10 @@ pub(crate) async fn update_parent(
         query.push_str(&format!(" WHERE id = ${}", bind_count));
 
         let mut q = sqlx::query(&query);
+
+        if let Some(ref full_name) = update_req.full_name {
+            q = q.bind(full_name);
+        }
 
         if let Some(ref email) = update_req.email {
             q = q.bind(email);
@@ -337,36 +346,7 @@ pub(crate) async fn update_parent(
         }
     }
 
-    // Update parent table
-    if let Some(ref full_name) = update_req.full_name {
-        if let Err(e) = sqlx::query(
-            "UPDATE parents SET full_name = $1 WHERE user_id = $2"
-        )
-        .bind(full_name)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await
-        {
-            error!("Failed to update parent: {}", e);
-            let _ = tx.rollback().await;
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to update parent info"
-            }));
-        }
-
-        // Sync full_name to other role tables
-        let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
-            .bind(full_name)
-            .bind(user_id)
-            .execute(&mut *tx)
-            .await;
-
-        let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
-            .bind(full_name)
-            .bind(user_id)
-            .execute(&mut *tx)
-            .await;
-    }
+    // No role-table full_name updates needed
 
     // Commit transaction
     if let Err(e) = tx.commit().await {

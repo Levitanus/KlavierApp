@@ -107,7 +107,9 @@ class _HomeScreenState extends State<HomeScreen> {
         final teacherData = data['teacher_data'] as Map<String, dynamic>?;
         String? fullName;
 
-        if (studentData != null) {
+        if (data['full_name'] != null) {
+          fullName = data['full_name']?.toString();
+        } else if (studentData != null) {
           fullName = studentData['full_name']?.toString();
         } else if (parentData != null) {
           fullName = parentData['full_name']?.toString();
@@ -427,12 +429,11 @@ class _ChatNavIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<ChatService>(
-      builder: (context, chatService, child) {
-        final unreadCount = chatService.threads.fold<int>(
-          0,
-          (sum, thread) => sum + thread.unreadCount,
-        );
+    return Consumer2<AuthService, ChatService>(
+      builder: (context, authService, chatService, child) {
+        final unreadCount = authService.isAdmin
+            ? chatService.totalUnreadCount
+            : chatService.personalUnreadCount;
         final icon = Icon(
           active ? Icons.chat_bubble : Icons.chat_bubble_outline,
         );

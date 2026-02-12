@@ -419,7 +419,7 @@ async fn get_token_info(
     // Get related student info if exists
     let related_student = if let Some(student_id) = token_record.related_student_id {
         match sqlx::query_as::<_, (i32, String, String)>(
-            "SELECT u.id, u.username, s.full_name 
+            "SELECT u.id, u.username, u.full_name 
              FROM users u 
              INNER JOIN students s ON u.id = s.user_id 
              WHERE u.id = $1"
@@ -441,7 +441,7 @@ async fn get_token_info(
 
     let related_teacher = if let Some(teacher_id) = token_record.related_teacher_id {
         match sqlx::query_as::<_, (i32, String, String)>(
-            "SELECT u.id, u.username, t.full_name
+            "SELECT u.id, u.username, u.full_name
              FROM users u
              INNER JOIN teachers t ON u.id = t.user_id
              WHERE u.id = $1"
@@ -550,10 +550,11 @@ async fn register_with_token(
     
     // Create user
     let user_id = match sqlx::query_scalar::<_, i32>(
-        "INSERT INTO users (username, password_hash, email, phone) 
-         VALUES ($1, $2, $3, $4) RETURNING id"
+        "INSERT INTO users (username, full_name, password_hash, email, phone) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING id"
     )
     .bind(&register_req.username)
+    .bind(&register_req.full_name)
     .bind(&password_hash)
     .bind(&register_req.email)
     .bind(&register_req.phone)
@@ -620,11 +621,10 @@ async fn register_with_token(
             };
             
             if let Err(e) = sqlx::query(
-                "INSERT INTO students (user_id, full_name, address, birthday) 
-                 VALUES ($1, $2, $3, $4)"
+                "INSERT INTO students (user_id, address, birthday) 
+                 VALUES ($1, $2, $3)"
             )
             .bind(user_id)
-            .bind(&register_req.full_name)
             .bind(register_req.address.as_ref().unwrap())
             .bind(birthday)
             .execute(&mut *tx)
@@ -664,10 +664,9 @@ async fn register_with_token(
         }
         "parent" => {
             if let Err(e) = sqlx::query(
-                "INSERT INTO parents (user_id, full_name) VALUES ($1, $2)"
+                "INSERT INTO parents (user_id) VALUES ($1)"
             )
             .bind(user_id)
-            .bind(&register_req.full_name)
             .execute(&mut *tx)
             .await
             {
@@ -707,10 +706,9 @@ async fn register_with_token(
         }
         "teacher" => {
             if let Err(e) = sqlx::query(
-                "INSERT INTO teachers (user_id, full_name) VALUES ($1, $2)"
+                "INSERT INTO teachers (user_id) VALUES ($1)"
             )
             .bind(user_id)
-            .bind(&register_req.full_name)
             .execute(&mut *tx)
             .await
             {

@@ -23,7 +23,6 @@ class AdminPanel extends StatefulWidget {
 
 abstract class _AdminPanelStateBase extends State<AdminPanel> {
   List<User> _users = [];
-  final Map<int, String> _userFullNames = {};
   bool _isLoading = false;
   String? _errorMessage;
   bool _hasOpenedDialog = false;
@@ -32,6 +31,7 @@ abstract class _AdminPanelStateBase extends State<AdminPanel> {
   Future<void> _saveUser({
     int? userId,
     required String username,
+    required String fullName,
     required String password,
     String? email,
     String? phone,
@@ -39,16 +39,14 @@ abstract class _AdminPanelStateBase extends State<AdminPanel> {
   });
   Future<void> _makeUserStudent(
     int userId,
-    String fullName,
     String address,
     String birthday,
   );
   Future<void> _makeUserParent(
     int userId,
-    String fullName,
     List<int> studentIds,
   );
-  Future<void> _makeUserTeacher(int userId, String fullName);
+  Future<void> _makeUserTeacher(int userId);
   Future<void> _createStudent(
     String username,
     String password,
@@ -183,9 +181,7 @@ class _AdminPanelState extends _AdminPanelStateBase
                                             return DataRow(
                                               cells: [
                                                 DataCell(
-                                                  Text(
-                                                    _userFullNames[user.id] ?? '-',
-                                                  ),
+                                                  Text(user.fullName.isNotEmpty ? user.fullName : '-'),
                                                 ),
                                                 DataCell(Text(user.username)),
                                                 DataCell(

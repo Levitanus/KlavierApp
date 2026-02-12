@@ -37,12 +37,9 @@ async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> 
 
 async fn fetch_user_display_name(db: &PgPool, user_id: i32) -> String {
     sqlx::query_scalar::<_, String>(
-        "SELECT COALESCE(
-            (SELECT full_name FROM students WHERE user_id = $1),
-            (SELECT full_name FROM parents WHERE user_id = $1),
-            (SELECT full_name FROM teachers WHERE user_id = $1),
-            (SELECT username FROM users WHERE id = $1)
-        )"
+        "SELECT COALESCE(full_name, username)
+         FROM users
+         WHERE id = $1"
     )
     .bind(user_id)
     .fetch_optional(db)
@@ -415,12 +412,13 @@ pub async fn get_related_teachers(
 ) -> Result<Vec<RelatedTeacher>, sqlx::Error> {
     // Check if user is a student
     let student_teachers = sqlx::query_as::<_, (i32, String)>(
-        "SELECT DISTINCT t.user_id, t.full_name
+        "SELECT DISTINCT t.user_id, u.full_name
          FROM teacher_student_relations tsr
          JOIN teachers t ON tsr.teacher_user_id = t.user_id
+         JOIN users u ON t.user_id = u.id
          WHERE tsr.student_user_id = $1
          AND t.status = 'active'
-         ORDER BY t.full_name",
+         ORDER BY u.full_name",
     )
     .bind(user_id)
     .fetch_all(pool)
@@ -438,13 +436,14 @@ pub async fn get_related_teachers(
 
     // If not a student, check if user is a parent with children
     let parent_children_teachers = sqlx::query_as::<_, (i32, String)>(
-        "SELECT DISTINCT t.user_id, t.full_name
+        "SELECT DISTINCT t.user_id, u.full_name
          FROM parent_student_relations psr
          JOIN teacher_student_relations tsr ON psr.student_user_id = tsr.student_user_id
          JOIN teachers t ON tsr.teacher_user_id = t.user_id
+         JOIN users u ON t.user_id = u.id
          WHERE psr.parent_user_id = $1
          AND t.status = 'active'
-         ORDER BY t.full_name",
+         ORDER BY u.full_name",
     )
     .bind(user_id)
     .fetch_all(pool)
@@ -547,8 +546,10 @@ async fn list_threads(
         sqlx::query_as::<_, ChatThread>(
             "SELECT id, participant_a_id, participant_b_id, is_admin_chat, created_at, updated_at
              FROM chat_threads
-             WHERE is_admin_chat = false
-             AND (participant_a_id = $1 OR participant_b_id = $1)
+                 WHERE (
+                         (is_admin_chat = false AND (participant_a_id = $1 OR participant_b_id = $1))
+                     OR (is_admin_chat = true AND participant_a_id = $1)
+                 )
              ORDER BY updated_at DESC",
         )
         .bind(user_id)
@@ -570,12 +571,9 @@ async fn list_threads(
 
         let peer_name = if let Some(pid) = peer_id {
             sqlx::query_scalar::<_, Option<String>>(
-                "SELECT COALESCE(
-                    (SELECT full_name FROM students WHERE user_id = $1),
-                    (SELECT full_name FROM parents WHERE user_id = $1),
-                    (SELECT full_name FROM teachers WHERE user_id = $1),
-                    (SELECT username FROM users WHERE id = $1)
-                )",
+                "SELECT COALESCE(full_name, username)
+                 FROM users
+                 WHERE id = $1",
             )
             .bind(pid)
             .fetch_one(&app_state.db)
@@ -601,12 +599,9 @@ async fn list_threads(
 
         let last_message_response = if let Some(msg) = last_message {
             let sender_name = sqlx::query_scalar::<_, Option<String>>(
-                "SELECT COALESCE(
-                    (SELECT full_name FROM students WHERE user_id = $1),
-                    (SELECT full_name FROM parents WHERE user_id = $1),
-                    (SELECT full_name FROM teachers WHERE user_id = $1),
-                    (SELECT username FROM users WHERE id = $1)
-                )",
+                "SELECT COALESCE(full_name, username)
+                 FROM users
+                 WHERE id = $1",
             )
             .bind(msg.sender_id)
             .fetch_one(&app_state.db)
@@ -717,12 +712,9 @@ async fn get_thread_messages(
     let mut responses = Vec::new();
     for msg in messages {
         let sender_name = sqlx::query_scalar::<_, Option<String>>(
-            "SELECT COALESCE(
-                (SELECT full_name FROM students WHERE user_id = $1),
-                (SELECT full_name FROM parents WHERE user_id = $1),
-                (SELECT full_name FROM teachers WHERE user_id = $1),
-                (SELECT username FROM users WHERE id = $1)
-            )",
+            "SELECT COALESCE(full_name, username)
+             FROM users
+             WHERE id = $1",
         )
         .bind(msg.sender_id)
         .fetch_one(&app_state.db)
@@ -852,17 +844,34 @@ async fn send_message(
 
     // Determine recipient(s)
     let recipients = if thread.is_admin_chat {
-        // For admin chat, all admins are recipients
-        sqlx::query_scalar::<_, i32>(
-            "SELECT DISTINCT ur.user_id
-             FROM user_roles ur
-             JOIN roles r ON ur.role_id = r.id
-             WHERE r.name = 'admin'
-             AND ur.user_id != $1",
+        let is_sender_admin = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(
+                SELECT 1 FROM user_roles ur
+                JOIN roles r ON ur.role_id = r.id
+                WHERE ur.user_id = $1 AND r.name = 'admin'
+            )",
         )
-        .fetch_all(&app_state.db)
+        .bind(user_id)
+        .fetch_one(&app_state.db)
         .await
-        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+        if is_sender_admin {
+            vec![thread.participant_a_id]
+        } else {
+            // For admin chat from users, all admins are recipients
+            sqlx::query_scalar::<_, i32>(
+                "SELECT DISTINCT ur.user_id
+                 FROM user_roles ur
+                 JOIN roles r ON ur.role_id = r.id
+                 WHERE r.name = 'admin'
+                 AND ur.user_id != $1",
+            )
+            .bind(user_id)
+            .fetch_all(&app_state.db)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?
+        }
     } else {
         // For peer chat, the other participant is the recipient
         let recipient = if user_id == thread.participant_a_id {
@@ -1156,12 +1165,9 @@ async fn list_available_chat_users(
     let users = sqlx::query_as::<_, AvailableChatUser>(
         "SELECT u.id as user_id,
                 u.username,
-                COALESCE(s.full_name, p.full_name, t.full_name, u.username) as full_name,
+                COALESCE(u.full_name, u.username) as full_name,
                 u.profile_image
          FROM users u
-         LEFT JOIN students s ON u.id = s.user_id
-         LEFT JOIN parents p ON u.id = p.user_id
-         LEFT JOIN teachers t ON u.id = t.user_id
          WHERE u.id = ANY($1)
          ORDER BY full_name",
     )

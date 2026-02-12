@@ -65,6 +65,8 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
             _fullNameController.text = _parentData!['full_name'] ?? '';
           } else if (_teacherData != null) {
             _fullNameController.text = _teacherData!['full_name'] ?? '';
+          } else {
+            _fullNameController.text = data['full_name'] ?? '';
           }
 
           _isLoading = false;
@@ -163,9 +165,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
       await _loadAdminRoleDetails(token);
 
-      final unifiedFullName = _studentData?['full_name'] ??
+        final unifiedFullName = _studentData?['full_name'] ??
           _parentData?['full_name'] ??
           _teacherData?['full_name'] ??
+          userData['full_name'] ??
           '';
       _fullNameController.text = unifiedFullName.toString();
 
@@ -1316,8 +1319,8 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
-  Future<void> _makeUserStudent(
-      String fullName, String address, String birthday) async {
+    Future<void> _makeUserStudent(
+      String address, String birthday) async {
     if (_userId == null) return;
     final authService = Provider.of<AuthService>(context, listen: false);
 
@@ -1329,7 +1332,6 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'full_name': fullName,
           'address': address,
           'birthday': birthday,
         }),
@@ -1359,7 +1361,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
-  Future<void> _makeUserParent(String fullName, List<int> studentIds) async {
+  Future<void> _makeUserParent(List<int> studentIds) async {
     if (_userId == null) return;
     final authService = Provider.of<AuthService>(context, listen: false);
 
@@ -1371,7 +1373,6 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'full_name': fullName,
           'student_ids': studentIds,
         }),
       );
@@ -1400,7 +1401,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
-  Future<void> _makeUserTeacher(String fullName) async {
+  Future<void> _makeUserTeacher() async {
     if (_userId == null) return;
     final authService = Provider.of<AuthService>(context, listen: false);
 
@@ -1411,9 +1412,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'full_name': fullName,
-        }),
+        body: jsonEncode({}),
       );
 
       if (response.statusCode == 200) {

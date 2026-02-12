@@ -52,10 +52,11 @@ pub(crate) async fn create_teacher(
 
     // Create user
     let user_id = match sqlx::query_scalar::<_, i32>(
-        "INSERT INTO users (username, password_hash, email, phone) 
-         VALUES ($1, $2, $3, $4) RETURNING id"
+        "INSERT INTO users (username, full_name, password_hash, email, phone) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING id"
     )
     .bind(&teacher_req.username)
+    .bind(&teacher_req.full_name)
     .bind(&password_hash)
     .bind(&teacher_req.email)
     .bind(&teacher_req.phone)
@@ -106,10 +107,9 @@ pub(crate) async fn create_teacher(
 
     // Create teacher entry
     if let Err(e) = sqlx::query(
-        "INSERT INTO teachers (user_id, full_name) VALUES ($1, $2)"
+        "INSERT INTO teachers (user_id) VALUES ($1)"
     )
     .bind(user_id)
-    .bind(&teacher_req.full_name)
     .execute(&mut *tx)
     .await
     {
@@ -165,7 +165,7 @@ pub(crate) async fn get_teacher(
 
     // Get teacher with user info
     let teacher = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, t.full_name, t.status::text
+        "SELECT u.id, u.username, u.email, u.phone, u.full_name, t.status::text
          FROM users u
          INNER JOIN teachers t ON u.id = t.user_id
          WHERE u.id = $1"
@@ -245,10 +245,15 @@ pub(crate) async fn update_teacher(
     };
 
     // Update user table if email or phone changed
-    if update_req.email.is_some() || update_req.phone.is_some() {
+    if update_req.email.is_some() || update_req.phone.is_some() || update_req.full_name.is_some() {
         let mut query = String::from("UPDATE users SET ");
         let mut updates = Vec::new();
         let mut bind_count = 1;
+
+        if update_req.full_name.is_some() {
+            updates.push(format!("full_name = ${}", bind_count));
+            bind_count += 1;
+        }
 
         if update_req.email.is_some() {
             updates.push(format!("email = ${}", bind_count));
@@ -264,6 +269,10 @@ pub(crate) async fn update_teacher(
         query.push_str(&format!(" WHERE id = ${}", bind_count));
 
         let mut q = sqlx::query(&query);
+
+        if let Some(ref full_name) = update_req.full_name {
+            q = q.bind(full_name);
+        }
 
         if let Some(ref email) = update_req.email {
             q = q.bind(email);
@@ -284,36 +293,7 @@ pub(crate) async fn update_teacher(
         }
     }
 
-    // Update teacher table
-    if let Some(ref full_name) = update_req.full_name {
-        if let Err(e) = sqlx::query(
-            "UPDATE teachers SET full_name = $1 WHERE user_id = $2"
-        )
-        .bind(full_name)
-        .bind(user_id)
-        .execute(&mut *tx)
-        .await
-        {
-            error!("Failed to update teacher: {}", e);
-            let _ = tx.rollback().await;
-            return HttpResponse::InternalServerError().json(serde_json::json!({
-                "error": "Failed to update teacher info"
-            }));
-        }
-
-        // Sync full_name to other role tables
-        let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
-            .bind(full_name)
-            .bind(user_id)
-            .execute(&mut *tx)
-            .await;
-
-        let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
-            .bind(full_name)
-            .bind(user_id)
-            .execute(&mut *tx)
-            .await;
-    }
+    // No role-table full_name updates needed
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
@@ -394,7 +374,7 @@ pub(crate) async fn list_teacher_students(
     }
 
     let students: Vec<StudentWithUserInfo> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, s.full_name, s.address, s.birthday, s.status::text
+        "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.address, s.birthday, s.status::text
          FROM users u
          INNER JOIN students s ON u.id = s.user_id
          INNER JOIN teacher_student_relations tsr ON s.user_id = tsr.student_user_id
