@@ -9,6 +9,8 @@ pub mod registration_tokens;
 pub mod hometasks;
 pub mod models;
 pub mod storage;
+pub mod feeds;
+pub mod media;
 
 use actix_web::{middleware, web, App};
 use actix_files as fs;
@@ -25,6 +27,8 @@ pub struct AppState {
     pub email_service: Arc<email::EmailService>,
     pub storage: Arc<dyn StorageProvider>,
     pub profile_images_dir: PathBuf,
+    pub media_storage: Arc<dyn StorageProvider>,
+    pub media_dir: PathBuf,
 }
 
 pub fn create_app(app_state: web::Data<AppState>) -> App<
@@ -37,6 +41,7 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
     >,
 > {
     let profile_images_dir = app_state.profile_images_dir.clone();
+    let media_dir = app_state.media_dir.clone();
     
     println!("=== Creating App ===");
     
@@ -57,7 +62,10 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
         .configure(roles::configure_routes)
         .configure(registration_tokens::configure_routes)
         .configure(hometasks::init_routes)
+        .configure(feeds::configure)
+        .configure(media::configure)
         .service(fs::Files::new("/uploads/profile_images", profile_images_dir).show_files_listing())
+        .service(fs::Files::new("/uploads/media", media_dir).show_files_listing())
 }
 
 pub async fn init_db(database_url: &str) -> Result<PgPool, sqlx::Error> {

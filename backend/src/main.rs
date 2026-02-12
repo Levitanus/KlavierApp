@@ -67,11 +67,18 @@ async fn main() -> std::io::Result<()> {
         .join("uploads");
     
     let profile_images_dir = upload_dir.join("profile_images");
+    let media_dir = upload_dir.join("media");
     
     std::fs::create_dir_all(&profile_images_dir)
         .map_err(|e| std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Failed to create upload directory: {}", e)
+        ))?;
+
+    std::fs::create_dir_all(&media_dir)
+        .map_err(|e| std::io::Error::new(
+            std::io::ErrorKind::Other,
+            format!("Failed to create media directory: {}", e)
         ))?;
     
     println!("Upload directory: {:?}", profile_images_dir);
@@ -81,6 +88,11 @@ async fn main() -> std::io::Result<()> {
         "/uploads/profile_images".to_string(),
     ));
 
+    let media_storage = Arc::new(LocalStorage::new(
+        media_dir.clone(),
+        "/uploads/media".to_string(),
+    ));
+
     // Create application state
     let app_state = web::Data::new(AppState {
         db: db_pool,
@@ -88,6 +100,8 @@ async fn main() -> std::io::Result<()> {
         email_service,
         storage,
         profile_images_dir,
+        media_storage,
+        media_dir,
     });
 
     println!("Starting server at http://127.0.0.1:8080");

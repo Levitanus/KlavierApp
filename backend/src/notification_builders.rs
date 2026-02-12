@@ -239,6 +239,92 @@ pub fn build_hometask_completed_notification(
     }
 }
 
+pub fn build_feed_post_notification(
+    feed_title: &str,
+    post_title: &str,
+    feed_id: i32,
+    post_id: i32,
+) -> NotificationBody {
+    let clean_feed = feed_title.trim();
+    let clean_post = if post_title.trim().is_empty() {
+        "Untitled post"
+    } else {
+        post_title
+    };
+
+    NotificationBody {
+        body_type: "feed_post".to_string(),
+        title: format!("New post in {}", clean_feed),
+        route: Some("/feeds".to_string()),
+        content: NotificationContent {
+            blocks: vec![
+                ContentBlock::Text {
+                    text: format!("New post in {}:", clean_feed),
+                    style: Some("body".to_string()),
+                },
+                ContentBlock::Text {
+                    text: clean_post.to_string(),
+                    style: Some("title".to_string()),
+                },
+            ],
+            actions: Some(vec![ActionButton {
+                label: "Open Feeds".to_string(),
+                route: Some("/feeds".to_string()),
+                action: None,
+                primary: true,
+                icon: Some("dynamic_feed".to_string()),
+            }]),
+        },
+        metadata: Some(json!({
+            "feed_id": feed_id,
+            "post_id": post_id,
+        })),
+    }
+}
+
+pub fn build_feed_comment_notification(
+    feed_title: &str,
+    post_title: &str,
+    feed_id: i32,
+    post_id: i32,
+) -> NotificationBody {
+    let clean_feed = feed_title.trim();
+    let clean_post = if post_title.trim().is_empty() {
+        "Untitled post"
+    } else {
+        post_title
+    };
+
+    NotificationBody {
+        body_type: "feed_comment".to_string(),
+        title: format!("New comment in {}", clean_feed),
+        route: Some("/feeds".to_string()),
+        content: NotificationContent {
+            blocks: vec![
+                ContentBlock::Text {
+                    text: format!("New comment on a post in {}:", clean_feed),
+                    style: Some("body".to_string()),
+                },
+                ContentBlock::Text {
+                    text: clean_post.to_string(),
+                    style: Some("title".to_string()),
+                },
+            ],
+            actions: Some(vec![ActionButton {
+                label: "Open Feeds".to_string(),
+                route: Some("/feeds".to_string()),
+                action: None,
+                primary: true,
+                icon: Some("dynamic_feed".to_string()),
+            }]),
+        },
+        metadata: Some(json!({
+            "feed_id": feed_id,
+            "post_id": post_id,
+        })),
+    }
+}
+
 pub fn build_hometask_reopened_notification(
     hometask_id: i32,
     task_title: &str,

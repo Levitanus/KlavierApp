@@ -31,7 +31,8 @@ class NotificationService extends ChangeNotifier {
     // Initial fetch
     fetchNotifications();
     // Poll every 30 seconds
-    _pollTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+    _pollTimer = Timer.periodic(const Duration(seconds: 30), (
+      _) {
       fetchUnreadCount();
     });
   }

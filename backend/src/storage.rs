@@ -16,6 +16,15 @@ pub type ByteStream = Pin<Box<dyn Stream<Item = Result<Bytes, std::io::Error>>>>
 pub struct StoredFile {
     pub key: String,
     pub url: String,
+    pub size_bytes: u64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MediaKind {
+    Image,
+    Audio,
+    Video,
+    File,
 }
 
 #[derive(Debug)]
@@ -107,6 +116,10 @@ impl StorageProvider for LocalStorage {
 pub struct MediaService {
     provider: Arc<dyn StorageProvider>,
     max_profile_image_size: u64,
+    max_image_size: u64,
+    max_audio_size: u64,
+    max_video_size: u64,
+    max_file_size: u64,
 }
 
 impl MediaService {
@@ -114,6 +127,10 @@ impl MediaService {
         Self {
             provider,
             max_profile_image_size: 5 * 1024 * 1024,
+            max_image_size: 10 * 1024 * 1024,
+            max_audio_size: 25 * 1024 * 1024,
+            max_video_size: 100 * 1024 * 1024,
+            max_file_size: 25 * 1024 * 1024,
         }
     }
 
@@ -134,10 +151,13 @@ impl MediaService {
         let filename = format!("{}_{}.{}", username, Uuid::new_v4(), safe_ext);
         let size_limit = self.max_profile_image_size;
 
+        let size_counter = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let size_counter_clone = size_counter.clone();
         let limited_stream = stream.scan(0u64, move |size, chunk| {
             let next = match chunk {
                 Ok(bytes) => {
                     *size += bytes.len() as u64;
+                    size_counter_clone.fetch_add(bytes.len() as u64, std::sync::atomic::Ordering::Relaxed);
                     if *size > size_limit {
                         Err(std::io::Error::new(
                             ErrorKind::InvalidData,
@@ -167,6 +187,7 @@ impl MediaService {
         Ok(StoredFile {
             key: filename.clone(),
             url: self.provider.public_url(&filename),
+            size_bytes: size_counter.load(std::sync::atomic::Ordering::Relaxed),
         })
     }
 
@@ -175,5 +196,78 @@ impl MediaService {
             .delete(key)
             .await
             .map_err(MediaError::Io)
+    }
+
+    pub async fn save_media_file<S>(
+        &self,
+        kind: MediaKind,
+        extension: &str,
+        stream: S,
+    ) -> Result<StoredFile, MediaError>
+    where
+        S: Stream<Item = Result<Bytes, std::io::Error>> + 'static,
+    {
+        let safe_ext = extension.trim_start_matches('.').to_lowercase();
+        let (size_limit, allowed) = match kind {
+            MediaKind::Image => (
+                self.max_image_size,
+                vec!["jpg", "jpeg", "png", "gif", "webp"],
+            ),
+            MediaKind::Audio => (
+                self.max_audio_size,
+                vec!["mp3", "wav", "aac", "m4a", "ogg", "opus"],
+            ),
+            MediaKind::Video => (
+                self.max_video_size,
+                vec!["mp4", "mov", "webm", "mkv", "avi", "m4v"],
+            ),
+            MediaKind::File => (self.max_file_size, vec![]),
+        };
+
+        if kind != MediaKind::File && !allowed.iter().any(|ext| ext == &safe_ext) {
+            return Err(MediaError::InvalidFileType);
+        }
+
+        let extension = if safe_ext.is_empty() { "bin" } else { &safe_ext };
+        let filename = format!("{}.{}", Uuid::new_v4(), extension);
+
+        let size_counter = std::sync::Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let size_counter_clone = size_counter.clone();
+        let limited_stream = stream.scan(0u64, move |size, chunk| {
+            let next = match chunk {
+                Ok(bytes) => {
+                    *size += bytes.len() as u64;
+                    size_counter_clone.fetch_add(bytes.len() as u64, std::sync::atomic::Ordering::Relaxed);
+                    if *size > size_limit {
+                        Err(std::io::Error::new(
+                            ErrorKind::InvalidData,
+                            "File too large",
+                        ))
+                    } else {
+                        Ok(bytes)
+                    }
+                }
+                Err(err) => Err(err),
+            };
+
+            future::ready(Some(next))
+        });
+
+        if let Err(err) = self
+            .provider
+            .put(&filename, Box::pin(limited_stream))
+            .await
+        {
+            if err.kind() == ErrorKind::InvalidData {
+                return Err(MediaError::TooLarge);
+            }
+            return Err(MediaError::Io(err));
+        }
+
+        Ok(StoredFile {
+            key: filename.clone(),
+            url: self.provider.public_url(&filename),
+            size_bytes: size_counter.load(std::sync::atomic::Ordering::Relaxed),
+        })
     }
 }

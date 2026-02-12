@@ -119,6 +119,22 @@ pub(crate) async fn create_teacher(
         }));
     }
 
+    let feed_title = format!("{} Feed", teacher_req.full_name);
+    if let Err(e) = sqlx::query(
+        "INSERT INTO feeds (owner_type, owner_user_id, title) VALUES ('teacher', $1, $2)"
+    )
+    .bind(user_id)
+    .bind(&feed_title)
+    .execute(&mut *tx)
+    .await
+    {
+        eprintln!("Failed to create teacher feed: {}", e);
+        let _ = tx.rollback().await;
+        return HttpResponse::InternalServerError().json(serde_json::json!({
+            "error": "Failed to create teacher feed"
+        }));
+    }
+
     // Commit transaction
     if let Err(e) = tx.commit().await {
         eprintln!("Failed to commit transaction: {}", e);

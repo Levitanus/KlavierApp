@@ -5,13 +5,23 @@ import 'login_screen.dart';
 import 'admin_panel.dart';
 import 'profile_screen.dart';
 import 'hometasks_screen.dart';
+import 'dashboard_screen.dart';
 import 'widgets/notification_widget.dart';
+import 'feeds_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? adminUsername;
   final int? initialStudentId;
+  final int? initialFeedId;
+  final int? initialPostId;
   
-  const HomeScreen({super.key, this.adminUsername, this.initialStudentId});
+  const HomeScreen({
+    super.key,
+    this.adminUsername,
+    this.initialStudentId,
+    this.initialFeedId,
+    this.initialPostId,
+  });
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -29,11 +39,17 @@ class _HomeScreenState extends State<HomeScreen> {
     if (widget.adminUsername != null) {
       _currentPage = AdminPanel(username: widget.adminUsername);
       _selectedIndex = 100;
+    } else if (widget.initialFeedId != null) {
+      _currentPage = FeedsScreen(
+        initialFeedId: widget.initialFeedId,
+        initialPostId: widget.initialPostId,
+      );
+      _selectedIndex = 2;
     } else if (widget.initialStudentId != null) {
       _currentPage = HometasksScreen(initialStudentId: widget.initialStudentId);
-      _selectedIndex = 0;
+      _selectedIndex = 1;
     } else {
-      _currentPage = const DashboardPage();
+      _currentPage = const DashboardScreen();
     }
   }
 
@@ -128,19 +144,25 @@ class _HomeScreenState extends State<HomeScreen> {
               leading: const Icon(Icons.dashboard),
               title: const Text('Dashboard'),
               selected: _selectedIndex == 0,
-              onTap: () => _navigateTo(const DashboardPage(), 0),
+              onTap: () => _navigateTo(const DashboardScreen(), 0),
             ),
             ListTile(
-              leading: const Icon(Icons.music_note),
-              title: const Text('Lessons'),
+              leading: const Icon(Icons.checklist),
+              title: const Text('Hometasks'),
               selected: _selectedIndex == 1,
-              onTap: () => _navigateTo(const LessonsPage(), 1),
+              onTap: () => _navigateTo(const HometasksScreen(), 1),
+            ),
+            ListTile(
+              leading: const Icon(Icons.dynamic_feed),
+              title: const Text('Feeds'),
+              selected: _selectedIndex == 2,
+              onTap: () => _navigateTo(const FeedsScreen(), 2),
             ),
             ListTile(
               leading: const Icon(Icons.person),
               title: const Text('Profile'),
-              selected: _selectedIndex == 2,
-              onTap: () => _navigateTo(const ProfileScreen(), 2),
+              selected: _selectedIndex == 3,
+              onTap: () => _navigateTo(const ProfileScreen(), 3),
             ),
             const Divider(),
             if (authService.isAdmin) ...[
@@ -166,50 +188,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      body: _currentPage ?? const DashboardPage(),
-    );
-  }
-}
-
-// Dashboard Page
-class DashboardPage extends StatelessWidget {
-  final int? initialStudentId;
-
-  const DashboardPage({super.key, this.initialStudentId});
-
-  @override
-  Widget build(BuildContext context) {
-    return HometasksScreen(initialStudentId: initialStudentId);
-  }
-}
-
-// Lessons Page
-class LessonsPage extends StatelessWidget {
-  const LessonsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.music_note,
-            size: 80,
-            color: Colors.green,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Lessons',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Your music lessons will appear here',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ],
-      ),
+      body: _currentPage ?? const DashboardScreen(),
     );
   }
 }

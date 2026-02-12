@@ -11,17 +11,19 @@ class AuthService extends ChangeNotifier {
   String? _token;
   bool _isAuthenticated = false;
   List<String> _roles = [];
+  int? _userId;
 
   bool get isAuthenticated => _isAuthenticated;
   String? get token => _token;
   List<String> get roles => _roles;
   bool get isAdmin => _roles.contains('admin');
+  int? get userId => _userId;
 
   AuthService() {
     _loadToken();
   }
 
-  /// Decode JWT and extract roles
+  /// Decode JWT and extract roles and user ID
   void _decodeToken(String token) {
     try {
       final payload = Jwt.parseJwt(token);
@@ -30,11 +32,17 @@ class AuthService extends ChangeNotifier {
       } else {
         _roles = [];
       }
+      if (payload['user_id'] != null) {
+        _userId = payload['user_id'] as int;
+      } else {
+        _userId = null;
+      }
     } catch (e) {
       if (kDebugMode) {
         print('Error decoding token: $e');
       }
       _roles = [];
+      _userId = null;
     }
   }
 
@@ -81,6 +89,7 @@ class AuthService extends ChangeNotifier {
       _token = null;
       _isAuthenticated = false;
       _roles = [];
+      _userId = null;
       notifyListeners();
     } catch (e) {
       if (kDebugMode) {

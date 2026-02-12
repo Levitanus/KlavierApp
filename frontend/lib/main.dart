@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'auth.dart';
 import 'services/notification_service.dart';
 import 'services/hometask_service.dart';
+import 'services/feed_service.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 import 'reset_password_screen.dart';
@@ -40,6 +43,16 @@ class MyApp extends StatelessWidget {
             return service;
           },
         ),
+        ChangeNotifierProxyProvider<AuthService, FeedService>(
+          create: (context) => FeedService(
+            authService: context.read<AuthService>(),
+          ),
+          update: (context, authService, previous) {
+            final service = previous ?? FeedService(authService: authService);
+            service.syncAuth();
+            return service;
+          },
+        ),
       ],
       child: MaterialApp(
         title: 'Klavier',
@@ -47,6 +60,15 @@ class MyApp extends StatelessWidget {
           primarySwatch: Colors.blue,
           useMaterial3: true,
         ),
+        localizationsDelegates: const [
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+          quill.FlutterQuillLocalizations.delegate,
+        ],
+        supportedLocales: const [
+          Locale('en'),
+        ],
         onGenerateRoute: (settings) {
           final name = settings.name ?? '/';
           final uri = Uri.parse(name);

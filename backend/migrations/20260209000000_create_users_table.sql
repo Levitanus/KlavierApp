@@ -273,3 +273,154 @@ CREATE TRIGGER update_hometasks_updated_at
     BEFORE UPDATE ON hometasks
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- Media Storage (General)
+-- ============================================================================
+
+CREATE TYPE media_type AS ENUM ('image', 'audio', 'video', 'file');
+
+CREATE TABLE IF NOT EXISTS media_files (
+    id SERIAL PRIMARY KEY,
+    storage_key TEXT NOT NULL UNIQUE,
+    public_url TEXT NOT NULL,
+    media_type media_type NOT NULL,
+    mime_type TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL,
+    created_by_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_media_files_created_by ON media_files(created_by_user_id);
+CREATE INDEX IF NOT EXISTS idx_media_files_type ON media_files(media_type);
+
+-- ============================================================================
+-- Chat (Matrix mapping)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS matrix_accounts (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    matrix_user_id TEXT NOT NULL UNIQUE,
+    access_token TEXT,
+    device_id TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TRIGGER update_matrix_accounts_updated_at
+    BEFORE UPDATE ON matrix_accounts
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+-- ============================================================================
+-- Feeds
+-- ============================================================================
+
+CREATE TYPE feed_owner_type AS ENUM ('school', 'teacher');
+
+CREATE TABLE IF NOT EXISTS feeds (
+    id SERIAL PRIMARY KEY,
+    owner_type feed_owner_type NOT NULL,
+    owner_user_id INTEGER REFERENCES teachers(user_id) ON DELETE SET NULL,
+    title TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO feeds (owner_type, title)
+VALUES ('school', 'School Feed');
+
+CREATE TABLE IF NOT EXISTS feed_settings (
+    feed_id INTEGER PRIMARY KEY REFERENCES feeds(id) ON DELETE CASCADE,
+    allow_student_posts BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+INSERT INTO feed_settings (feed_id)
+SELECT id FROM feeds WHERE owner_type = 'school'
+ON CONFLICT (feed_id) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS feed_user_settings (
+    feed_id INTEGER NOT NULL REFERENCES feeds(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    auto_subscribe_new_posts BOOLEAN NOT NULL DEFAULT TRUE,
+    notify_new_posts BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (feed_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS feed_posts (
+    id SERIAL PRIMARY KEY,
+    feed_id INTEGER NOT NULL REFERENCES feeds(id) ON DELETE CASCADE,
+    author_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT,
+    content JSONB NOT NULL,
+    is_important BOOLEAN NOT NULL DEFAULT FALSE,
+    important_rank INTEGER,
+    allow_comments BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS feed_post_media (
+    post_id INTEGER NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+    media_id INTEGER NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (post_id, media_id)
+);
+
+CREATE TABLE IF NOT EXISTS feed_post_subscriptions (
+    post_id INTEGER NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    notify_on_comments BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (post_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS feed_comments (
+    id SERIAL PRIMARY KEY,
+    post_id INTEGER NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+    author_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    parent_comment_id INTEGER REFERENCES feed_comments(id) ON DELETE CASCADE,
+    content JSONB NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS feed_comment_media (
+    comment_id INTEGER NOT NULL REFERENCES feed_comments(id) ON DELETE CASCADE,
+    media_id INTEGER NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (comment_id, media_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_feeds_owner_type ON feeds(owner_type);
+CREATE INDEX IF NOT EXISTS idx_feeds_owner_user ON feeds(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_feed_posts_feed ON feed_posts(feed_id);
+CREATE INDEX IF NOT EXISTS idx_feed_posts_created_at ON feed_posts(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_feed_posts_important ON feed_posts(feed_id, is_important);
+CREATE INDEX IF NOT EXISTS idx_feed_comments_post ON feed_comments(post_id);
+CREATE INDEX IF NOT EXISTS idx_feed_comments_parent ON feed_comments(parent_comment_id);
+CREATE INDEX IF NOT EXISTS idx_feed_post_subscriptions_user ON feed_post_subscriptions(user_id);
+CREATE INDEX IF NOT EXISTS idx_feed_post_media_post ON feed_post_media(post_id);
+CREATE INDEX IF NOT EXISTS idx_feed_comment_media_comment ON feed_comment_media(comment_id);
+
+CREATE TRIGGER update_feed_posts_updated_at
+    BEFORE UPDATE ON feed_posts
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_feed_comments_updated_at
+    BEFORE UPDATE ON feed_comments
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TABLE IF NOT EXISTS feed_post_reads (
+    post_id INTEGER NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    read_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    PRIMARY KEY (post_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_feed_post_reads_user_id ON feed_post_reads(user_id);
+CREATE INDEX IF NOT EXISTS idx_feed_post_reads_post_id ON feed_post_reads(post_id);
+

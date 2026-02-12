@@ -36,6 +36,19 @@ void _navigateToRoute(BuildContext context, String route, Map<String, dynamic>? 
         builder: (context) => HomeScreen(initialStudentId: studentId),
       ),
     );
+  } else if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'feeds') {
+    final rawFeedId = metadata?['feed_id'];
+    final rawPostId = metadata?['post_id'];
+    final feedId = rawFeedId is int ? rawFeedId : null;
+    final postId = rawPostId is int ? rawPostId : null;
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(
+        builder: (context) => HomeScreen(
+          initialFeedId: feedId,
+          initialPostId: postId,
+        ),
+      ),
+    );
   } else {
     // Handle other routes - just go back to home
     Navigator.of(context).pushReplacement(
@@ -149,16 +162,19 @@ class _NotificationDropdownContentState
       children: [
         // Header
         Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
-              'Notifications',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+            const Expanded(
+              child: Text(
+                'Notifications',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
                 FilterChip(
                   label: const Text('Unread'),
