@@ -9,6 +9,7 @@ import 'package:provider/provider.dart';
 import '../auth.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
+import '../utils/media_download.dart';
 import '../widgets/quill_embed_builders.dart';
 import '../widgets/quill_editor_composer.dart';
 
@@ -760,7 +761,7 @@ class _MessageBubble extends StatelessWidget {
                       for (final attachment in attachments)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 6),
-                          child: _buildAttachmentWidget(attachment),
+                          child: _buildAttachmentWidget(context, attachment),
                         ),
                     ],
                     const SizedBox(height: 4),
@@ -802,22 +803,27 @@ class _MessageBubble extends StatelessWidget {
         .toList();
   }
 
-  Widget _buildAttachmentWidget(ChatAttachment attachment) {
+  Widget _buildAttachmentWidget(BuildContext context, ChatAttachment attachment) {
     final url = normalizeMediaUrl(attachment.url);
+    Widget content;
     switch (attachment.attachmentType) {
       case 'image':
-        return ConstrainedBox(
+        content = ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 240),
           child: Image.network(url, fit: BoxFit.contain),
         );
+        break;
       case 'video':
-        return ChatVideoPlayer(url: url);
+        content = ChatVideoPlayer(url: url);
+        break;
       case 'audio':
-        return ChatAudioPlayer(url: url, label: 'Audio');
+        content = ChatAudioPlayer(url: url, label: 'Audio');
+        break;
       case 'voice':
-        return ChatAudioPlayer(url: url, label: 'Voice message');
+        content = ChatAudioPlayer(url: url, label: 'Voice message');
+        break;
       case 'file':
-        return Row(
+        content = Row(
           children: [
             const Icon(Icons.insert_drive_file),
             const SizedBox(width: 8),
@@ -830,9 +836,73 @@ class _MessageBubble extends StatelessWidget {
             ),
           ],
         );
+        break;
       default:
-        return Text('Unsupported attachment: ${attachment.attachmentType}');
+        content = Text('Unsupported attachment: ${attachment.attachmentType}');
     }
+
+    return _buildAttachmentWithMenu(
+      child: content,
+      onDownload: () => _downloadAttachment(context, url),
+    );
+  }
+
+  Widget _buildAttachmentWithMenu({
+    required Widget child,
+    required VoidCallback onDownload,
+  }) {
+    return Stack(
+      alignment: Alignment.topRight,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 32),
+          child: child,
+        ),
+        PopupMenuButton<String>(
+          tooltip: 'Attachment actions',
+          onSelected: (value) {
+            if (value == 'download') {
+              onDownload();
+            }
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: 'download',
+              child: Text('Download source file'),
+            ),
+          ],
+          icon: const Icon(Icons.more_horiz, size: 20),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _downloadAttachment(BuildContext context, String url) async {
+    final filename = _fileNameFromUrl(url);
+    final result = await downloadMedia(
+      url: url,
+      filename: filename,
+      appFolderName: 'klavierapp',
+    );
+
+    if (!context.mounted) return;
+
+    final message = result.success
+        ? (result.filePath != null
+            ? 'Saved to ${result.filePath}'
+            : 'Download started')
+        : (result.errorMessage ?? 'Download failed');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  String? _fileNameFromUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.pathSegments.isEmpty) return null;
+    final name = uri.pathSegments.last.trim();
+    return name.isEmpty ? null : name;
   }
 
   Widget _buildReceiptStatus(List<MessageReceipt> receipts) {

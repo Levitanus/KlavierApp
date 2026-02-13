@@ -4,6 +4,7 @@ import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:just_audio/just_audio.dart';
 import 'package:video_player/video_player.dart';
 import '../config/app_config.dart';
+import '../utils/media_download.dart';
 
 String normalizeMediaUrl(String url) {
   if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -20,25 +21,32 @@ class ImageEmbedBuilder extends quill.EmbedBuilder {
   Widget build(BuildContext context, quill.EmbedContext embedContext) {
     final url = embedContext.node.value.data as String;
     final absoluteUrl = normalizeMediaUrl(url);
+    final content = GestureDetector(
+      onTap: () {},
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxHeight: 300),
+        child: Image.network(
+          absoluteUrl,
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stackTrace) {
+            return Container(
+              color: Colors.grey[200],
+              child: const Center(
+                child: Icon(Icons.broken_image),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: GestureDetector(
-        onTap: () {},
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 300),
-          child: Image.network(
-            absoluteUrl,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: Colors.grey[200],
-                child: const Center(
-                  child: Icon(Icons.broken_image),
-                ),
-              );
-            },
-          ),
-        ),
+      child: _buildAttachmentWithMenu(
+        context,
+        content: content,
+        url: absoluteUrl,
+        showMenu: embedContext.readOnly,
       ),
     );
   }
@@ -51,9 +59,15 @@ class VideoEmbedBuilder extends quill.EmbedBuilder {
   @override
   Widget build(BuildContext context, quill.EmbedContext embedContext) {
     final url = embedContext.node.value.data as String;
+    final absoluteUrl = normalizeMediaUrl(url);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: ChatVideoPlayer(url: normalizeMediaUrl(url)),
+      child: _buildAttachmentWithMenu(
+        context,
+        content: ChatVideoPlayer(url: absoluteUrl),
+        url: absoluteUrl,
+        showMenu: embedContext.readOnly,
+      ),
     );
   }
 }
@@ -65,11 +79,17 @@ class AudioEmbedBuilder extends quill.EmbedBuilder {
   @override
   Widget build(BuildContext context, quill.EmbedContext embedContext) {
     final url = embedContext.node.value.data as String;
+    final absoluteUrl = normalizeMediaUrl(url);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: ChatAudioPlayer(
-        url: normalizeMediaUrl(url),
-        label: 'Audio',
+      child: _buildAttachmentWithMenu(
+        context,
+        content: ChatAudioPlayer(
+          url: absoluteUrl,
+          label: 'Audio',
+        ),
+        url: absoluteUrl,
+        showMenu: embedContext.readOnly,
       ),
     );
   }
@@ -82,11 +102,17 @@ class VoiceEmbedBuilder extends quill.EmbedBuilder {
   @override
   Widget build(BuildContext context, quill.EmbedContext embedContext) {
     final url = embedContext.node.value.data as String;
+    final absoluteUrl = normalizeMediaUrl(url);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: ChatAudioPlayer(
-        url: normalizeMediaUrl(url),
-        label: 'Voice message',
+      child: _buildAttachmentWithMenu(
+        context,
+        content: ChatAudioPlayer(
+          url: absoluteUrl,
+          label: 'Voice message',
+        ),
+        url: absoluteUrl,
+        showMenu: embedContext.readOnly,
       ),
     );
   }
@@ -100,23 +126,90 @@ class FileEmbedBuilder extends quill.EmbedBuilder {
   Widget build(BuildContext context, quill.EmbedContext embedContext) {
     final url = embedContext.node.value.data as String;
     final absoluteUrl = normalizeMediaUrl(url);
+    final content = Row(
+      children: [
+        const Icon(Icons.file_present),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            absoluteUrl.split('/').last,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        children: [
-          const Icon(Icons.file_present),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              absoluteUrl.split('/').last,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
+      child: _buildAttachmentWithMenu(
+        context,
+        content: content,
+        url: absoluteUrl,
+        showMenu: embedContext.readOnly,
       ),
     );
   }
+}
+
+Widget _buildAttachmentWithMenu(
+  BuildContext context, {
+  required Widget content,
+  required String url,
+  required bool showMenu,
+}) {
+  if (!showMenu) return content;
+
+  return Stack(
+    alignment: Alignment.topRight,
+    children: [
+      Padding(
+        padding: const EdgeInsets.only(right: 32),
+        child: content,
+      ),
+      PopupMenuButton<String>(
+        tooltip: 'Attachment actions',
+        onSelected: (value) {
+          if (value == 'download') {
+            _downloadAttachment(context, url);
+          }
+        },
+        itemBuilder: (context) => const [
+          PopupMenuItem(
+            value: 'download',
+            child: Text('Download source file'),
+          ),
+        ],
+        icon: const Icon(Icons.more_horiz, size: 20),
+      ),
+    ],
+  );
+}
+
+Future<void> _downloadAttachment(BuildContext context, String url) async {
+  final filename = _fileNameFromUrl(url);
+  final result = await downloadMedia(
+    url: url,
+    filename: filename,
+    appFolderName: 'klavierapp',
+  );
+
+  if (!context.mounted) return;
+
+  final message = result.success
+      ? (result.filePath != null ? 'Saved to ${result.filePath}' : 'Download started')
+      : (result.errorMessage ?? 'Download failed');
+
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(content: Text(message)),
+  );
+}
+
+String? _fileNameFromUrl(String url) {
+  final uri = Uri.tryParse(url);
+  if (uri == null || uri.pathSegments.isEmpty) return null;
+  final name = uri.pathSegments.last.trim();
+  return name.isEmpty ? null : name;
 }
 
 class UnknownEmbedBuilder extends quill.EmbedBuilder {
