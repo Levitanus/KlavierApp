@@ -20,6 +20,10 @@ class AuthService extends ChangeNotifier {
   bool get isAdmin => _roles.contains('admin');
   int? get userId => _userId;
 
+  LoginResult _loginFailure(String message) {
+    return LoginResult.failure(message);
+  }
+
   AuthService() {
     _loadToken();
   }
@@ -109,7 +113,7 @@ class AuthService extends ChangeNotifier {
   }
 
   /// Login with username and password
-  Future<bool> login(String username, String password) async {
+  Future<LoginResult> login(String username, String password) async {
     try {
       final response = await http.post(
         Uri.parse('$_baseUrl/api/auth/login'),
@@ -126,16 +130,16 @@ class AuthService extends ChangeNotifier {
         
         if (token != null && token.isNotEmpty) {
           await _saveToken(token);
-          return true;
+          return const LoginResult.success();
         }
       }
       
-      return false;
+      return _loginFailure('Invalid username or password');
     } catch (e) {
       if (kDebugMode) {
         print('Login error: $e');
       }
-      return false;
+      return _loginFailure('Network error. Check your connection and try again.');
     }
   }
 
@@ -171,4 +175,15 @@ class AuthService extends ChangeNotifier {
       return false;
     }
   }
+}
+
+class LoginResult {
+  final bool success;
+  final String? errorMessage;
+
+  const LoginResult.success()
+      : success = true,
+        errorMessage = null;
+
+  const LoginResult.failure(this.errorMessage) : success = false;
 }

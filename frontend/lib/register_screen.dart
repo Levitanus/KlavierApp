@@ -141,10 +141,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
         final authService = Provider.of<AuthService>(context, listen: false);
         
         // Auto-login after registration
-        await authService.login(
+        final loginResult = await authService.login(
           _usernameController.text,
           _passwordController.text,
         );
+
+        if (!loginResult.success) {
+          setState(() {
+            _errorMessage = loginResult.errorMessage ?? 'Login failed';
+            _isSubmitting = false;
+          });
+          return;
+        }
 
         if (mounted) {
           Navigator.of(context).pushReplacementNamed('/');

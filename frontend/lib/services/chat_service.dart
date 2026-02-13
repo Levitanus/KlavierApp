@@ -501,7 +501,7 @@ class ChatService extends ChangeNotifier {
           
           final index = messagesByThread[threadId]!.indexOf(message);
           messagesByThread[threadId]![index] = updated;
-          notifyListeners();
+          // Don't notify listeners for receipt updates to avoid disrupting input
           break;
         }
       }
@@ -683,9 +683,9 @@ class ChatService extends ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
-        if (!messagesByThread.containsKey(threadId)) {
-          await loadThreadMessages(threadId);
-        }
+        // Reload thread messages to ensure the new message appears
+        // This is a fallback in case websocket doesn't update immediately
+        await loadThreadMessages(threadId, limit: 50, offset: 0, append: false);
         return true;
       } else {
         errorMessage = 'Failed to send message: ${response.statusCode}';

@@ -107,9 +107,10 @@ async fn main() -> std::io::Result<()> {
     });
 
     info!("Starting server at http://0.0.0.0:8080");
-
     HttpServer::new(move || create_app(app_state.clone()))
         .bind(("0.0.0.0", 8080))?
         .run()
         .await
+    
+
 }

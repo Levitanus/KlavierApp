@@ -27,7 +27,7 @@
     },
     {
       "name": "characters",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/characters-1.4.0",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/characters-1.4.1",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },
@@ -125,7 +125,7 @@
       "name": "flutter",
       "rootUri": "file:///home/levitanus/flutter/packages/flutter",
       "packageUri": "lib/",
-      "languageVersion": "3.8"
+      "languageVersion": "3.9"
     },
     {
       "name": "flutter_colorpicker",
@@ -173,7 +173,7 @@
       "name": "flutter_localizations",
       "rootUri": "file:///home/levitanus/flutter/packages/flutter_localizations",
       "packageUri": "lib/",
-      "languageVersion": "3.8"
+      "languageVersion": "3.9"
     },
     {
       "name": "flutter_plugin_android_lifecycle",
@@ -197,7 +197,7 @@
       "name": "flutter_web_plugins",
       "rootUri": "file:///home/levitanus/flutter/packages/flutter_web_plugins",
       "packageUri": "lib/",
-      "languageVersion": "3.8"
+      "languageVersion": "3.9"
     },
     {
       "name": "glob",
@@ -285,9 +285,9 @@
     },
     {
       "name": "material_color_utilities",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/material_color_utilities-0.11.1",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/material_color_utilities-0.13.0",
       "packageUri": "lib/",
-      "languageVersion": "2.17"
+      "languageVersion": "3.5"
     },
     {
       "name": "meta",
@@ -527,7 +527,7 @@
       "name": "sky_engine",
       "rootUri": "file:///home/levitanus/flutter/bin/cache/pkg/sky_engine",
       "packageUri": "lib/",
-      "languageVersion": "3.8"
+      "languageVersion": "3.9"
     },
     {
       "name": "source_span",
@@ -711,8 +711,8 @@
     }
   ],
   "generator": "pub",
-  "generatorVersion": "3.10.8",
+  "generatorVersion": "3.11.0",
   "flutterRoot": "file:///home/levitanus/flutter",
-  "flutterVersion": "3.38.9",
+  "flutterVersion": "3.41.1",
   "pubCache": "file:///home/levitanus/.pub-cache"
 }

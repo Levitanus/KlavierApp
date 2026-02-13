@@ -10,6 +10,7 @@ import 'models/chat.dart';
 import 'models/feed.dart';
 import 'services/feed_service.dart';
 import 'widgets/quill_embed_builders.dart';
+import 'widgets/quill_editor_composer.dart';
 import 'widgets/feed_preview_card.dart';
 
 class FeedsScreen extends StatefulWidget {
@@ -232,8 +233,6 @@ class _FeedDetailScreenState extends State<FeedDetailScreen> {
   }
 
   bool _canCreatePost(AuthService authService) {
-    if (_feedSettings == null) return false;
-
     final isSchoolFeed = widget.feed.ownerType.toLowerCase() == 'school';
     if (isSchoolFeed) {
       return authService.isAdmin;
@@ -861,9 +860,11 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   }
 
   Future<void> _editPost() async {
-    final updated = await showDialog<bool>(
-      context: context,
-      builder: (_) => FeedPostEditor(feed: widget.feed, post: _post),
+    final updated = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => FeedPostEditor(feed: widget.feed, post: _post),
+        fullscreenDialog: true,
+      ),
     );
 
     if (updated == true && mounted) {
@@ -916,6 +917,8 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
       ? (auth.isAdmin || isAuthor)
       : isAuthor;
 
+    final listBottomPadding = _post.allowComments ? 96.0 : 16.0;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Post'),
@@ -934,8 +937,8 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
       ),
       body: _isDeleting
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.all(16),
+            : ListView(
+              padding: EdgeInsets.fromLTRB(16, 16, 16, listBottomPadding),
               children: [
                 if (_post.title != null && _post.title!.isNotEmpty) ...[
                   Text(
@@ -1039,6 +1042,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
   bool _isImportant = false;
   bool _allowComments = true;
   bool _isSubmitting = false;
+  int _activeToolbarTab = 0;
+  bool _showToolbar = false;
+  bool _isUploadingAttachment = false;
 
   @override
   void initState() {
@@ -1052,11 +1058,382 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     _allowComments = widget.post.allowComments;
   }
 
+  void _insertEmbed(String type, String url) {
+    final selection = _controller.selection;
+    final index = selection.baseOffset < 0 ? _controller.document.length : selection.baseOffset;
+
+    quill.BlockEmbed embed;
+    switch (type) {
+      case 'image':
+        embed = quill.BlockEmbed.image(url);
+        break;
+      case 'video':
+        embed = quill.BlockEmbed.video(url);
+        break;
+      case 'audio':
+      case 'voice':
+      case 'file':
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed(type, url),
+        );
+        break;
+      default:
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed('file', url),
+        );
+    }
+
+    _controller.document.insert(index, embed);
+    _controller.updateSelection(
+      TextSelection.collapsed(offset: index + 1),
+      quill.ChangeSource.local,
+    );
+  }
+
+  Future<void> _pickEditorAttachment({
+    required String attachmentType,
+  }) async {
+    if (_isUploadingAttachment) return;
+
+    final allowed = <String, List<String>>{
+      'image': ['jpg', 'jpeg', 'png', 'webp'],
+      'audio': ['mp3', 'm4a', 'ogg', 'opus', 'wav'],
+      'video': ['mp4', 'webm', 'mov', 'mkv'],
+      'file': [],
+    };
+
+    final type = attachmentType == 'file' ? FileType.any : FileType.custom;
+    final result = await FilePicker.platform.pickFiles(
+      type: type,
+      allowedExtensions: type == FileType.custom ? allowed[attachmentType] : null,
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+
+    setState(() {
+      _isUploadingAttachment = true;
+    });
+
+    final service = context.read<FeedService>();
+    final uploaded = await service.uploadMedia(
+      mediaType: attachmentType,
+      bytes: bytes,
+      filename: file.name,
+    );
+
+    if (!mounted) return;
+
+    if (uploaded == null) {
+      setState(() {
+        _isUploadingAttachment = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to upload media')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isUploadingAttachment = false;
+    });
+
+    _insertEmbed(attachmentType, uploaded.url);
+  }
+
+  void _showEditorAttachmentMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image),
+                title: const Text('Image'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickEditorAttachment(attachmentType: 'image');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.video_library),
+                title: const Text('Video'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickEditorAttachment(attachmentType: 'video');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.audiotrack),
+                title: const Text('Audio'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickEditorAttachment(attachmentType: 'audio');
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.insert_drive_file),
+                title: const Text('File'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickEditorAttachment(attachmentType: 'file');
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _toggleToolbarTab(int index) {
+    setState(() {
+      if (_activeToolbarTab == index) {
+        _showToolbar = !_showToolbar;
+      } else {
+        _activeToolbarTab = index;
+        _showToolbar = true;
+      }
+    });
+  }
+
+  Widget _fontFamilyIconButton(
+    dynamic options,
+    dynamic extraOptions,
+  ) {
+    final typedOptions = options as quill.QuillToolbarFontFamilyButtonOptions;
+    final typedExtra = extraOptions as quill.QuillToolbarFontFamilyButtonExtraOptions;
+    return quill.QuillToolbarIconButton(
+      tooltip: typedOptions.tooltip,
+      isSelected: false,
+      iconTheme: typedOptions.iconTheme,
+      onPressed: typedExtra.onPressed,
+      icon: const Icon(Icons.font_download_outlined, size: 18),
+    );
+  }
+
+  Widget _fontSizeIconButton(
+    dynamic options,
+    dynamic extraOptions,
+  ) {
+    final typedOptions = options as quill.QuillToolbarFontSizeButtonOptions;
+    final typedExtra = extraOptions as quill.QuillToolbarFontSizeButtonExtraOptions;
+    return quill.QuillToolbarIconButton(
+      tooltip: typedOptions.tooltip,
+      isSelected: false,
+      iconTheme: typedOptions.iconTheme,
+      onPressed: typedExtra.onPressed,
+      icon: const Icon(Icons.format_size_outlined, size: 18),
+    );
+  }
+
+  Widget _headerStyleIconButton(
+    dynamic options,
+    dynamic extraOptions,
+  ) {
+    final typedOptions = options as quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions;
+    final typedExtra =
+        extraOptions as quill.QuillToolbarSelectHeaderStyleDropdownButtonExtraOptions;
+    return quill.QuillToolbarIconButton(
+      tooltip: typedOptions.tooltip ?? 'Paragraph type',
+      isSelected: false,
+      iconTheme: typedOptions.iconTheme,
+      onPressed: typedExtra.onPressed,
+      icon: const Icon(Icons.text_fields_outlined, size: 18),
+    );
+  }
+
+  quill.QuillSimpleToolbarConfig _toolbarConfigForTab(int index) {
+    final isText = index == 0;
+    final isFormatting = index == 1;
+    final isJustify = index == 2;
+    final isLists = index == 3;
+    final isAttachments = index == 4;
+
+    return quill.QuillSimpleToolbarConfig(
+      buttonOptions: quill.QuillSimpleToolbarButtonOptions(
+        fontFamily: quill.QuillToolbarFontFamilyButtonOptions(
+          childBuilder: _fontFamilyIconButton,
+          tooltip: 'Font',
+        ),
+        fontSize: quill.QuillToolbarFontSizeButtonOptions(
+          childBuilder: _fontSizeIconButton,
+          tooltip: 'Size',
+        ),
+        selectHeaderStyleDropdownButton:
+            quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions(
+          childBuilder: _headerStyleIconButton,
+          tooltip: 'Paragraph type',
+        ),
+      ),
+      showFontFamily: isText,
+      showFontSize: isText,
+      showHeaderStyle: isText,
+      showColorButton: isText,
+      showBackgroundColorButton: isText,
+      showAlignmentButtons: isJustify,
+      showListNumbers: isLists,
+      showListBullets: isLists,
+      showListCheck: isLists,
+      showIndent: isLists,
+      showUndo: false,
+      showRedo: false,
+      showBoldButton: isFormatting,
+      showItalicButton: isFormatting,
+      showSmallButton: false,
+      showUnderLineButton: isFormatting,
+      showStrikeThrough: isFormatting,
+      showInlineCode: false,
+      showClearFormat: false,
+      showSubscript: isFormatting,
+      showSuperscript: isFormatting,
+      showLink: isAttachments,
+      showSearchButton: false,
+      showCodeBlock: false,
+      showQuote: false,
+      showLineHeightButton: false,
+      showDirection: false,
+      showClipboardCut: false,
+      showClipboardCopy: false,
+      showClipboardPaste: false,
+      customButtons: isAttachments
+          ? [
+              quill.QuillToolbarCustomButtonOptions(
+                icon: Icon(
+                  _isUploadingAttachment
+                      ? Icons.hourglass_top
+                      : Icons.attach_file,
+                ),
+                tooltip: 'Attach',
+                onPressed: _isUploadingAttachment ? null : _showEditorAttachmentMenu,
+              ),
+            ]
+          : const [],
+    );
+  }
+
   @override
   void dispose() {
     _titleController.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  Widget _buildEditorContextMenu(
+    BuildContext context,
+    quill.QuillRawEditorState editorState,
+  ) {
+    final controller = editorState.controller;
+    final selection = controller.selection;
+    
+    // Get button items with error handling for layout issues
+    List<ContextMenuButtonItem> buttonItems;
+    try {
+      buttonItems = editorState.contextMenuButtonItems;
+    } catch (e) {
+      // If context menu can't be built yet (layout not ready), return empty
+      return const SizedBox.shrink();
+    }
+
+    // If no selection, just show default buttons
+    if (selection.isCollapsed) {
+      return AdaptiveTextSelectionToolbar.buttonItems(
+        anchors: editorState.contextMenuAnchors,
+        buttonItems: buttonItems,
+      );
+    }
+
+    // Add custom formatting buttons for text selections
+    final formattingButtons = <ContextMenuButtonItem>[
+      ContextMenuButtonItem(
+        onPressed: () {
+          final index = selection.start;
+          final length = selection.end - selection.start;
+          controller.formatText(index, length, quill.Attribute.bold);
+          controller.updateSelection(
+            TextSelection.collapsed(offset: selection.end),
+            quill.ChangeSource.local,
+          );
+          ContextMenuController.removeAny();
+        },
+        label: 'Bold',
+      ),
+      ContextMenuButtonItem(
+        onPressed: () {
+          final index = selection.start;
+          final length = selection.end - selection.start;
+          controller.formatText(index, length, quill.Attribute.italic);
+          controller.updateSelection(
+            TextSelection.collapsed(offset: selection.end),
+            quill.ChangeSource.local,
+          );
+          ContextMenuController.removeAny();
+        },
+        label: 'Italic',
+      ),
+      ContextMenuButtonItem(
+        onPressed: () {
+          final index = selection.start;
+          final length = selection.end - selection.start;
+          controller.formatText(index, length, quill.Attribute.underline);
+          controller.updateSelection(
+            TextSelection.collapsed(offset: selection.end),
+            quill.ChangeSource.local,
+          );
+          ContextMenuController.removeAny();
+        },
+        label: 'Underline',
+      ),
+      ContextMenuButtonItem(
+        onPressed: () {
+          final index = selection.start;
+          final length = selection.end - selection.start;
+          controller.formatText(index, length, quill.Attribute.strikeThrough);
+          controller.updateSelection(
+            TextSelection.collapsed(offset: selection.end),
+            quill.ChangeSource.local,
+          );
+          ContextMenuController.removeAny();
+        },
+        label: 'Strike',
+      ),
+      ContextMenuButtonItem(
+        onPressed: () {
+          final index = selection.start;
+          final length = selection.end - selection.start;
+          controller.formatText(index, length, quill.Attribute.subscript);
+          controller.updateSelection(
+            TextSelection.collapsed(offset: selection.end),
+            quill.ChangeSource.local,
+          );
+          ContextMenuController.removeAny();
+        },
+        label: 'Sub',
+      ),
+      ContextMenuButtonItem(
+        onPressed: () {
+          final index = selection.start;
+          final length = selection.end - selection.start;
+          controller.formatText(index, length, quill.Attribute.superscript);
+          controller.updateSelection(
+            TextSelection.collapsed(offset: selection.end),
+            quill.ChangeSource.local,
+          );
+          ContextMenuController.removeAny();
+        },
+        label: 'Super',
+      ),
+    ];
+
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: editorState.contextMenuAnchors,
+      buttonItems: [...formattingButtons, ...buttonItems],
+    );
   }
 
   Future<void> _submit() async {
@@ -1094,90 +1471,182 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
   @override
   Widget build(BuildContext context) {
     final authService = context.read<AuthService>();
+    final mediaQuery = MediaQuery.of(context);
+    final isPhone = mediaQuery.size.width < 600;
+    final spacing = isPhone ? 8.0 : 12.0;
+    final toolbarIconColor = Theme.of(context).iconTheme.color ??
+      Theme.of(context).colorScheme.onSurfaceVariant;
+    final toolbarActiveColor = Theme.of(context).colorScheme.primary;
 
-    return AlertDialog(
-      title: const Text('Edit post'),
-      content: SizedBox(
-        width: 600,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: _titleController,
-              decoration: const InputDecoration(labelText: 'Title'),
-            ),
-            const SizedBox(height: 12),
-            quill.QuillSimpleToolbar(
-              controller: _controller,
-              config: const quill.QuillSimpleToolbarConfig(
-                showAlignmentButtons: true,
-                showCodeBlock: false,
-                showQuote: false,
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Edit post'),
+      ),
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              padding: EdgeInsets.symmetric(
+                horizontal: isPhone ? 12 : 24,
+                vertical: isPhone ? 12 : 16,
               ),
-            ),
-            SizedBox(
-              height: 200,
-              child: quill.QuillEditor.basic(
-                controller: _controller,
-                config: quill.QuillEditorConfig(
-                  embedBuilders: [
-                    ImageEmbedBuilder(),
-                    VideoEmbedBuilder(),
-                    AudioEmbedBuilder(),
-                    VoiceEmbedBuilder(),
-                    FileEmbedBuilder(),
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextField(
+                      controller: _titleController,
+                      decoration: const InputDecoration(labelText: 'Title'),
+                    ),
+                    SizedBox(height: spacing),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: IconButton(
+                            tooltip: 'Text tools',
+                            onPressed: () => _toggleToolbarTab(0),
+                            icon: Icon(
+                              Icons.text_fields,
+                              color: _activeToolbarTab == 0 && _showToolbar
+                                  ? toolbarActiveColor
+                                  : toolbarIconColor,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: IconButton(
+                            tooltip: 'Text formatting',
+                            onPressed: () => _toggleToolbarTab(1),
+                            icon: Icon(
+                              Icons.format_bold,
+                              color: _activeToolbarTab == 1 && _showToolbar
+                                  ? toolbarActiveColor
+                                  : toolbarIconColor,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: IconButton(
+                            tooltip: 'Justification tools',
+                            onPressed: () => _toggleToolbarTab(2),
+                            icon: Icon(
+                              Icons.format_align_left,
+                              color: _activeToolbarTab == 2 && _showToolbar
+                                  ? toolbarActiveColor
+                                  : toolbarIconColor,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: IconButton(
+                            tooltip: 'Lists and padding tools',
+                            onPressed: () => _toggleToolbarTab(3),
+                            icon: Icon(
+                              Icons.format_list_bulleted,
+                              color: _activeToolbarTab == 3 && _showToolbar
+                                  ? toolbarActiveColor
+                                  : toolbarIconColor,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: IconButton(
+                            tooltip: 'Attachments',
+                            onPressed: () => _toggleToolbarTab(4),
+                            icon: Icon(
+                              Icons.attach_file,
+                              color: _activeToolbarTab == 4 && _showToolbar
+                                  ? toolbarActiveColor
+                                  : toolbarIconColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_showToolbar) ...[
+                      SizedBox(height: spacing),
+                      quill.QuillSimpleToolbar(
+                        controller: _controller,
+                        config: _toolbarConfigForTab(_activeToolbarTab),
+                      ),
+                    ],
+                    SizedBox(height: spacing),
+                    ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: isPhone ? 200 : 240,
+                      ),
+                      child: quill.QuillEditor.basic(
+                        controller: _controller,
+                        config: quill.QuillEditorConfig(
+                          contextMenuBuilder: _buildEditorContextMenu,
+                          embedBuilders: [
+                            ImageEmbedBuilder(),
+                            VideoEmbedBuilder(),
+                            AudioEmbedBuilder(),
+                            VoiceEmbedBuilder(),
+                            FileEmbedBuilder(),
+                          ],
+                          unknownEmbedBuilder: UnknownEmbedBuilder(),
+                        ),
+                      ),
+                    ),
+                    SizedBox(height: spacing),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: _allowComments,
+                          onChanged: (value) {
+                            setState(() {
+                              _allowComments = value ?? true;
+                            });
+                          },
+                        ),
+                        const Text('Allow comments'),
+                      ],
+                    ),
+                    if (authService.isAdmin || authService.roles.contains('teacher'))
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _isImportant,
+                            onChanged: (value) {
+                              setState(() {
+                                _isImportant = value ?? false;
+                              });
+                            },
+                          ),
+                          const Text('Mark as important'),
+                        ],
+                      ),
+                    SizedBox(height: spacing),
+                    Row(
+                      children: [
+                        TextButton(
+                          onPressed:
+                              _isSubmitting ? null : () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        const Spacer(),
+                        ElevatedButton(
+                          onPressed: _isSubmitting ? null : _submit,
+                          child: _isSubmitting
+                              ? const SizedBox(
+                                  height: 16,
+                                  width: 16,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                )
+                              : const Text('Save'),
+                        ),
+                      ],
+                    ),
                   ],
-                  unknownEmbedBuilder: UnknownEmbedBuilder(),
                 ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Checkbox(
-                  value: _allowComments,
-                  onChanged: (value) {
-                    setState(() {
-                      _allowComments = value ?? true;
-                    });
-                  },
-                ),
-                const Text('Allow comments'),
-              ],
-            ),
-            if (authService.isAdmin || authService.roles.contains('teacher'))
-              Row(
-                children: [
-                  Checkbox(
-                    value: _isImportant,
-                    onChanged: (value) {
-                      setState(() {
-                        _isImportant = value ?? false;
-                      });
-                    },
-                  ),
-                  const Text('Mark as important'),
-                ],
-              ),
-          ],
+            );
+          },
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        ElevatedButton(
-          onPressed: _isSubmitting ? null : _submit,
-          child: _isSubmitting
-              ? const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Save'),
-        ),
-      ],
     );
   }
 }
@@ -1584,28 +2053,14 @@ class _FeedCommentEditorState extends State<FeedCommentEditor> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            quill.QuillSimpleToolbar(
+            QuillEditorComposer(
               controller: _controller,
-              config: const quill.QuillSimpleToolbarConfig(
-                showAlignmentButtons: true,
-                showCodeBlock: false,
-                showQuote: false,
-              ),
-            ),
-            SizedBox(
-              height: 180,
-              child: quill.QuillEditor.basic(
-                controller: _controller,
-                config: quill.QuillEditorConfig(
-                  embedBuilders: [
-                    ImageEmbedBuilder(),
-                    VideoEmbedBuilder(),
-                    AudioEmbedBuilder(),
-                    VoiceEmbedBuilder(),
-                    FileEmbedBuilder(),
-                  ],
-                  unknownEmbedBuilder: UnknownEmbedBuilder(),
-                ),
+              config: const QuillEditorComposerConfig(
+                minHeight: 80,
+                maxHeight: 180,
+                showAttachButton: false,
+                showVoiceButton: false,
+                showSendButton: false,
               ),
             ),
           ],
@@ -1743,8 +2198,8 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
     }
   }
 
-  void _showAttachmentMenu() {
-    showModalBottomSheet<void>(
+  Future<void> _showAttachmentMenu() async {
+    await showModalBottomSheet<void>(
       context: context,
       builder: (context) => SafeArea(
         child: Padding(
@@ -1850,42 +2305,16 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
                 ),
               ),
             if (_pendingAttachments.isNotEmpty) const SizedBox(height: 12),
-            quill.QuillSimpleToolbar(
+            QuillEditorComposer(
               controller: _controller,
-              config: const quill.QuillSimpleToolbarConfig(
-                showAlignmentButtons: true,
-                showCodeBlock: false,
-                showQuote: false,
+              config: const QuillEditorComposerConfig(
+                minHeight: 80,
+                maxHeight: 200,
+                showAttachButton: true,
+                showVoiceButton: false,
+                showSendButton: false,
               ),
-            ),
-            SizedBox(
-              height: 180,
-              child: quill.QuillEditor.basic(
-                controller: _controller,
-                config: quill.QuillEditorConfig(
-                  embedBuilders: [
-                    ImageEmbedBuilder(),
-                    VideoEmbedBuilder(),
-                    AudioEmbedBuilder(),
-                    VoiceEmbedBuilder(),
-                    FileEmbedBuilder(),
-                  ],
-                  unknownEmbedBuilder: UnknownEmbedBuilder(),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: ElevatedButton.icon(
-                onPressed: _isUploadingAttachment ? null : _showAttachmentMenu,
-                icon: Icon(
-                  _isUploadingAttachment
-                      ? Icons.hourglass_top
-                      : Icons.attach_file,
-                ),
-                label: const Text('Attach'),
-              ),
+              onAttachmentSelected: _showAttachmentMenu,
             ),
           ],
         ),

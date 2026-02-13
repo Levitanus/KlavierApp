@@ -37,11 +37,44 @@ class VoiceRecorder {
 
   Future<RecordedAudio?> stop() async {
     if (!_recording) return null;
-    final path = await _record.stop();
-    _recording = false;
-    if (path == null) return null;
+    
+    try {
+      final path = await _record.stop();
+      _recording = false;
+      
+      if (path == null || path.isEmpty) return null;
 
-    final bytes = await File(path).readAsBytes();
-    return RecordedAudio(bytes: bytes, extension: 'ogg');
+      // Give the filesystem time to finalize the audio file before reading
+      await Future.delayed(const Duration(milliseconds: 200));
+
+      final file = File(path);
+      
+      // Check if file exists and has content
+      if (!await file.exists()) {
+        return null;
+      }
+      
+      final fileSize = await file.length();
+      if (fileSize == 0) {
+        // File is empty, try waiting a bit more
+        await Future.delayed(const Duration(milliseconds: 300));
+        final updatedSize = await file.length();
+        if (updatedSize == 0) return null;
+      }
+
+      final bytes = await file.readAsBytes();
+      
+      // Clean up the temporary file
+      try {
+        await file.delete();
+      } catch (_) {
+        // Ignore delete errors
+      }
+      
+      return RecordedAudio(bytes: bytes, extension: 'ogg');
+    } catch (e) {
+      _recording = false;
+      return null;
+    }
   }
 }
