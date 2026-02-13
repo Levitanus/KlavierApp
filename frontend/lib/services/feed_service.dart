@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../auth.dart';
 import '../models/feed.dart';
+import '../models/chat.dart';
 import 'websocket_service.dart';
 
 class FeedService extends ChangeNotifier {
@@ -276,7 +277,7 @@ class FeedService extends ChangeNotifier {
     bool isImportant = false,
     int? importantRank,
     bool allowComments = true,
-    List<int>? mediaIds,
+    List<ChatAttachmentInput>? attachments,
   }) async {
     if (authService.token == null) return null;
 
@@ -293,7 +294,7 @@ class FeedService extends ChangeNotifier {
           'is_important': isImportant,
           'important_rank': importantRank,
           'allow_comments': allowComments,
-          'media_ids': mediaIds,
+          'attachments': attachments?.map((a) => a.toJson()).toList(),
         }),
       );
 
@@ -379,7 +380,7 @@ class FeedService extends ChangeNotifier {
     int postId, {
     int? parentCommentId,
     required List<dynamic> content,
-    List<int>? mediaIds,
+    List<ChatAttachmentInput>? attachments,
   }) async {
     if (authService.token == null) return null;
 
@@ -393,7 +394,7 @@ class FeedService extends ChangeNotifier {
         body: json.encode({
           'parent_comment_id': parentCommentId,
           'content': content,
-          'media_ids': mediaIds,
+          'attachments': attachments?.map((a) => a.toJson()).toList(),
         }),
       );
 

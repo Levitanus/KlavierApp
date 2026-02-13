@@ -428,6 +428,7 @@ CREATE TABLE IF NOT EXISTS feed_posts (
 CREATE TABLE IF NOT EXISTS feed_post_media (
     post_id INTEGER NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
     media_id INTEGER NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
+    attachment_type chat_attachment_type NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (post_id, media_id)
 );
@@ -453,6 +454,7 @@ CREATE TABLE IF NOT EXISTS feed_comments (
 CREATE TABLE IF NOT EXISTS feed_comment_media (
     comment_id INTEGER NOT NULL REFERENCES feed_comments(id) ON DELETE CASCADE,
     media_id INTEGER NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
+    attachment_type chat_attachment_type NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (comment_id, media_id)
 );

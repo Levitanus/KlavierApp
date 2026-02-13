@@ -1,4 +1,5 @@
 import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'chat.dart';
 
 class Feed {
   final int id;
@@ -91,6 +92,7 @@ class FeedPost {
   final int authorUserId;
   final String? title;
   final List<dynamic> content;
+  final List<ChatAttachment> attachments;
   final bool isImportant;
   final int? importantRank;
   final bool allowComments;
@@ -104,6 +106,7 @@ class FeedPost {
     required this.authorUserId,
     required this.title,
     required this.content,
+    required this.attachments,
     required this.isImportant,
     required this.importantRank,
     required this.allowComments,
@@ -119,6 +122,10 @@ class FeedPost {
       authorUserId: json['author_user_id'] as int,
       title: json['title'] as String?,
       content: (json['content'] as List<dynamic>? ?? []).toList(),
+        attachments: (json['attachments'] as List?)
+            ?.map((a) => ChatAttachment.fromJson(a as Map<String, dynamic>))
+            .toList() ??
+          [],
       isImportant: json['is_important'] as bool? ?? false,
       importantRank: json['important_rank'] as int?,
       allowComments: json['allow_comments'] as bool? ?? true,
@@ -143,6 +150,7 @@ class FeedComment {
   final int authorUserId;
   final int? parentCommentId;
   final List<dynamic> content;
+  final List<ChatAttachment> attachments;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -152,6 +160,7 @@ class FeedComment {
     required this.authorUserId,
     required this.parentCommentId,
     required this.content,
+    required this.attachments,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -163,6 +172,10 @@ class FeedComment {
       authorUserId: json['author_user_id'] as int,
       parentCommentId: json['parent_comment_id'] as int?,
       content: (json['content'] as List<dynamic>? ?? []).toList(),
+      attachments: (json['attachments'] as List?)
+              ?.map((a) => ChatAttachment.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          [],
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: DateTime.parse(json['updated_at'] as String),
     );

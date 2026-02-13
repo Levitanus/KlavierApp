@@ -1,11 +1,12 @@
 use actix_web::{web, HttpRequest, HttpResponse, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use serde_json::Value as JsonValue;
-use sqlx::{FromRow, PgPool};
-use std::collections::HashSet;
+use serde_json::{json, Value as JsonValue};
+use sqlx::{FromRow, PgConnection, PgPool};
+use std::collections::{HashMap, HashSet};
 use log::{error};
 
+use crate::chats::{ChatAttachmentInput, ChatAttachmentResponse};
 use crate::users::verify_token;
 use crate::notification_builders::{
     build_feed_comment_notification,
@@ -64,6 +65,34 @@ pub struct FeedComment {
     pub updated_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct FeedPostResponse {
+    pub id: i32,
+    pub feed_id: i32,
+    pub author_user_id: i32,
+    pub title: Option<String>,
+    pub content: JsonValue,
+    pub is_important: bool,
+    pub important_rank: Option<i32>,
+    pub allow_comments: bool,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub is_read: bool,
+    pub attachments: Vec<ChatAttachmentResponse>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct FeedCommentResponse {
+    pub id: i32,
+    pub post_id: i32,
+    pub author_user_id: i32,
+    pub parent_comment_id: Option<i32>,
+    pub content: JsonValue,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub attachments: Vec<ChatAttachmentResponse>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct PostListQuery {
     pub limit: Option<i64>,
@@ -78,14 +107,14 @@ pub struct CreatePostRequest {
     pub is_important: Option<bool>,
     pub important_rank: Option<i32>,
     pub allow_comments: Option<bool>,
-    pub media_ids: Option<Vec<i32>>,
+    pub attachments: Option<Vec<ChatAttachmentInput>>,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct CreateCommentRequest {
     pub parent_comment_id: Option<i32>,
     pub content: JsonValue,
-    pub media_ids: Option<Vec<i32>>,
+    pub attachments: Option<Vec<ChatAttachmentInput>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -123,6 +152,263 @@ async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> 
     .ok_or_else(|| actix_web::error::ErrorUnauthorized("User not found"))?;
 
     Ok(user_id)
+}
+
+fn is_valid_attachment_type(value: &str) -> bool {
+    matches!(value, "image" | "audio" | "voice" | "video" | "file")
+}
+
+#[derive(Debug, FromRow)]
+struct FeedPostAttachmentRow {
+    pub post_id: i32,
+    pub media_id: i32,
+    pub attachment_type: String,
+    pub public_url: String,
+    pub mime_type: String,
+    pub size_bytes: i32,
+}
+
+#[derive(Debug, FromRow)]
+struct FeedCommentAttachmentRow {
+    pub comment_id: i32,
+    pub media_id: i32,
+    pub attachment_type: String,
+    pub public_url: String,
+    pub mime_type: String,
+    pub size_bytes: i32,
+}
+
+#[derive(Debug, FromRow)]
+struct MediaRow {
+    pub id: i32,
+    pub public_url: String,
+    pub mime_type: String,
+    pub size_bytes: i32,
+    pub media_type: String,
+}
+
+async fn load_attachments_for_posts(
+    db: &PgPool,
+    post_ids: &[i32],
+) -> Result<HashMap<i32, Vec<ChatAttachmentResponse>>, sqlx::Error> {
+    if post_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let rows = sqlx::query_as::<_, FeedPostAttachmentRow>(
+        "SELECT fpm.post_id,
+                fpm.media_id,
+                fpm.attachment_type::text as attachment_type,
+                mf.public_url,
+                mf.mime_type,
+                mf.size_bytes
+         FROM feed_post_media fpm
+         JOIN media_files mf ON fpm.media_id = mf.id
+         WHERE fpm.post_id = ANY($1)
+         ORDER BY fpm.sort_order, fpm.media_id",
+    )
+    .bind(post_ids)
+    .fetch_all(db)
+    .await?;
+
+    let mut map: HashMap<i32, Vec<ChatAttachmentResponse>> = HashMap::new();
+    for row in rows {
+        map.entry(row.post_id)
+            .or_default()
+            .push(ChatAttachmentResponse {
+                media_id: row.media_id,
+                attachment_type: row.attachment_type,
+                url: row.public_url,
+                mime_type: row.mime_type,
+                size_bytes: row.size_bytes,
+            });
+    }
+
+    Ok(map)
+}
+
+async fn load_attachments_for_comments(
+    db: &PgPool,
+    comment_ids: &[i32],
+) -> Result<HashMap<i32, Vec<ChatAttachmentResponse>>, sqlx::Error> {
+    if comment_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let rows = sqlx::query_as::<_, FeedCommentAttachmentRow>(
+        "SELECT fcm.comment_id,
+                fcm.media_id,
+                fcm.attachment_type::text as attachment_type,
+                mf.public_url,
+                mf.mime_type,
+                mf.size_bytes
+         FROM feed_comment_media fcm
+         JOIN media_files mf ON fcm.media_id = mf.id
+         WHERE fcm.comment_id = ANY($1)
+         ORDER BY fcm.sort_order, fcm.media_id",
+    )
+    .bind(comment_ids)
+    .fetch_all(db)
+    .await?;
+
+    let mut map: HashMap<i32, Vec<ChatAttachmentResponse>> = HashMap::new();
+    for row in rows {
+        map.entry(row.comment_id)
+            .or_default()
+            .push(ChatAttachmentResponse {
+                media_id: row.media_id,
+                attachment_type: row.attachment_type,
+                url: row.public_url,
+                mime_type: row.mime_type,
+                size_bytes: row.size_bytes,
+            });
+    }
+
+    Ok(map)
+}
+
+async fn store_post_attachments(
+    tx: &mut PgConnection,
+    user_id: i32,
+    post_id: i32,
+    attachments: &[ChatAttachmentInput],
+) -> Result<Vec<ChatAttachmentResponse>, HttpResponse> {
+    if attachments.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut stored = Vec::new();
+
+    for (index, attachment) in attachments.iter().enumerate() {
+        if !is_valid_attachment_type(&attachment.attachment_type) {
+            return Err(HttpResponse::BadRequest().json(json!({
+                "error": "Invalid attachment type"
+            })));
+        }
+
+        let media = sqlx::query_as::<_, MediaRow>(
+            "SELECT id, public_url, mime_type, size_bytes, media_type::text as media_type
+             FROM media_files
+             WHERE id = $1 AND created_by_user_id = $2",
+        )
+        .bind(attachment.media_id)
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|e| HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to load media: {}", e)
+        })))?
+        .ok_or_else(|| HttpResponse::BadRequest().json(json!({
+            "error": "Media not found"
+        })))?;
+
+        let is_voice = attachment.attachment_type == "voice";
+        let matches_type = attachment.attachment_type == media.media_type
+            || (is_voice && media.media_type == "audio")
+            || attachment.attachment_type == "file";
+
+        if !matches_type {
+            return Err(HttpResponse::BadRequest().json(json!({
+                "error": "Attachment type does not match media type"
+            })));
+        }
+
+        sqlx::query(
+            "INSERT INTO feed_post_media (post_id, media_id, attachment_type, sort_order)
+             VALUES ($1, $2, $3::chat_attachment_type, $4)",
+        )
+        .bind(post_id)
+        .bind(media.id)
+        .bind(&attachment.attachment_type)
+        .bind(index as i32)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to save attachment: {}", e)
+        })))?;
+
+        stored.push(ChatAttachmentResponse {
+            media_id: media.id,
+            attachment_type: attachment.attachment_type.clone(),
+            url: media.public_url,
+            mime_type: media.mime_type,
+            size_bytes: media.size_bytes,
+        });
+    }
+
+    Ok(stored)
+}
+
+async fn store_comment_attachments(
+    tx: &mut PgConnection,
+    user_id: i32,
+    comment_id: i32,
+    attachments: &[ChatAttachmentInput],
+) -> Result<Vec<ChatAttachmentResponse>, HttpResponse> {
+    if attachments.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut stored = Vec::new();
+
+    for (index, attachment) in attachments.iter().enumerate() {
+        if !is_valid_attachment_type(&attachment.attachment_type) {
+            return Err(HttpResponse::BadRequest().json(json!({
+                "error": "Invalid attachment type"
+            })));
+        }
+
+        let media = sqlx::query_as::<_, MediaRow>(
+            "SELECT id, public_url, mime_type, size_bytes, media_type::text as media_type
+             FROM media_files
+             WHERE id = $1 AND created_by_user_id = $2",
+        )
+        .bind(attachment.media_id)
+        .bind(user_id)
+        .fetch_optional(&mut *tx)
+        .await
+        .map_err(|e| HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to load media: {}", e)
+        })))?
+        .ok_or_else(|| HttpResponse::BadRequest().json(json!({
+            "error": "Media not found"
+        })))?;
+
+        let is_voice = attachment.attachment_type == "voice";
+        let matches_type = attachment.attachment_type == media.media_type
+            || (is_voice && media.media_type == "audio")
+            || attachment.attachment_type == "file";
+
+        if !matches_type {
+            return Err(HttpResponse::BadRequest().json(json!({
+                "error": "Attachment type does not match media type"
+            })));
+        }
+
+        sqlx::query(
+            "INSERT INTO feed_comment_media (comment_id, media_id, attachment_type, sort_order)
+             VALUES ($1, $2, $3::chat_attachment_type, $4)",
+        )
+        .bind(comment_id)
+        .bind(media.id)
+        .bind(&attachment.attachment_type)
+        .bind(index as i32)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to save attachment: {}", e)
+        })))?;
+
+        stored.push(ChatAttachmentResponse {
+            media_id: media.id,
+            attachment_type: attachment.attachment_type.clone(),
+            url: media.public_url,
+            mime_type: media.mime_type,
+            size_bytes: media.size_bytes,
+        });
+    }
+
+    Ok(stored)
 }
 
 async fn insert_notification(
@@ -474,7 +760,36 @@ pub async fn list_posts(
             actix_web::error::ErrorInternalServerError("Failed to fetch posts")
         })?;
 
-    Ok(HttpResponse::Ok().json(posts))
+    let post_ids: Vec<i32> = posts.iter().map(|post| post.id).collect();
+    let attachments_map = load_attachments_for_posts(&app_state.db, &post_ids)
+        .await
+        .map_err(|e| {
+            error!("Database error fetching post attachments: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Failed to fetch post attachments")
+        })?;
+
+    let responses: Vec<FeedPostResponse> = posts
+        .into_iter()
+        .map(|post| FeedPostResponse {
+            id: post.id,
+            feed_id: post.feed_id,
+            author_user_id: post.author_user_id,
+            title: post.title,
+            content: post.content,
+            is_important: post.is_important,
+            important_rank: post.important_rank,
+            allow_comments: post.allow_comments,
+            created_at: post.created_at,
+            updated_at: post.updated_at,
+            is_read: post.is_read,
+            attachments: attachments_map
+                .get(&post.id)
+                .cloned()
+                .unwrap_or_default(),
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(responses))
 }
 
 pub async fn get_post(
@@ -502,7 +817,32 @@ pub async fn get_post(
     let feed = fetch_feed(&app_state, post.feed_id).await?;
     ensure_feed_access(&app_state, &feed, user_id, &claims).await?;
 
-    Ok(HttpResponse::Ok().json(post))
+    let attachments_map = load_attachments_for_posts(&app_state.db, &[post.id])
+        .await
+        .map_err(|e| {
+            error!("Database error fetching post attachments: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Failed to fetch post attachments")
+        })?;
+
+    let response = FeedPostResponse {
+        id: post.id,
+        feed_id: post.feed_id,
+        author_user_id: post.author_user_id,
+        title: post.title,
+        content: post.content,
+        is_important: post.is_important,
+        important_rank: post.important_rank,
+        allow_comments: post.allow_comments,
+        created_at: post.created_at,
+        updated_at: post.updated_at,
+        is_read: post.is_read,
+        attachments: attachments_map
+            .get(&post.id)
+            .cloned()
+            .unwrap_or_default(),
+    };
+
+    Ok(HttpResponse::Ok().json(response))
 }
 
 pub async fn mark_post_read(
@@ -670,22 +1010,14 @@ pub async fn create_post(
         actix_web::error::ErrorInternalServerError("Failed to mark post as read")
     })?;
 
-    if let Some(media_ids) = &payload.media_ids {
-        for (index, media_id) in media_ids.iter().enumerate() {
-            sqlx::query(
-                "INSERT INTO feed_post_media (post_id, media_id, sort_order) VALUES ($1, $2, $3)"
-            )
-            .bind(post.id)
-            .bind(media_id)
-            .bind(index as i32)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| {
-                error!("Database error linking post media: {:?}", e);
-                actix_web::error::ErrorInternalServerError("Failed to attach media")
-            })?;
+    let attachments = if let Some(items) = payload.attachments.as_deref() {
+        match store_post_attachments(&mut *tx, user_id, post.id, items).await {
+            Ok(saved) => saved,
+            Err(response) => return Ok(response),
         }
-    }
+    } else {
+        Vec::new()
+    };
 
     sqlx::query(
         r#"
@@ -748,7 +1080,22 @@ pub async fn create_post(
         }
     }
 
-    Ok(HttpResponse::Created().json(post))
+    let response = FeedPostResponse {
+        id: post.id,
+        feed_id: post.feed_id,
+        author_user_id: post.author_user_id,
+        title: post.title,
+        content: post.content,
+        is_important: post.is_important,
+        important_rank: post.important_rank,
+        allow_comments: post.allow_comments,
+        created_at: post.created_at,
+        updated_at: post.updated_at,
+        is_read: post.is_read,
+        attachments,
+    };
+
+    Ok(HttpResponse::Created().json(response))
 }
 
 pub async fn list_comments(
@@ -790,7 +1137,32 @@ pub async fn list_comments(
         actix_web::error::ErrorInternalServerError("Failed to fetch comments")
     })?;
 
-    Ok(HttpResponse::Ok().json(comments))
+    let comment_ids: Vec<i32> = comments.iter().map(|comment| comment.id).collect();
+    let attachments_map = load_attachments_for_comments(&app_state.db, &comment_ids)
+        .await
+        .map_err(|e| {
+            error!("Database error fetching comment attachments: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Failed to fetch comment attachments")
+        })?;
+
+    let responses: Vec<FeedCommentResponse> = comments
+        .into_iter()
+        .map(|comment| FeedCommentResponse {
+            id: comment.id,
+            post_id: comment.post_id,
+            author_user_id: comment.author_user_id,
+            parent_comment_id: comment.parent_comment_id,
+            content: comment.content,
+            created_at: comment.created_at,
+            updated_at: comment.updated_at,
+            attachments: attachments_map
+                .get(&comment.id)
+                .cloned()
+                .unwrap_or_default(),
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(responses))
 }
 
 pub async fn create_comment(
@@ -846,22 +1218,14 @@ pub async fn create_comment(
         actix_web::error::ErrorInternalServerError("Failed to create comment")
     })?;
 
-    if let Some(media_ids) = &payload.media_ids {
-        for (index, media_id) in media_ids.iter().enumerate() {
-            sqlx::query(
-                "INSERT INTO feed_comment_media (comment_id, media_id, sort_order) VALUES ($1, $2, $3)"
-            )
-            .bind(comment.id)
-            .bind(media_id)
-            .bind(index as i32)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| {
-                error!("Database error linking comment media: {:?}", e);
-                actix_web::error::ErrorInternalServerError("Failed to attach media")
-            })?;
+    let attachments = if let Some(items) = payload.attachments.as_deref() {
+        match store_comment_attachments(&mut *tx, user_id, comment.id, items).await {
+            Ok(saved) => saved,
+            Err(response) => return Ok(response),
         }
-    }
+    } else {
+        Vec::new()
+    };
 
     sqlx::query(
         r#"
@@ -905,7 +1269,19 @@ pub async fn create_comment(
         }
     }
 
-    let comment_data = serde_json::to_value(&comment).unwrap_or_else(|_| serde_json::json!({}));
+    let comment_response = FeedCommentResponse {
+        id: comment.id,
+        post_id: comment.post_id,
+        author_user_id: comment.author_user_id,
+        parent_comment_id: comment.parent_comment_id,
+        content: comment.content,
+        created_at: comment.created_at,
+        updated_at: comment.updated_at,
+        attachments: attachments.clone(),
+    };
+
+    let comment_data = serde_json::to_value(&comment_response)
+        .unwrap_or_else(|_| serde_json::json!({}));
     let ws_message = websockets::WsMessage {
         msg_type: "comment".to_string(),
         user_id: Some(user_id),
@@ -918,7 +1294,7 @@ pub async fn create_comment(
         .broadcast_to_post(*post_id, ws_message)
         .await;
 
-    Ok(HttpResponse::Created().json(comment))
+    Ok(HttpResponse::Created().json(comment_response))
 }
 
 pub async fn update_post_subscription(

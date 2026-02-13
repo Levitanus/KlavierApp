@@ -1,9 +1,12 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 import 'auth.dart';
+import 'models/chat.dart';
 import 'models/feed.dart';
 import 'services/feed_service.dart';
 import 'widgets/quill_embed_builders.dart';
@@ -515,6 +518,8 @@ class FeedPostCard extends StatelessWidget {
                 embedBuilders: [
                   ImageEmbedBuilder(),
                   VideoEmbedBuilder(),
+                  AudioEmbedBuilder(),
+                  VoiceEmbedBuilder(),
                   FileEmbedBuilder(),
                 ],
                 unknownEmbedBuilder: UnknownEmbedBuilder(),
@@ -704,6 +709,48 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     return map;
   }
 
+  List<ChatAttachment> _visibleAttachments(
+    List<dynamic> content,
+    List<ChatAttachment> attachments,
+  ) {
+    if (attachments.isEmpty) return [];
+    final body = jsonEncode(content);
+    return attachments.where((attachment) => !body.contains(attachment.url)).toList();
+  }
+
+  Widget _buildAttachmentWidget(ChatAttachment attachment) {
+    final url = normalizeMediaUrl(attachment.url);
+    switch (attachment.attachmentType) {
+      case 'image':
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 240),
+          child: Image.network(url, fit: BoxFit.contain),
+        );
+      case 'video':
+        return ChatVideoPlayer(url: url);
+      case 'audio':
+        return ChatAudioPlayer(url: url, label: 'Audio');
+      case 'voice':
+        return ChatAudioPlayer(url: url, label: 'Voice message');
+      case 'file':
+        return Row(
+          children: [
+            const Icon(Icons.insert_drive_file),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                url.split('/').last,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        );
+      default:
+        return Text('Unsupported attachment: ${attachment.attachmentType}');
+    }
+  }
+
   List<Widget> _buildCommentWidgets(
     Map<int?, List<FeedComment>> tree,
     int? parentId,
@@ -715,6 +762,10 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
         document: comment.toDocument(),
         selection: const TextSelection.collapsed(offset: 0),
         readOnly: true,
+      );
+      final commentAttachments = _visibleAttachments(
+        comment.content,
+        comment.attachments,
       );
 
       final children = _buildCommentWidgets(tree, comment.id, depth + 1);
@@ -736,11 +787,21 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                 embedBuilders: [
                   ImageEmbedBuilder(),
                   VideoEmbedBuilder(),
+                  AudioEmbedBuilder(),
+                  VoiceEmbedBuilder(),
                   FileEmbedBuilder(),
                 ],
                 unknownEmbedBuilder: UnknownEmbedBuilder(),
               ),
             ),
+              if (commentAttachments.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                for (final attachment in commentAttachments)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: _buildAttachmentWidget(attachment),
+                  ),
+              ],
               const SizedBox(height: 8),
               Text(
                 'Posted ${comment.createdAt.toLocal()}'.split('.').first,
@@ -784,6 +845,10 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
       document: widget.post.toDocument(),
       selection: const TextSelection.collapsed(offset: 0),
       readOnly: true,
+    );
+    final postAttachments = _visibleAttachments(
+      widget.post.content,
+      widget.post.attachments,
     );
 
     final tree = _buildTree(_comments);
@@ -835,11 +900,21 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                     embedBuilders: [
                       ImageEmbedBuilder(),
                       VideoEmbedBuilder(),
+                      AudioEmbedBuilder(),
+                      VoiceEmbedBuilder(),
                       FileEmbedBuilder(),
                     ],
                     unknownEmbedBuilder: UnknownEmbedBuilder(),
                   ),
                 ),
+                if (postAttachments.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  for (final attachment in postAttachments)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _buildAttachmentWidget(attachment),
+                    ),
+                ],
                 const SizedBox(height: 16),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -897,7 +972,8 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
   bool _isImportant = false;
   bool _allowComments = true;
   bool _isSubmitting = false;
-  final List<int> _mediaIds = [];
+  bool _isUploadingAttachment = false;
+  final List<_PendingAttachment> _pendingAttachments = [];
 
   @override
   void dispose() {
@@ -906,62 +982,151 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     super.dispose();
   }
 
-  Future<void> _attachMedia() async {
-    final result = await FilePicker.platform.pickFiles(withData: true);
-    if (result == null || result.files.isEmpty) return;
+  void _insertEmbed(String type, String url) {
+    final selection = _controller.selection;
+    final index = selection.baseOffset < 0 ? _controller.document.length : selection.baseOffset;
 
-    final file = result.files.first;
-    if (file.bytes == null) return;
-
-    final extension = file.extension?.toLowerCase() ?? '';
-    String mediaType = 'file';
-
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension)) {
-      mediaType = 'image';
-    } else if (['mp3', 'wav', 'aac', 'm4a', 'ogg', 'opus'].contains(extension)) {
-      mediaType = 'audio';
-    } else if (['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v'].contains(extension)) {
-      mediaType = 'video';
+    quill.BlockEmbed embed;
+    switch (type) {
+      case 'image':
+        embed = quill.BlockEmbed.image(url);
+        break;
+      case 'video':
+        embed = quill.BlockEmbed.video(url);
+        break;
+      case 'audio':
+      case 'voice':
+      case 'file':
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed(type, url),
+        );
+        break;
+      default:
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed('file', url),
+        );
     }
 
+    _controller.document.insert(index, embed);
+    _controller.updateSelection(
+      TextSelection.collapsed(offset: index + 1),
+      quill.ChangeSource.local,
+    );
+  }
+
+  Future<void> _pickAttachment({
+    required String attachmentType,
+    required bool inline,
+  }) async {
+    if (_isUploadingAttachment) return;
+
+    final allowed = <String, List<String>>{
+      'image': ['jpg', 'jpeg', 'png', 'webp'],
+      'audio': ['mp3', 'm4a', 'ogg', 'opus', 'wav'],
+      'video': ['mp4', 'webm', 'mov', 'mkv'],
+      'file': [],
+    };
+
+    final type = attachmentType == 'file' ? FileType.any : FileType.custom;
+    final result = await FilePicker.platform.pickFiles(
+      type: type,
+      allowedExtensions: type == FileType.custom ? allowed[attachmentType] : null,
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+
+    setState(() {
+      _isUploadingAttachment = true;
+    });
+
     final service = context.read<FeedService>();
-    final upload = await service.uploadMedia(
-      mediaType: mediaType,
-      bytes: file.bytes!,
+    final uploaded = await service.uploadMedia(
+      mediaType: attachmentType,
+      bytes: bytes,
       filename: file.name,
     );
 
-    if (upload == null) return;
+    if (!mounted) return;
+
+    if (uploaded == null) {
+      setState(() {
+        _isUploadingAttachment = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to upload media')),
+      );
+      return;
+    }
+
+    final attachment = _PendingAttachment(
+      input: ChatAttachmentInput(
+        mediaId: uploaded.id,
+        attachmentType: attachmentType,
+      ),
+      url: uploaded.url,
+      attachmentType: attachmentType,
+      inline: inline,
+    );
 
     setState(() {
-      _mediaIds.add(upload.id);
+      _pendingAttachments.add(attachment);
+      _isUploadingAttachment = false;
     });
 
-    try {
-      // Ensure document has content - insert placeholder if empty
-      if (_controller.document.length <= 1) {
-        _controller.document.insert(0, '\n');
-      }
-
-      // Insert media at a safe position within the document
-      final insertIndex = _controller.document.length > 1 
-        ? _controller.document.length - 1  // Before final newline
-        : 0;  // Empty or minimal document
-      
-      if (mediaType == 'image') {
-        _controller.document.insert(insertIndex, quill.BlockEmbed.image(upload.url));
-      } else if (mediaType == 'video') {
-        _controller.document.insert(insertIndex, quill.BlockEmbed.video(upload.url));
-      } else {
-        _controller.document.insert(insertIndex, '\nAttachment: ${upload.url}\n');
-      }
-    } catch (e) {
-      print('Error inserting media: $e');
-      // Remove media ID if insertion failed
-      setState(() {
-        _mediaIds.removeLast();
-      });
+    if (inline) {
+      _insertEmbed(attachmentType, uploaded.url);
     }
+  }
+
+  void _showAttachmentMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image),
+                title: const Text('Image'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'image', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.video_library),
+                title: const Text('Video'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'video', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.audiotrack),
+                title: const Text('Audio'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'audio', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.insert_drive_file),
+                title: const Text('File'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'file', inline: false);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _submit() async {
@@ -973,6 +1138,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
 
     final service = context.read<FeedService>();
     final content = _controller.document.toDelta().toJson();
+    final attachments = _pendingAttachments.map((a) => a.input).toList();
 
     final created = await service.createPost(
       widget.feed.id,
@@ -982,7 +1148,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
       content: content,
       isImportant: _isImportant,
       allowComments: _allowComments,
-      mediaIds: _mediaIds.isEmpty ? null : _mediaIds,
+      attachments: attachments.isEmpty ? null : attachments,
     );
 
     if (!mounted) return;
@@ -1012,6 +1178,28 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
               decoration: const InputDecoration(labelText: 'Title'),
             ),
             const SizedBox(height: 12),
+            if (_pendingAttachments.isNotEmpty)
+              SizedBox(
+                height: 48,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _pendingAttachments.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  itemBuilder: (context, index) {
+                    final item = _pendingAttachments[index];
+                    return Chip(
+                      label: Text(item.label),
+                      onDeleted: () {
+                        setState(() {
+                          _pendingAttachments.removeAt(index);
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            if (_pendingAttachments.isNotEmpty) const SizedBox(height: 12),
             quill.QuillSimpleToolbar(
               controller: _controller,
               config: const quill.QuillSimpleToolbarConfig(
@@ -1028,6 +1216,8 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                   embedBuilders: [
                     ImageEmbedBuilder(),
                     VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
                     FileEmbedBuilder(),
                   ],
                   unknownEmbedBuilder: UnknownEmbedBuilder(),
@@ -1038,8 +1228,12 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
             Row(
               children: [
                 ElevatedButton.icon(
-                  onPressed: _attachMedia,
-                  icon: const Icon(Icons.attach_file),
+                  onPressed: _isUploadingAttachment ? null : _showAttachmentMenu,
+                  icon: Icon(
+                    _isUploadingAttachment
+                        ? Icons.hourglass_top
+                        : Icons.attach_file,
+                  ),
                   label: const Text('Attach'),
                 ),
                 const Spacer(),
@@ -1108,7 +1302,8 @@ class FeedCommentComposer extends StatefulWidget {
 class _FeedCommentComposerState extends State<FeedCommentComposer> {
   final quill.QuillController _controller = quill.QuillController.basic();
   bool _isSubmitting = false;
-  final List<int> _mediaIds = [];
+  bool _isUploadingAttachment = false;
+  final List<_PendingAttachment> _pendingAttachments = [];
 
   @override
   void dispose() {
@@ -1116,62 +1311,151 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
     super.dispose();
   }
 
-  Future<void> _attachMedia() async {
-    final result = await FilePicker.platform.pickFiles(withData: true);
-    if (result == null || result.files.isEmpty) return;
+  void _insertEmbed(String type, String url) {
+    final selection = _controller.selection;
+    final index = selection.baseOffset < 0 ? _controller.document.length : selection.baseOffset;
 
-    final file = result.files.first;
-    if (file.bytes == null) return;
-
-    final extension = file.extension?.toLowerCase() ?? '';
-    String mediaType = 'file';
-
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension)) {
-      mediaType = 'image';
-    } else if (['mp3', 'wav', 'aac', 'm4a', 'ogg', 'opus'].contains(extension)) {
-      mediaType = 'audio';
-    } else if (['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v'].contains(extension)) {
-      mediaType = 'video';
+    quill.BlockEmbed embed;
+    switch (type) {
+      case 'image':
+        embed = quill.BlockEmbed.image(url);
+        break;
+      case 'video':
+        embed = quill.BlockEmbed.video(url);
+        break;
+      case 'audio':
+      case 'voice':
+      case 'file':
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed(type, url),
+        );
+        break;
+      default:
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed('file', url),
+        );
     }
 
+    _controller.document.insert(index, embed);
+    _controller.updateSelection(
+      TextSelection.collapsed(offset: index + 1),
+      quill.ChangeSource.local,
+    );
+  }
+
+  Future<void> _pickAttachment({
+    required String attachmentType,
+    required bool inline,
+  }) async {
+    if (_isUploadingAttachment) return;
+
+    final allowed = <String, List<String>>{
+      'image': ['jpg', 'jpeg', 'png', 'webp'],
+      'audio': ['mp3', 'm4a', 'ogg', 'opus', 'wav'],
+      'video': ['mp4', 'webm', 'mov', 'mkv'],
+      'file': [],
+    };
+
+    final type = attachmentType == 'file' ? FileType.any : FileType.custom;
+    final result = await FilePicker.platform.pickFiles(
+      type: type,
+      allowedExtensions: type == FileType.custom ? allowed[attachmentType] : null,
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+
+    setState(() {
+      _isUploadingAttachment = true;
+    });
+
     final service = context.read<FeedService>();
-    final upload = await service.uploadMedia(
-      mediaType: mediaType,
-      bytes: file.bytes!,
+    final uploaded = await service.uploadMedia(
+      mediaType: attachmentType,
+      bytes: bytes,
       filename: file.name,
     );
 
-    if (upload == null) return;
+    if (!mounted) return;
+
+    if (uploaded == null) {
+      setState(() {
+        _isUploadingAttachment = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to upload media')),
+      );
+      return;
+    }
+
+    final attachment = _PendingAttachment(
+      input: ChatAttachmentInput(
+        mediaId: uploaded.id,
+        attachmentType: attachmentType,
+      ),
+      url: uploaded.url,
+      attachmentType: attachmentType,
+      inline: inline,
+    );
 
     setState(() {
-      _mediaIds.add(upload.id);
+      _pendingAttachments.add(attachment);
+      _isUploadingAttachment = false;
     });
 
-    try {
-      // Ensure document has content - insert placeholder if empty
-      if (_controller.document.length <= 1) {
-        _controller.document.insert(0, '\n');
-      }
-
-      // Insert media at a safe position within the document
-      final insertIndex = _controller.document.length > 1 
-        ? _controller.document.length - 1  // Before final newline
-        : 0;  // Empty or minimal document
-      
-      if (mediaType == 'image') {
-        _controller.document.insert(insertIndex, quill.BlockEmbed.image(upload.url));
-      } else if (mediaType == 'video') {
-        _controller.document.insert(insertIndex, quill.BlockEmbed.video(upload.url));
-      } else {
-        _controller.document.insert(insertIndex, '\nAttachment: ${upload.url}\n');
-      }
-    } catch (e) {
-      print('Error inserting media: $e');
-      // Remove media ID if insertion failed
-      setState(() {
-        _mediaIds.removeLast();
-      });
+    if (inline) {
+      _insertEmbed(attachmentType, uploaded.url);
     }
+  }
+
+  void _showAttachmentMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image),
+                title: const Text('Image'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'image', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.video_library),
+                title: const Text('Video'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'video', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.audiotrack),
+                title: const Text('Audio'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'audio', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.insert_drive_file),
+                title: const Text('File'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'file', inline: false);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _submit() async {
@@ -1183,12 +1467,13 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
 
     final service = context.read<FeedService>();
     final content = _controller.document.toDelta().toJson();
+    final attachments = _pendingAttachments.map((a) => a.input).toList();
 
     final created = await service.createComment(
       widget.postId,
       parentCommentId: widget.parentCommentId,
       content: content,
-      mediaIds: _mediaIds.isEmpty ? null : _mediaIds,
+      attachments: attachments.isEmpty ? null : attachments,
     );
 
     if (!mounted) return;
@@ -1211,6 +1496,28 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (_pendingAttachments.isNotEmpty)
+              SizedBox(
+                height: 48,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _pendingAttachments.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  itemBuilder: (context, index) {
+                    final item = _pendingAttachments[index];
+                    return Chip(
+                      label: Text(item.label),
+                      onDeleted: () {
+                        setState(() {
+                          _pendingAttachments.removeAt(index);
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            if (_pendingAttachments.isNotEmpty) const SizedBox(height: 12),
             quill.QuillSimpleToolbar(
               controller: _controller,
               config: const quill.QuillSimpleToolbarConfig(
@@ -1227,6 +1534,8 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
                   embedBuilders: [
                     ImageEmbedBuilder(),
                     VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
                     FileEmbedBuilder(),
                   ],
                   unknownEmbedBuilder: UnknownEmbedBuilder(),
@@ -1237,8 +1546,12 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
             Align(
               alignment: Alignment.centerLeft,
               child: ElevatedButton.icon(
-                onPressed: _attachMedia,
-                icon: const Icon(Icons.attach_file),
+                onPressed: _isUploadingAttachment ? null : _showAttachmentMenu,
+                icon: Icon(
+                  _isUploadingAttachment
+                      ? Icons.hourglass_top
+                      : Icons.attach_file,
+                ),
                 label: const Text('Attach'),
               ),
             ),
@@ -1263,6 +1576,22 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
       ],
     );
   }
+}
+
+class _PendingAttachment {
+  final ChatAttachmentInput input;
+  final String url;
+  final String attachmentType;
+  final bool inline;
+
+  _PendingAttachment({
+    required this.input,
+    required this.url,
+    required this.attachmentType,
+    required this.inline,
+  });
+
+  String get label => inline ? '$attachmentType (inline)' : attachmentType;
 }
 
 class FeedSettingsDialog extends StatefulWidget {
