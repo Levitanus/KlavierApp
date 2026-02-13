@@ -511,19 +511,18 @@ class FeedPostCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
             ],
-            IgnorePointer(
-              child: quill.QuillEditor.basic(
-                controller: controller,
-                config: quill.QuillEditorConfig(
-                  embedBuilders: [
-                    ImageEmbedBuilder(),
-                    VideoEmbedBuilder(),
-                    AudioEmbedBuilder(),
-                    VoiceEmbedBuilder(),
-                    FileEmbedBuilder(),
-                  ],
-                  unknownEmbedBuilder: UnknownEmbedBuilder(),
-                ),
+            quill.QuillEditor.basic(
+              controller: controller,
+              config: quill.QuillEditorConfig(
+                showCursor: false,
+                embedBuilders: [
+                  ImageEmbedBuilder(),
+                  VideoEmbedBuilder(),
+                  AudioEmbedBuilder(),
+                  VoiceEmbedBuilder(),
+                  FileEmbedBuilder(),
+                ],
+                unknownEmbedBuilder: UnknownEmbedBuilder(),
               ),
             ),
             const SizedBox(height: 12),
@@ -785,19 +784,18 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            IgnorePointer(
-              child: quill.QuillEditor.basic(
-                controller: controller,
-                config: quill.QuillEditorConfig(
-                  embedBuilders: [
-                    ImageEmbedBuilder(),
-                    VideoEmbedBuilder(),
-                    AudioEmbedBuilder(),
-                    VoiceEmbedBuilder(),
-                    FileEmbedBuilder(),
-                  ],
-                  unknownEmbedBuilder: UnknownEmbedBuilder(),
-                ),
+            quill.QuillEditor.basic(
+              controller: controller,
+              config: quill.QuillEditorConfig(
+                showCursor: false,
+                embedBuilders: [
+                  ImageEmbedBuilder(),
+                  VideoEmbedBuilder(),
+                  AudioEmbedBuilder(),
+                  VoiceEmbedBuilder(),
+                  FileEmbedBuilder(),
+                ],
+                unknownEmbedBuilder: UnknownEmbedBuilder(),
               ),
             ),
               if (commentAttachments.isNotEmpty) ...[
@@ -947,19 +945,18 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
-                IgnorePointer(
-                  child: quill.QuillEditor.basic(
-                    controller: postController,
-                    config: quill.QuillEditorConfig(
-                      embedBuilders: [
-                        ImageEmbedBuilder(),
-                        VideoEmbedBuilder(),
-                        AudioEmbedBuilder(),
-                        VoiceEmbedBuilder(),
-                        FileEmbedBuilder(),
-                      ],
-                      unknownEmbedBuilder: UnknownEmbedBuilder(),
-                    ),
+                quill.QuillEditor.basic(
+                  controller: postController,
+                  config: quill.QuillEditorConfig(
+                    showCursor: false,
+                    embedBuilders: [
+                      ImageEmbedBuilder(),
+                      VideoEmbedBuilder(),
+                      AudioEmbedBuilder(),
+                      VoiceEmbedBuilder(),
+                      FileEmbedBuilder(),
+                    ],
+                    unknownEmbedBuilder: UnknownEmbedBuilder(),
                   ),
                 ),
                 if (postAttachments.isNotEmpty) ...[

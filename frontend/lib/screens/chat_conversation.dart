@@ -729,22 +729,21 @@ class _MessageBubble extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: IgnorePointer(
-                            child: quill.QuillEditor.basic(
-                              controller: controller,
-                              config: quill.QuillEditorConfig(
-                                scrollable: false,
-                                autoFocus: false,
-                                padding: EdgeInsets.zero,
-                                embedBuilders: [
-                                  ImageEmbedBuilder(),
-                                  VideoEmbedBuilder(),
-                                  AudioEmbedBuilder(),
-                                  VoiceEmbedBuilder(),
-                                  FileEmbedBuilder(),
-                                ],
-                                unknownEmbedBuilder: UnknownEmbedBuilder(),
-                              ),
+                          child: quill.QuillEditor.basic(
+                            controller: controller,
+                            config: quill.QuillEditorConfig(
+                              scrollable: false,
+                              autoFocus: false,
+                              showCursor: false,
+                              padding: EdgeInsets.zero,
+                              embedBuilders: [
+                                ImageEmbedBuilder(),
+                                VideoEmbedBuilder(),
+                                AudioEmbedBuilder(),
+                                VoiceEmbedBuilder(),
+                                FileEmbedBuilder(),
+                              ],
+                              unknownEmbedBuilder: UnknownEmbedBuilder(),
                             ),
                           ),
                         ),
