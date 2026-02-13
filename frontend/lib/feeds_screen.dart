@@ -9,10 +9,12 @@ import 'auth.dart';
 import 'models/chat.dart';
 import 'models/feed.dart';
 import 'services/feed_service.dart';
+import 'services/audio_player_service.dart';
 import 'utils/media_download.dart';
 import 'widgets/quill_embed_builders.dart';
 import 'widgets/quill_editor_composer.dart';
 import 'widgets/feed_preview_card.dart';
+import 'widgets/floating_audio_player.dart';
 
 class FeedsScreen extends StatefulWidget {
   final int? initialFeedId;
@@ -987,65 +989,71 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
 
     final listBottomPadding = _post.allowComments ? 96.0 : 16.0;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Post'),
-        actions: [
-          if (canEdit)
-            IconButton(
-              icon: const Icon(Icons.edit),
-              onPressed: _editPost,
-            ),
-          if (canDelete)
-            IconButton(
-              icon: const Icon(Icons.delete),
-              onPressed: _isDeleting ? null : _deletePost,
-            ),
-        ],
-      ),
-      body: _isDeleting
-          ? const Center(child: CircularProgressIndicator())
-            : ListView(
-              padding: EdgeInsets.fromLTRB(16, 16, 16, listBottomPadding),
-              children: [
-                if (_post.title != null && _post.title!.isNotEmpty) ...[
-                  Text(
-                    _post.title!,
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: 12),
-                ],
-                quill.QuillEditor.basic(
-                  controller: postController,
-                  config: quill.QuillEditorConfig(
-                    showCursor: false,
-                    embedBuilders: [
-                      ImageEmbedBuilder(),
-                      VideoEmbedBuilder(),
-                      AudioEmbedBuilder(),
-                      VoiceEmbedBuilder(),
-                      FileEmbedBuilder(),
-                    ],
-                    unknownEmbedBuilder: UnknownEmbedBuilder(),
-                  ),
-                ),
-                if (postAttachments.isNotEmpty) ...[
-                  const SizedBox(height: 8),
-                  for (final attachment in postAttachments)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: _buildAttachmentWidget(attachment),
-                    ),
-                ],
-                const SizedBox(height: 8),
-                Text(
-                  _formatTimestamp(_post.createdAt, _post.updatedAt),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const SizedBox(height: 16),
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
+    return ChangeNotifierProvider(
+      create: (_) => AudioPlayerService(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Post'),
+          actions: [
+            if (canEdit)
+              IconButton(
+                icon: const Icon(Icons.edit),
+                onPressed: _editPost,
+              ),
+            if (canDelete)
+              IconButton(
+                icon: const Icon(Icons.delete),
+                onPressed: _isDeleting ? null : _deletePost,
+              ),
+          ],
+        ),
+        body: _isDeleting
+            ? const Center(child: CircularProgressIndicator())
+              : Column(
+                children: [
+                  const FloatingAudioPlayer(),
+                  Expanded(
+                    child: ListView(
+                      padding: EdgeInsets.fromLTRB(16, 16, 16, listBottomPadding),
+                      children: [
+                        if (_post.title != null && _post.title!.isNotEmpty) ...[
+                          Text(
+                            _post.title!,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        quill.QuillEditor.basic(
+                          controller: postController,
+                          config: quill.QuillEditorConfig(
+                            showCursor: false,
+                            embedBuilders: [
+                              ImageEmbedBuilder(),
+                              VideoEmbedBuilder(),
+                              AudioEmbedBuilder(),
+                              VoiceEmbedBuilder(),
+                              FileEmbedBuilder(),
+                            ],
+                            unknownEmbedBuilder: UnknownEmbedBuilder(),
+                          ),
+                        ),
+                        if (postAttachments.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          for (final attachment in postAttachments)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: _buildAttachmentWidget(attachment),
+                            ),
+                        ],
+                        const SizedBox(height: 8),
+                        Text(
+                          _formatTimestamp(_post.createdAt, _post.updatedAt),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 16),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
                     onPressed: _loadingSubscription ? null : _toggleSubscription,
                     icon: Icon(
                       _isSubscribed
@@ -1069,17 +1077,21 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                   const Center(child: CircularProgressIndicator())
                 else if (_comments.isEmpty)
                   const Text('No comments yet.')
-                else
-                  ..._buildCommentWidgets(tree, null, 0),
-              ],
-            ),
-      floatingActionButton: _post.allowComments
-          ? FloatingActionButton.extended(
-              onPressed: () => _openCommentComposer(null),
-              icon: const Icon(Icons.add_comment),
-              label: const Text('Add Comment'),
-            )
-          : null,
+                        else
+                          ..._buildCommentWidgets(tree, null, 0),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+        floatingActionButton: _post.allowComments
+            ? FloatingActionButton.extended(
+                onPressed: () => _openCommentComposer(null),
+                icon: const Icon(Icons.add_comment),
+                label: const Text('Add Comment'),
+              )
+            : null,
+      ),
     );
   }
 }

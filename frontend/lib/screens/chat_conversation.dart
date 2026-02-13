@@ -9,9 +9,11 @@ import 'package:provider/provider.dart';
 import '../auth.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
+import '../services/audio_player_service.dart';
 import '../utils/media_download.dart';
 import '../widgets/quill_embed_builders.dart';
 import '../widgets/quill_editor_composer.dart';
+import '../widgets/floating_audio_player.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   final ChatThread thread;
@@ -387,18 +389,22 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   Widget build(BuildContext context) {
     final displayName = widget.thread.peerName ?? 'Unknown';
 
-    return Scaffold(
-      resizeToAvoidBottomInset: true,
-      appBar: AppBar(
-        title: Text(displayName),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _buildMessageList(),
-          ),
-          _buildMessageComposer(),
-        ],
+    return ChangeNotifierProvider(
+      create: (_) => AudioPlayerService(),
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          title: Text(displayName),
+        ),
+        body: Column(
+          children: [
+            const FloatingAudioPlayer(),
+            Expanded(
+              child: _buildMessageList(),
+            ),
+            _buildMessageComposer(),
+          ],
+        ),
       ),
     );
   }
