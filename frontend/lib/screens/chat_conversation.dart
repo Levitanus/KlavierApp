@@ -8,13 +8,11 @@ import '../models/chat.dart';
 import '../services/chat_service.dart';
 
 class ChatConversationScreen extends StatefulWidget {
-  final ChatThread? thread;
-  final bool toAdmin;
+  final ChatThread thread;
 
   const ChatConversationScreen({
     Key? key,
-    this.thread,
-    this.toAdmin = false,
+    required this.thread,
   }) : super(key: key);
 
   @override
@@ -39,12 +37,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     _editorFocusNode = FocusNode();
     _scrollController.addListener(_handleScroll);
 
-    if (widget.thread != null && !widget.toAdmin) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        // Load message history after first build
-        _loadMessages();
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Load message history after first build
+      _loadMessages();
+    });
   }
 
   @override
@@ -57,11 +53,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   Future<void> _loadMessages() async {
-    if (widget.thread == null) return;
+    // Skip loading if thread is virtual (id == -1)
+    if (widget.thread.id == -1) {
+      setState(() {
+        _hasMore = false;
+      });
+      return;
+    }
 
     final chatService = context.read<ChatService>();
     final count = await chatService.loadThreadMessages(
-      widget.thread!.id,
+      widget.thread.id,
       limit: _pageSize,
       offset: 0,
       append: false,
@@ -77,18 +79,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   Future<void> _markMessagesRead() async {
-    if (widget.thread == null) return;
     final chatService = context.read<ChatService>();
     final authService = context.read<AuthService>();
     final currentUserId = authService.userId;
-    final peerUserId = widget.thread?.peerUserId;
+    final isAdminChat = widget.thread.isAdminChat;
+    final isAdminViewer = authService.isAdmin;
+    final peerUserId = widget.thread.peerUserId;
 
-    final messages = chatService.messagesByThread[widget.thread!.id] ?? [];
+    final messages = chatService.messagesByThread[widget.thread.id] ?? [];
     bool updatedAny = false;
     for (final message in messages) {
-      final isOwn = currentUserId != null
-          ? message.senderId == currentUserId
-          : (peerUserId != null && message.senderId != peerUserId);
+      final isOwn = _isOwnMessage(
+        message,
+        currentUserId: currentUserId,
+        isAdminChat: isAdminChat,
+        isAdminViewer: isAdminViewer,
+        peerUserId: peerUserId,
+      );
       if (isOwn) continue;
       if (_readMarkedMessageIds.contains(message.id)) continue;
 
@@ -105,16 +112,44 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   bool _hasUnreadMessages(
     List<ChatMessage> messages,
     int? currentUserId,
+    bool isAdminChat,
+    bool isAdminViewer,
     int? peerUserId,
   ) {
     for (final message in messages) {
-      final isOwn = currentUserId != null
-          ? message.senderId == currentUserId
-          : (peerUserId != null && message.senderId != peerUserId);
+      final isOwn = _isOwnMessage(
+        message,
+        currentUserId: currentUserId,
+        isAdminChat: isAdminChat,
+        isAdminViewer: isAdminViewer,
+        peerUserId: peerUserId,
+      );
       if (isOwn) continue;
       if (_readMarkedMessageIds.contains(message.id)) continue;
       return true;
     }
+    return false;
+  }
+
+  bool _isOwnMessage(
+    ChatMessage message, {
+    required int? currentUserId,
+    required bool isAdminChat,
+    required bool isAdminViewer,
+    required int? peerUserId,
+  }) {
+    if (currentUserId != null) {
+      return message.senderId == currentUserId;
+    }
+
+    if (!isAdminChat && peerUserId != null) {
+      return message.senderId != peerUserId;
+    }
+
+    if (isAdminChat && !isAdminViewer) {
+      return message.senderId == widget.thread.participantAId;
+    }
+
     return false;
   }
 
@@ -127,15 +162,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   Future<void> _loadMoreMessages() async {
-    if (widget.thread == null) return;
     setState(() {
       _isLoadingMore = true;
     });
 
     final chatService = context.read<ChatService>();
-    final currentCount = chatService.messagesByThread[widget.thread!.id]?.length ?? 0;
+    final currentCount = chatService.messagesByThread[widget.thread.id]?.length ?? 0;
     final count = await chatService.loadThreadMessages(
-      widget.thread!.id,
+      widget.thread.id,
       limit: _pageSize,
       offset: currentCount,
       append: true,
@@ -180,10 +214,31 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final quillJson = _editorController.document.toDelta().toJson();
 
     bool success = false;
-    if (widget.toAdmin) {
-      success = await chatService.sendAdminMessage({'ops': quillJson});
-    } else if (widget.thread != null) {
-      success = await chatService.sendMessage(widget.thread!.id, {'ops': quillJson});
+    
+    // Only use admin message endpoint for virtual threads (user creating first message to admin)
+    if (widget.thread.isAdminChat && widget.thread.id == -1) {
+      // Non-admin user sending first message to admin
+      final threadId = await chatService.sendAdminMessage({'ops': quillJson});
+      success = threadId != null;
+      
+      if (success && threadId != null) {
+        // Thread was just created, navigate to the real thread
+        final realThread = chatService.personalThreads.firstWhere(
+          (t) => t.id == threadId,
+          orElse: () => widget.thread,
+        );
+        if (mounted && realThread.id != -1) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => ChatConversationScreen(thread: realThread),
+            ),
+          );
+          return;
+        }
+      }
+    } else {
+      // All other cases: regular peer chat, admin replying in admin chat
+      success = await chatService.sendMessage(widget.thread.id, {'ops': quillJson});
     }
 
     if (mounted) {
@@ -254,9 +309,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final displayName = widget.toAdmin
-        ? 'Administration'
-        : (widget.thread?.peerName ?? 'Unknown');
+    final displayName = widget.thread.peerName ?? 'Unknown';
 
     return Scaffold(
       appBar: AppBar(
@@ -265,7 +318,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       body: Column(
         children: [
           Expanded(
-            child: widget.toAdmin ? _buildNewMessageView() : _buildMessageList(),
+            child: _buildMessageList(),
           ),
           _buildMessageComposer(),
         ],
@@ -273,39 +326,24 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
-  Widget _buildNewMessageView() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.mail, size: 64, color: Colors.grey),
-            const SizedBox(height: 16),
-            Text(
-              'Message Administration',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 8),
-            const Text('Your message will be sent to all admin users'),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildMessageList() {
     return Consumer<ChatService>(
       builder: (context, chatService, _) {
-        if (widget.thread == null) {
-          return const SizedBox.shrink();
-        }
-
-        final messages = chatService.messagesByThread[widget.thread!.id] ?? [];
+        // For virtual threads (id == -1), show empty state
+        final messages = widget.thread.id == -1 
+            ? <ChatMessage>[]
+            : (chatService.messagesByThread[widget.thread.id] ?? []);
         final authService = context.read<AuthService>();
         final currentUserId = authService.userId;
-        final peerUserId = widget.thread?.peerUserId;
-        final hasUnread = _hasUnreadMessages(messages, currentUserId, peerUserId);
+        final isAdminChat = widget.thread.isAdminChat;
+        final isAdminViewer = authService.isAdmin;
+        final hasUnread = _hasUnreadMessages(
+          messages,
+          currentUserId,
+          isAdminChat,
+          isAdminViewer,
+          widget.thread.peerUserId,
+        );
         if (hasUnread) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) {
@@ -333,10 +371,19 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           itemCount: messages.length,
           itemBuilder: (context, index) {
             final message = messages[index];
-            final isOwn = currentUserId != null
-                ? message.senderId == currentUserId
-                : (peerUserId != null && message.senderId != peerUserId);
-            return _MessageBubble(message: message, isOwn: isOwn);
+            final isOwn = _isOwnMessage(
+              message,
+              currentUserId: currentUserId,
+              isAdminChat: isAdminChat,
+              isAdminViewer: isAdminViewer,
+              peerUserId: widget.thread.peerUserId,
+            );
+            final showSenderName = isAdminChat && (isAdminViewer || !isOwn);
+            return _MessageBubble(
+              message: message,
+              isOwn: isOwn,
+              showSenderName: showSenderName,
+            );
           },
         );
       },
@@ -557,14 +604,19 @@ class _NewlineIntent extends Intent {
 class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool isOwn;
+  final bool showSenderName;
 
-  const _MessageBubble({required this.message, required this.isOwn});
+  const _MessageBubble({
+    required this.message,
+    required this.isOwn,
+    required this.showSenderName,
+  });
 
   @override
   Widget build(BuildContext context) {
     final bubbleColor = isOwn ? Colors.blue.shade100 : Colors.grey.shade100;
     final align = isOwn ? CrossAxisAlignment.end : CrossAxisAlignment.start;
-    final name = isOwn ? 'You' : message.senderName;
+    final name = message.senderName;
     final controller = _buildReadOnlyController();
     final maxWidth = MediaQuery.of(context).size.width * 0.72;
 
@@ -575,14 +627,16 @@ class _MessageBubble extends StatelessWidget {
         child: Column(
           crossAxisAlignment: align,
           children: [
-            Text(
-              name,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 12,
+            if (showSenderName) ...[
+              Text(
+                name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
+              const SizedBox(height: 4),
+            ],
             ConstrainedBox(
               constraints: BoxConstraints(maxWidth: maxWidth),
               child: Container(

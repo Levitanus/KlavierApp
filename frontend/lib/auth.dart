@@ -33,7 +33,16 @@ class AuthService extends ChangeNotifier {
         _roles = [];
       }
       if (payload['user_id'] != null) {
-        _userId = payload['user_id'] as int;
+        final rawUserId = payload['user_id'];
+        if (rawUserId is int) {
+          _userId = rawUserId;
+        } else if (rawUserId is String) {
+          _userId = int.tryParse(rawUserId);
+        } else if (rawUserId is num) {
+          _userId = rawUserId.toInt();
+        } else {
+          _userId = null;
+        }
       } else {
         _userId = null;
       }

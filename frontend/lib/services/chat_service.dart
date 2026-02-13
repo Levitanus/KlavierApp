@@ -13,6 +13,8 @@ class ChatService extends ChangeNotifier {
   final WebSocketService wsService;
   
   List<ChatThread> threads = [];
+  List<ChatThread> personalThreads = [];
+  List<ChatThread> adminThreads = [];
   Map<int, List<ChatMessage>> messagesByThread = {};
   List<RelatedTeacher> relatedTeachers = [];
   List<ChatUserOption> availableUsers = [];
@@ -22,6 +24,10 @@ class ChatService extends ChangeNotifier {
   String? errorMessage;
   String currentMode = 'personal'; // 'personal' or 'admin'
   bool _threadsLoaded = false;
+  bool _isAdminUser = false;
+  bool _adminCountsLoaded = false;
+  int personalUnreadCount = 0;
+  int adminUnreadCount = 0;
   
   // Track subscribed threads and listening state
   Set<int> subscribedThreads = {};
@@ -38,6 +44,8 @@ class ChatService extends ChangeNotifier {
   }
 
   String get token => _token;
+  bool get isAdminUser => _isAdminUser;
+  int get totalUnreadCount => personalUnreadCount + adminUnreadCount;
 
   void updateToken(String token) {
     if (token == _token) return;
@@ -50,10 +58,23 @@ class ChatService extends ChangeNotifier {
     _currentUserId = userId;
   }
 
+  void updateIsAdmin(bool isAdmin) {
+    _isAdminUser = isAdmin;
+    if (!_isAdminUser) {
+      _adminCountsLoaded = false;
+      adminThreads = [];
+      adminUnreadCount = 0;
+    }
+  }
+
   Future<void> ensureThreadsLoaded({String mode = 'personal'}) async {
-    if (_threadsLoaded) return;
+    if (_threadsLoaded && (!_isAdminUser || _adminCountsLoaded)) return;
     await loadThreads(mode: mode);
     _threadsLoaded = true;
+    if (_isAdminUser && !_adminCountsLoaded) {
+      await loadThreads(mode: 'admin', setCurrent: false);
+      _adminCountsLoaded = true;
+    }
     _startThreadPolling();
   }
 
@@ -61,14 +82,20 @@ class ChatService extends ChangeNotifier {
     _threadPollTimer?.cancel();
     _threadPollTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       loadThreads(mode: currentMode);
+      if (_isAdminUser) {
+        final otherMode = currentMode == 'admin' ? 'personal' : 'admin';
+        loadThreads(mode: otherMode, setCurrent: false);
+      }
     });
   }
 
-  Future<void> loadThreads({String mode = 'personal'}) async {
-    isLoading = true;
-    errorMessage = null;
-    currentMode = mode;
-    notifyListeners();
+  Future<void> loadThreads({String mode = 'personal', bool setCurrent = true}) async {
+    if (setCurrent) {
+      isLoading = true;
+      errorMessage = null;
+      currentMode = mode;
+      notifyListeners();
+    }
 
     try {
       final response = await http.get(
@@ -78,20 +105,44 @@ class ChatService extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        threads = data.map((t) => ChatThread.fromJson(t as Map<String, dynamic>)).toList();
-        errorMessage = null;
-        for (final thread in threads) {
+        final loadedThreads = data
+            .map((t) => ChatThread.fromJson(t as Map<String, dynamic>))
+            .toList();
+
+        if (mode == 'admin') {
+          adminThreads = loadedThreads;
+          adminUnreadCount = _calculateUnreadCount(loadedThreads);
+        } else {
+          personalThreads = loadedThreads;
+          personalUnreadCount = _calculateUnreadCount(loadedThreads);
+        }
+
+        // Subscribe to all loaded threads for real-time updates
+        for (final thread in loadedThreads) {
           _subscribeToThread(thread.id);
         }
-      } else {
+
+        if (setCurrent) {
+          threads = loadedThreads;
+          errorMessage = null;
+        }
+      } else if (setCurrent) {
         errorMessage = 'Failed to load threads: ${response.statusCode}';
       }
     } catch (e) {
-      errorMessage = 'Error loading threads: $e';
+      if (setCurrent) {
+        errorMessage = 'Error loading threads: $e';
+      }
     }
 
-    isLoading = false;
+    if (setCurrent) {
+      isLoading = false;
+    }
     notifyListeners();
+  }
+
+  int _calculateUnreadCount(List<ChatThread> items) {
+    return items.fold<int>(0, (sum, thread) => sum + thread.unreadCount);
   }
 
   Future<int> loadThreadMessages(
@@ -235,6 +286,8 @@ class ChatService extends ChangeNotifier {
         if (!alreadyExists) {
           existing.insert(0, newMessage);
         }
+      } else {
+        messagesByThread[threadId] = [newMessage];
       }
 
       _updateThreadPreview(threadId, newMessage, incrementUnread: !isOwn);
@@ -249,26 +302,65 @@ class ChatService extends ChangeNotifier {
     ChatMessage newMessage, {
     required bool incrementUnread,
   }) {
+    // Update in current mode list
     final index = threads.indexWhere((thread) => thread.id == threadId);
-    if (index == -1) {
-      _scheduleThreadRefresh();
-      return;
+    if (index != -1) {
+      final thread = threads[index];
+      final updatedThread = ChatThread(
+        id: thread.id,
+        participantAId: thread.participantAId,
+        participantBId: thread.participantBId,
+        peerUserId: thread.peerUserId,
+        peerName: thread.peerName,
+        isAdminChat: thread.isAdminChat,
+        lastMessage: newMessage,
+        updatedAt: newMessage.createdAt,
+        unreadCount: incrementUnread ? thread.unreadCount + 1 : thread.unreadCount,
+      );
+
+      threads[index] = updatedThread;
     }
 
-    final thread = threads[index];
-    final updatedThread = ChatThread(
-      id: thread.id,
-      participantAId: thread.participantAId,
-      participantBId: thread.participantBId,
-      peerUserId: thread.peerUserId,
-      peerName: thread.peerName,
-      isAdminChat: thread.isAdminChat,
-      lastMessage: newMessage,
-      updatedAt: newMessage.createdAt,
-      unreadCount: incrementUnread ? thread.unreadCount + 1 : thread.unreadCount,
-    );
+    // Update in personal list if present
+    final pIndex = personalThreads.indexWhere((thread) => thread.id == threadId);
+    if (pIndex != -1) {
+      final thread = personalThreads[pIndex];
+      personalThreads[pIndex] = ChatThread(
+        id: thread.id,
+        participantAId: thread.participantAId,
+        participantBId: thread.participantBId,
+        peerUserId: thread.peerUserId,
+        peerName: thread.peerName,
+        isAdminChat: thread.isAdminChat,
+        lastMessage: newMessage,
+        updatedAt: newMessage.createdAt,
+        unreadCount: incrementUnread ? thread.unreadCount + 1 : thread.unreadCount,
+      );
+      personalUnreadCount = _calculateUnreadCount(personalThreads);
+    }
 
-    threads[index] = updatedThread;
+    // Update in admin list if present
+    final aIndex = adminThreads.indexWhere((thread) => thread.id == threadId);
+    if (aIndex != -1) {
+      final thread = adminThreads[aIndex];
+      adminThreads[aIndex] = ChatThread(
+        id: thread.id,
+        participantAId: thread.participantAId,
+        participantBId: thread.participantBId,
+        peerUserId: thread.peerUserId,
+        peerName: thread.peerName,
+        isAdminChat: thread.isAdminChat,
+        lastMessage: newMessage,
+        updatedAt: newMessage.createdAt,
+        unreadCount: incrementUnread ? thread.unreadCount + 1 : thread.unreadCount,
+      );
+      adminUnreadCount = _calculateUnreadCount(adminThreads);
+    }
+
+    // If thread not found in any list, schedule full reload
+    if (index == -1 && pIndex == -1 && aIndex == -1) {
+      _scheduleThreadRefresh();
+    }
   }
 
   void _scheduleThreadRefresh() {
@@ -433,7 +525,52 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  Future<bool> sendAdminMessage(Map<String, dynamic> quillJson) async {
+  Future<ChatThread?> getOrCreateAdminThread() async {
+    errorMessage = null;
+
+    try {
+      // Reload personal threads to make sure we have latest
+      await loadThreads(mode: 'personal', setCurrent: false);
+
+      // Check if admin thread exists
+      final existingThread = personalThreads.firstWhere(
+        (t) => t.isAdminChat,
+        orElse: () => ChatThread(
+          id: -1,
+          participantAId: 0,
+          participantBId: null,
+          peerUserId: null,
+          peerName: null,
+          isAdminChat: false,
+          lastMessage: null,
+          updatedAt: DateTime.now(),
+          unreadCount: 0,
+        ),
+      );
+
+      if (existingThread.id != -1) {
+        return existingThread;
+      }
+
+      // Return virtual thread that will be created on first message
+      return ChatThread(
+        id: -1,
+        participantAId: 0,
+        participantBId: null,
+        peerUserId: null,
+        peerName: 'Administration',
+        isAdminChat: true,
+        lastMessage: null,
+        updatedAt: DateTime.now(),
+        unreadCount: 0,
+      );
+    } catch (e) {
+      errorMessage = 'Error finding admin thread: $e';
+      return null;
+    }
+  }
+
+  Future<int?> sendAdminMessage(Map<String, dynamic> quillJson) async {
     errorMessage = null;
 
     try {
@@ -447,16 +584,20 @@ class ChatService extends ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
-        // Reload threads to show the new admin thread
-        await loadThreads(mode: currentMode);
-        return true;
+        final data = json.decode(response.body);
+        final threadId = data['thread_id'] as int?;
+        
+        // Reload personal threads to get the new/updated thread
+        await loadThreads(mode: 'personal', setCurrent: false);
+        
+        return threadId;
       } else {
         errorMessage = 'Failed to send message: ${response.statusCode}';
-        return false;
+        return null;
       }
     } catch (e) {
       errorMessage = 'Error sending message: $e';
-      return false;
+      return null;
     }
   }
 

@@ -94,6 +94,7 @@ class MyApp extends StatelessWidget {
             );
             service.updateToken(authService.token ?? '');
             service.updateCurrentUserId(authService.userId);
+            service.updateIsAdmin(authService.isAdmin);
             if (authService.isAuthenticated) {
               service.ensureThreadsLoaded();
             }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'auth.dart';
 import 'models/chat.dart';
 import 'services/chat_service.dart';
 import 'screens/chat_conversation.dart';
@@ -12,33 +13,44 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMixin {
-  late TabController? _tabController;
-  bool isAdmin = false;
+  late final TabController _tabController;
+  late final bool _isAdmin;
+  int _activeTabIndex = 0;
 
   @override
   void initState() {
     super.initState();
-    _initializeScreen();
-  }
-
-  void _initializeScreen() {
-    final chatService = context.read<ChatService>();
+    final authService = context.read<AuthService>();
+    _isAdmin = authService.isAdmin;
+    _tabController = TabController(length: _isAdmin ? 2 : 1, vsync: this);
+    if (_isAdmin) {
+      _tabController.addListener(_handleTabChange);
+    }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Load threads and related teachers after first build
+      final chatService = context.read<ChatService>();
       chatService.loadThreads(mode: 'personal');
-      chatService.loadRelatedTeachers();
+      if (!_isAdmin) {
+        chatService.loadRelatedTeachers();
+      }
     });
-
-    // Check if user is admin - this would require access to user role info
-    // For now, we'll assume based on whether they can see admin chat
-    _tabController = TabController(length: 1, vsync: this);
   }
 
   @override
   void dispose() {
-    _tabController?.dispose();
+    _tabController.dispose();
     super.dispose();
+  }
+
+  void _handleTabChange() {
+    if (_tabController.indexIsChanging) return;
+    if (_activeTabIndex == _tabController.index) return;
+    setState(() {
+      _activeTabIndex = _tabController.index;
+    });
+    final chatService = context.read<ChatService>();
+    final mode = _activeTabIndex == 1 ? 'admin' : 'personal';
+    chatService.loadThreads(mode: mode);
   }
 
   void _openConversation(ChatThread thread) {
@@ -117,22 +129,53 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     }
   }
 
-  void _sendAdminMessage() {
-    // Open empty message composer for admin
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const ChatConversationScreen(thread: null, toAdmin: true),
-      ),
-    );
+  Future<void> _sendAdminMessage() async {
+    final chatService = context.read<ChatService>();
+    final thread = await chatService.getOrCreateAdminThread();
+
+    if (!mounted) return;
+
+    if (thread == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to open admin chat')),
+      );
+      return;
+    }
+
+    _openConversation(thread);
   }
 
   @override
   Widget build(BuildContext context) {
+    final isAdminTab = _isAdmin && _activeTabIndex == 1;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Messages'),
         elevation: 0,
+        bottom: _isAdmin
+            ? PreferredSize(
+                preferredSize: const Size.fromHeight(48),
+                child: Consumer<ChatService>(
+                  builder: (context, chatService, _) => TabBar(
+                    controller: _tabController,
+                    tabs: [
+                      Tab(
+                        child: _TabLabel(
+                          label: 'Chats',
+                          count: chatService.personalUnreadCount,
+                        ),
+                      ),
+                      Tab(
+                        child: _TabLabel(
+                          label: 'Admin',
+                          count: chatService.adminUnreadCount,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : null,
       ),
       body: Consumer<ChatService>(
         builder: (context, chatService, _) {
@@ -168,17 +211,22 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
               final thread = chatService.threads[index];
               return _ThreadListTile(
                 thread: thread,
+                showAdminPeerName: isAdminTab,
                 onTap: () => _openConversation(thread),
               );
             },
           );
         },
       ),
-      bottomNavigationBar: _BottomChatToolbar(
-        onNewChat: _showNewChatDialog,
-        onMessageTeacher: _showTeacherSelectionDialog,
-        onMessageAdmin: _sendAdminMessage,
-      ),
+      bottomNavigationBar: isAdminTab
+          ? null
+          : _BottomChatToolbar(
+              onNewChat: _showNewChatDialog,
+              onMessageTeacher: _showTeacherSelectionDialog,
+              onMessageAdmin: _sendAdminMessage,
+              showAdminButton: !_isAdmin,
+              showTeacherButton: !_isAdmin,
+            ),
     );
   }
 }
@@ -186,16 +234,20 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 class _ThreadListTile extends StatelessWidget {
   final ChatThread thread;
   final VoidCallback onTap;
+  final bool showAdminPeerName;
 
   const _ThreadListTile({
     required this.thread,
     required this.onTap,
+    required this.showAdminPeerName,
   });
 
   @override
   Widget build(BuildContext context) {
     final lastMsg = thread.lastMessage;
-    final displayName = thread.isAdminChat ? 'Administration' : (thread.peerName ?? 'Unknown');
+    final displayName = thread.isAdminChat && !showAdminPeerName
+        ? 'Administration'
+        : (thread.peerName ?? 'Unknown');
     final preview = lastMsg?.plainText ?? '(No messages)';
 
     return ListTile(
@@ -226,11 +278,15 @@ class _BottomChatToolbar extends StatelessWidget {
   final VoidCallback onNewChat;
   final VoidCallback onMessageTeacher;
   final VoidCallback onMessageAdmin;
+  final bool showAdminButton;
+  final bool showTeacherButton;
 
   const _BottomChatToolbar({
     required this.onNewChat,
     required this.onMessageTeacher,
     required this.onMessageAdmin,
+    required this.showAdminButton,
+    required this.showTeacherButton,
   });
 
   @override
@@ -245,18 +301,22 @@ class _BottomChatToolbar extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            ElevatedButton.icon(
-              onPressed: onMessageAdmin,
-              icon: const Icon(Icons.shield),
-              label: const Text('Admin'),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(
-              onPressed: onMessageTeacher,
-              icon: const Icon(Icons.person),
-              label: const Text('Teachers'),
-            ),
-            const SizedBox(width: 8),
+            if (showAdminButton) ...[
+              ElevatedButton.icon(
+                onPressed: onMessageAdmin,
+                icon: const Icon(Icons.shield),
+                label: const Text('Admin'),
+              ),
+              const SizedBox(width: 8),
+            ],
+            if (showTeacherButton) ...[
+              ElevatedButton.icon(
+                onPressed: onMessageTeacher,
+                icon: const Icon(Icons.person),
+                label: const Text('Teachers'),
+              ),
+              const SizedBox(width: 8),
+            ],
             ElevatedButton.icon(
               onPressed: onNewChat,
               icon: const Icon(Icons.add),
@@ -265,6 +325,48 @@ class _BottomChatToolbar extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TabLabel extends StatelessWidget {
+  final String label;
+  final int count;
+
+  const _TabLabel({
+    required this.label,
+    required this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (count <= 0) {
+      return Text(label);
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.red,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+          child: Text(
+            count > 99 ? '99+' : count.toString(),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ],
     );
   }
 }
