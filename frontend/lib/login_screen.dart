@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'auth.dart';
 import 'home_screen.dart';
+import 'config/app_config.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -116,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _sendPasswordResetRequest(String username) async {
     try {
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/auth/forgot-password'),
+        Uri.parse('${AppConfig.instance.baseUrl}/api/auth/forgot-password'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'username': username}),
       );

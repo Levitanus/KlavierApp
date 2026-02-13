@@ -11,6 +11,7 @@ import 'services/hometask_service.dart';
 import 'services/chat_service.dart';
 import 'models/hometask.dart';
 import 'screens/chat_conversation.dart';
+import 'config/app_config.dart';
 
 part 'profile_screen/profile_screen_data.dart';
 part 'profile_screen/profile_screen_dialogs.dart';
@@ -43,7 +44,7 @@ class AdminUserProfilePage extends StatelessWidget {
 }
 
 abstract class _ProfileScreenStateBase extends State<ProfileScreen> {
-  static const String _baseUrl = 'http://localhost:8080';
+  static String get _baseUrl => AppConfig.instance.baseUrl;
 
   bool _isLoading = true;
   bool _isEditing = false;

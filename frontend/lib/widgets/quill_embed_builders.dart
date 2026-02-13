@@ -3,12 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:just_audio/just_audio.dart';
 import 'package:video_player/video_player.dart';
+import '../config/app_config.dart';
 
 String normalizeMediaUrl(String url) {
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url;
   }
-  return 'http://localhost:8080$url';
+  return '${AppConfig.instance.baseUrl}$url';
 }
 
 class ImageEmbedBuilder extends quill.EmbedBuilder {

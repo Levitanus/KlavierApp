@@ -25,7 +25,7 @@ class StudentInfo {
 }
 
 class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
-  static const String _baseUrl = 'http://localhost:8080';
+  static String get _baseUrl => AppConfig.instance.baseUrl;
 
   final _formKey = GlobalKey<FormState>();
   final _currentPasswordController = TextEditingController();

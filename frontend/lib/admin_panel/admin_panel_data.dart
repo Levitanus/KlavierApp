@@ -10,7 +10,7 @@ mixin _AdminPanelData on _AdminPanelStateBase {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.get(
-        Uri.parse('http://localhost:8080/api/admin/users'),
+        Uri.parse('${AppConfig.instance.baseUrl}/api/admin/users'),
         headers: {
           'Authorization': 'Bearer ${authService.token}',
         },

@@ -25,7 +25,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
 
       final response = isNewUser
           ? await http.post(
-              Uri.parse('http://localhost:8080/api/admin/users'),
+              Uri.parse('${AppConfig.instance.baseUrl}/api/admin/users'),
               headers: {
                 'Authorization': 'Bearer ${authService.token}',
                 'Content-Type': 'application/json',
@@ -33,7 +33,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
               body: jsonEncode(body),
             )
           : await http.put(
-              Uri.parse('http://localhost:8080/api/admin/users/$userId'),
+              Uri.parse('${AppConfig.instance.baseUrl}/api/admin/users/$userId'),
               headers: {
                 'Authorization': 'Bearer ${authService.token}',
                 'Content-Type': 'application/json',
@@ -73,7 +73,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
         Uri.parse(
-            'http://localhost:8080/api/admin/users/${user.id}/generate-reset-link'),
+          '${AppConfig.instance.baseUrl}/api/admin/users/${user.id}/generate-reset-link'),
         headers: {
           'Authorization': 'Bearer ${authService.token}',
         },
@@ -149,7 +149,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/admin/users/$userId/make-student'),
+        Uri.parse('${AppConfig.instance.baseUrl}/api/admin/users/$userId/make-student'),
         headers: {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
@@ -189,7 +189,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/admin/users/$userId/make-parent'),
+        Uri.parse('${AppConfig.instance.baseUrl}/api/admin/users/$userId/make-parent'),
         headers: {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
@@ -227,7 +227,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/admin/users/$userId/make-teacher'),
+        Uri.parse('${AppConfig.instance.baseUrl}/api/admin/users/$userId/make-teacher'),
         headers: {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
@@ -264,7 +264,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/admin/students'),
+        Uri.parse('${AppConfig.instance.baseUrl}/api/admin/students'),
         headers: {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
@@ -309,7 +309,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/admin/parents'),
+        Uri.parse('${AppConfig.instance.baseUrl}/api/admin/parents'),
         headers: {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
@@ -353,7 +353,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/admin/teachers'),
+        Uri.parse('${AppConfig.instance.baseUrl}/api/admin/teachers'),
         headers: {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',

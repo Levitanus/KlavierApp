@@ -4,6 +4,7 @@ import 'auth.dart';
 import 'models/chat.dart';
 import 'services/chat_service.dart';
 import 'screens/chat_conversation.dart';
+import 'config/app_config.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -384,7 +385,7 @@ class _NewChatDialogState extends State<_NewChatDialog> {
   List<ChatUserOption> _filteredUsers = [];
   bool _isLoading = false;
   String? _errorMessage;
-  static const String _baseUrl = 'http://localhost:8080';
+  static String get _baseUrl => AppConfig.instance.baseUrl;
 
   @override
   void initState() {

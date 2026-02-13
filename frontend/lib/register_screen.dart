@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'auth.dart';
+import 'config/app_config.dart';
 
 class RegisterScreen extends StatefulWidget {
   final String token;
@@ -14,7 +15,7 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  static const String _baseUrl = 'http://localhost:8080';
+  static String get _baseUrl => AppConfig.instance.baseUrl;
 
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();

@@ -3,10 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import 'package:jwt_decode/jwt_decode.dart';
+import 'config/app_config.dart';
 
 class AuthService extends ChangeNotifier {
   static const String _tokenKey = 'jwt_token';
-  static const String _baseUrl = 'http://localhost:8080'; // Adjust to your backend URL
+  static String get _baseUrl => AppConfig.instance.baseUrl;
   
   String? _token;
   bool _isAuthenticated = false;

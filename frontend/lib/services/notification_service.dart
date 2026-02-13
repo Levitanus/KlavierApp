@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/notification.dart';
 import '../auth.dart';
+import '../config/app_config.dart';
 
 class NotificationService extends ChangeNotifier {
   final AuthService authService;
@@ -16,8 +17,8 @@ class NotificationService extends ChangeNotifier {
 
   NotificationService({
     required this.authService,
-    this.baseUrl = 'http://localhost:8080',
-  }) {
+    String? baseUrl,
+  }) : baseUrl = baseUrl ?? AppConfig.instance.baseUrl {
     // Start polling for notifications every 30 seconds
     _startPolling();
   }

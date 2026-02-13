@@ -315,7 +315,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
     for (var studentUser in studentUsers) {
       try {
         final response = await http.get(
-          Uri.parse('http://localhost:8080/api/students/${studentUser.id}'),
+          Uri.parse('${AppConfig.instance.baseUrl}/api/students/${studentUser.id}'),
           headers: {'Authorization': 'Bearer ${authService.token}'},
         );
         if (response.statusCode == 200) {
@@ -655,7 +655,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
     for (var studentUser in studentUsers) {
       try {
         final response = await http.get(
-          Uri.parse('http://localhost:8080/api/students/${studentUser.id}'),
+          Uri.parse('${AppConfig.instance.baseUrl}/api/students/${studentUser.id}'),
           headers: {'Authorization': 'Bearer ${authService.token}'},
         );
         if (response.statusCode == 200) {

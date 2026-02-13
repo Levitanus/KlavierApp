@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../auth.dart';
 import '../models/hometask.dart';
+import '../config/app_config.dart';
 
 class HometaskService extends ChangeNotifier {
   final AuthService authService;
@@ -18,8 +19,8 @@ class HometaskService extends ChangeNotifier {
 
   HometaskService({
     required this.authService,
-    this.baseUrl = 'http://localhost:8080',
-  }) {
+    String? baseUrl,
+  }) : baseUrl = baseUrl ?? AppConfig.instance.baseUrl {
     _lastToken = authService.token;
   }
 

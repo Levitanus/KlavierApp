@@ -4,8 +4,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../models/chat.dart';
 import 'websocket_service.dart';
+import '../config/app_config.dart';
 
-const String _baseUrl = 'http://localhost:8080/chat';
+String get _baseUrl => '${AppConfig.instance.baseUrl}/chat';
 
 class ChatService extends ChangeNotifier {
   String _token;
@@ -786,7 +787,7 @@ class ChatService extends ChangeNotifier {
     if (_token.isEmpty) return null;
 
     try {
-      final uri = Uri.parse('http://localhost:8080/api/media/upload')
+        final uri = Uri.parse('${AppConfig.instance.baseUrl}/api/media/upload')
           .replace(queryParameters: {'type': mediaType});
       final request = http.MultipartRequest('POST', uri);
 

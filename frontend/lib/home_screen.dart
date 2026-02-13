@@ -13,6 +13,7 @@ import 'services/chat_service.dart';
 import 'feeds_screen.dart';
 import 'chat_screen.dart';
 import 'notifications_screen.dart';
+import 'config/app_config.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? adminUsername;
@@ -33,7 +34,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  static const String _baseUrl = 'http://localhost:8080';
+  static String get _baseUrl => AppConfig.instance.baseUrl;
   int _selectedTabIndex = 0;
   int? _selectedDrawerIndex;
   Widget? _currentPage;

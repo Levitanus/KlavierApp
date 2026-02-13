@@ -5,6 +5,7 @@ import '../auth.dart';
 import '../models/feed.dart';
 import '../models/chat.dart';
 import 'websocket_service.dart';
+import '../config/app_config.dart';
 
 class FeedService extends ChangeNotifier {
   final AuthService authService;
@@ -15,8 +16,8 @@ class FeedService extends ChangeNotifier {
   FeedService({
     required this.authService,
     required this.wsService,
-    this.baseUrl = 'http://localhost:8080',
-  }) {
+    String? baseUrl,
+  }) : baseUrl = baseUrl ?? AppConfig.instance.baseUrl {
     _lastToken = authService.token;
     wsService.onConnectionStateChanged(_connectionCallback);
   }

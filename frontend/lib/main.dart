@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'config/app_config.dart';
 import 'auth.dart';
 import 'services/notification_service.dart';
 import 'services/hometask_service.dart';
@@ -14,8 +15,9 @@ import 'home_screen.dart';
 import 'reset_password_screen.dart';
 import 'register_screen.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AppConfig.load();
   // Use path-based URL strategy instead of hash-based
   usePathUrlStrategy();
   runApp(const MyApp());
@@ -50,7 +52,7 @@ class MyApp extends StatelessWidget {
           create: (context) => WebSocketService(
             authService: context.read<AuthService>(),
             token: context.read<AuthService>().token ?? '',
-            serverUrl: 'http://localhost:8080',
+            serverUrl: AppConfig.instance.baseUrl,
           ),
           update: (context, authService, previous) {
             final token = authService.token ?? '';
@@ -58,7 +60,7 @@ class MyApp extends StatelessWidget {
                 ? WebSocketService(
                     authService: authService,
                     token: token,
-                    serverUrl: 'http://localhost:8080',
+                    serverUrl: AppConfig.instance.baseUrl,
                   )
                 : previous;
             // Connect if token is available and not already connected

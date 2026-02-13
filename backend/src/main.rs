@@ -106,10 +106,10 @@ async fn main() -> std::io::Result<()> {
         ws_server: websockets::WsServerActor::new(),
     });
 
-    info!("Starting server at http://127.0.0.1:8080");
+    info!("Starting server at http://0.0.0.0:8080");
 
     HttpServer::new(move || create_app(app_state.clone()))
-        .bind(("127.0.0.1", 8080))?
+        .bind(("0.0.0.0", 8080))?
         .run()
         .await
 }
