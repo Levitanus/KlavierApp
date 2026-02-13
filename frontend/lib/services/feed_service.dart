@@ -17,6 +17,7 @@ class FeedService extends ChangeNotifier {
     this.baseUrl = 'http://localhost:8080',
   }) {
     _lastToken = authService.token;
+    wsService.onConnectionStateChanged(_connectionCallback);
   }
 
   List<Feed> _feeds = [];
@@ -25,6 +26,7 @@ class FeedService extends ChangeNotifier {
   final Set<int> _subscribedPosts = {};
   bool _wsListenersRegistered = false;
   late final WsMessageCallback _commentCallback = _handleCommentMessage;
+  late final WsConnectionCallback _connectionCallback = _handleConnectionChange;
 
   List<Feed> get feeds => _feeds;
   bool get isLoadingFeeds => _isLoadingFeeds;
@@ -335,7 +337,18 @@ class FeedService extends ChangeNotifier {
     if (_subscribedPosts.contains(postId)) return;
     _subscribedPosts.add(postId);
     _ensureWsListeners();
+    if (!wsService.isConnected && !wsService.isConnecting) {
+      wsService.connect();
+    }
     wsService.subscribeToPost(postId);
+  }
+
+  void _handleConnectionChange(bool connected) {
+    if (!connected) return;
+    _ensureWsListeners();
+    for (final postId in _subscribedPosts) {
+      wsService.subscribeToPost(postId);
+    }
   }
 
   void _ensureWsListeners() {
