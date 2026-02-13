@@ -1,9 +1,10 @@
 use actix_web::{web, HttpServer};
-use klavierapp_backend::{create_app, init_db, AppState, email::EmailService};
+use klavierapp_backend::{create_app, init_db, AppState, email::EmailService, websockets};
 use klavierapp_backend::storage::LocalStorage;
 use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
+use log::{info, warn};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -43,14 +44,14 @@ async fn main() -> std::io::Result<()> {
             format!("Failed to initialize database: {}", e)
         ))?;
 
-    println!("Database initialized successfully");
+    info!("Database initialized successfully");
 
     // Initialize email service
     let email_service = EmailService::from_env()
         .map(Arc::new)
         .unwrap_or_else(|e| {
-            println!("Warning: Email service not configured: {}", e);
-            println!("Password reset emails will not be sent. Set SMTP environment variables to enable email.");
+            warn!("Email service not configured: {}", e);
+            warn!("Password reset emails will not be sent. Set SMTP environment variables to enable email.");
             // For development, we'll create a dummy service with empty values
             // In production, you should ensure proper email configuration
             std::env::set_var("FROM_EMAIL", "noreply@example.com");
@@ -81,7 +82,7 @@ async fn main() -> std::io::Result<()> {
             format!("Failed to create media directory: {}", e)
         ))?;
     
-    println!("Upload directory: {:?}", profile_images_dir);
+    info!("Upload directory: {:?}", profile_images_dir);
 
     let storage = Arc::new(LocalStorage::new(
         profile_images_dir.clone(),
@@ -102,9 +103,10 @@ async fn main() -> std::io::Result<()> {
         profile_images_dir,
         media_storage,
         media_dir,
+        ws_server: websockets::WsServerActor::new(),
     });
 
-    println!("Starting server at http://127.0.0.1:8080");
+    info!("Starting server at http://127.0.0.1:8080");
 
     HttpServer::new(move || create_app(app_state.clone()))
         .bind(("127.0.0.1", 8080))?

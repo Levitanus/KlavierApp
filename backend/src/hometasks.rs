@@ -3,6 +3,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::{FromRow, PgPool};
+use log::{error};
 
 use crate::models::hometask::{HometaskStatus, HometaskType};
 use crate::notification_builders::{
@@ -111,9 +112,8 @@ async fn insert_notification(
 
 async fn fetch_teacher_name(db: &PgPool, teacher_id: i32) -> String {
     sqlx::query_scalar::<_, String>(
-        "SELECT COALESCE(t.full_name, u.username)
+        "SELECT COALESCE(u.full_name, u.username)
          FROM users u
-         LEFT JOIN teachers t ON u.id = t.user_id
          WHERE u.id = $1",
     )
     .bind(teacher_id)
@@ -125,9 +125,8 @@ async fn fetch_teacher_name(db: &PgPool, teacher_id: i32) -> String {
 
 async fn fetch_student_name(db: &PgPool, student_id: i32) -> String {
     sqlx::query_scalar::<_, String>(
-        "SELECT COALESCE(s.full_name, u.username)
+        "SELECT COALESCE(u.full_name, u.username)
          FROM users u
-         LEFT JOIN students s ON u.id = s.user_id
          WHERE u.id = $1",
     )
     .bind(student_id)
@@ -316,7 +315,7 @@ async fn create_hometask(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(json!({
                 "error": "Database error"
             }));
@@ -361,7 +360,7 @@ async fn create_hometask(
             {
                 Ok(id) => id,
                 Err(e) => {
-                    eprintln!("Failed to create checklist: {}", e);
+                    error!("Failed to create checklist: {}", e);
                     let _ = tx.rollback().await;
                     return HttpResponse::InternalServerError().json(json!({
                         "error": "Failed to create checklist"
@@ -406,7 +405,7 @@ async fn create_hometask(
             {
                 Ok(id) => id,
                 Err(e) => {
-                    eprintln!("Failed to create progress items: {}", e);
+                    error!("Failed to create progress items: {}", e);
                     let _ = tx.rollback().await;
                     return HttpResponse::InternalServerError().json(json!({
                         "error": "Failed to create progress items"
@@ -436,7 +435,7 @@ async fn create_hometask(
     {
         Ok(order) => order,
         Err(e) => {
-            eprintln!("Failed to get sort order: {}", e);
+            error!("Failed to get sort order: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(json!({
                 "error": "Failed to create hometask"
@@ -467,7 +466,7 @@ async fn create_hometask(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to create hometask: {}", e);
+            error!("Failed to create hometask: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(json!({
                 "error": "Failed to create hometask"
@@ -476,7 +475,7 @@ async fn create_hometask(
     };
 
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(json!({
             "error": "Failed to create hometask"
         }));
@@ -551,11 +550,10 @@ async fn list_student_hometasks(
         "SELECT h.id, h.teacher_id, h.student_id, h.title, h.description, h.status, h.due_date,
                  h.created_at, h.updated_at, h.sort_order, h.hometask_type, h.content_id,
                  c.items AS checklist_items,
-                 COALESCE(t.full_name, u.username) AS teacher_name
+                 COALESCE(u.full_name, u.username) AS teacher_name
          FROM hometasks h
          LEFT JOIN hometask_checklists c
             ON (h.hometask_type = 'checklist' OR h.hometask_type = 'progress') AND h.content_id = c.id
-            LEFT JOIN teachers t ON h.teacher_id = t.user_id
             LEFT JOIN users u ON h.teacher_id = u.id
             WHERE h.student_id = $1 AND h.status = ANY($2::hometask_status[])
               AND ($3::int IS NULL OR h.teacher_id = $3)
@@ -570,7 +568,7 @@ async fn list_student_hometasks(
     match hometasks {
         Ok(list) => HttpResponse::Ok().json(list),
         Err(e) => {
-            eprintln!("Failed to fetch hometasks: {}", e);
+            error!("Failed to fetch hometasks: {}", e);
             HttpResponse::InternalServerError().json(json!({
                 "error": "Database error"
             }))
@@ -600,7 +598,7 @@ async fn get_hometask(
             }))
         }
         Err(e) => {
-            eprintln!("Failed to fetch hometask: {}", e);
+            error!("Failed to fetch hometask: {}", e);
             return HttpResponse::InternalServerError().json(json!({
                 "error": "Database error"
             }));
@@ -649,7 +647,7 @@ async fn get_hometask(
             "error": "Hometask not found"
         })),
         Err(e) => {
-            eprintln!("Failed to fetch hometask: {}", e);
+            error!("Failed to fetch hometask: {}", e);
             HttpResponse::InternalServerError().json(json!({
                 "error": "Database error"
             }))
@@ -690,7 +688,7 @@ async fn update_hometask_checklist(
             }))
         }
         Err(e) => {
-            eprintln!("Failed to fetch hometask: {}", e);
+            error!("Failed to fetch hometask: {}", e);
             return HttpResponse::InternalServerError().json(json!({
                 "error": "Database error"
             }));
@@ -699,7 +697,7 @@ async fn update_hometask_checklist(
 
     let (student_id, teacher_id, status, hometask_type, content_id) = hometask;
 
-    eprintln!(
+    error!(
         "Checklist update: user_id={}, student_id={}, roles={:?}",
         current_user_id,
         student_id,
@@ -820,7 +818,7 @@ async fn update_hometask_checklist(
     match result {
         Ok(_) => HttpResponse::Ok().json(json!({ "status": "updated" })),
         Err(e) => {
-            eprintln!("Failed to update checklist: {}", e);
+            error!("Failed to update checklist: {}", e);
             HttpResponse::InternalServerError().json(json!({
                 "error": "Failed to update checklist"
             }))
@@ -862,7 +860,7 @@ async fn update_hometask_status(
             }))
         }
         Err(e) => {
-            eprintln!("Failed to fetch hometask: {}", e);
+            error!("Failed to fetch hometask: {}", e);
             return HttpResponse::InternalServerError().json(json!({
                 "error": "Database error"
             }));
@@ -873,7 +871,7 @@ async fn update_hometask_status(
 
     match payload.status {
         HometaskStatus::CompletedByStudent => {
-            eprintln!(
+            error!(
                 "Hometask status update: user_id={}, student_id={}, roles={:?}, status={:?}",
                 current_user_id,
                 student_id,
@@ -1053,7 +1051,7 @@ async fn update_hometask_status(
             HttpResponse::Ok().json(json!({ "status": "updated" }))
         }
         Err(e) => {
-            eprintln!("Failed to update hometask status: {}", e);
+            error!("Failed to update hometask status: {}", e);
             HttpResponse::InternalServerError().json(json!({
                 "error": "Failed to update hometask"
             }))
@@ -1137,7 +1135,7 @@ async fn update_hometask_order(
     let count = match count {
         Ok(count) => count,
         Err(e) => {
-            eprintln!("Failed to validate hometask order: {}", e);
+            error!("Failed to validate hometask order: {}", e);
             return HttpResponse::InternalServerError().json(json!({
                 "error": "Database error"
             }));
@@ -1153,7 +1151,7 @@ async fn update_hometask_order(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(json!({
                 "error": "Database error"
             }));
@@ -1179,7 +1177,7 @@ async fn update_hometask_order(
         };
 
         if let Err(e) = update_query.execute(&mut *tx).await {
-            eprintln!("Failed to update hometask order: {}", e);
+            error!("Failed to update hometask order: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(json!({
                 "error": "Failed to update hometask order"
@@ -1188,7 +1186,7 @@ async fn update_hometask_order(
     }
 
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit hometask order update: {}", e);
+        error!("Failed to commit hometask order update: {}", e);
         return HttpResponse::InternalServerError().json(json!({
             "error": "Failed to update hometask order"
         }));
@@ -1235,7 +1233,7 @@ async fn verify_teacher_student_relation(
     match relation_exists {
         Ok(exists) => Ok(exists),
         Err(e) => {
-            eprintln!("Failed to verify teacher-student relation: {}", e);
+            error!("Failed to verify teacher-student relation: {}", e);
             Err(HttpResponse::InternalServerError().json(json!({
                 "error": "Database error"
             })))

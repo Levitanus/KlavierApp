@@ -5,6 +5,7 @@ CREATE TYPE role_status AS ENUM ('active', 'archived');
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     username TEXT NOT NULL UNIQUE,
+    full_name TEXT NOT NULL,
     password_hash TEXT NOT NULL,
     email TEXT,
     phone TEXT,
@@ -61,8 +62,8 @@ INSERT INTO roles (name) VALUES
 
 -- Insert initial user
 -- Password: "admin" hashed with Argon2id
-INSERT INTO users (username, password_hash) 
-VALUES ('levitanus', '$argon2id$v=19$m=19456,t=2,p=1$b9NSOm601oo4mk6MMcRN8w$bPUHwI7KVVAAf2Myosau4KUxO28X+MJ6Q7oL4ZCU1fY');
+INSERT INTO users (username, full_name, password_hash) 
+VALUES ('levitanus', 'Timofei Kazantsev', '$argon2id$v=19$m=19456,t=2,p=1$b9NSOm601oo4mk6MMcRN8w$bPUHwI7KVVAAf2Myosau4KUxO28X+MJ6Q7oL4ZCU1fY');
 
 -- Assign admin role to levitanus
 INSERT INTO user_roles (user_id, role_id)
@@ -99,7 +100,6 @@ CREATE INDEX IF NOT EXISTS idx_notifications_body_gin ON notifications USING gin
 -- Create students table with additional details
 CREATE TABLE IF NOT EXISTS students (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    full_name TEXT NOT NULL,
     address TEXT NOT NULL,
     birthday DATE NOT NULL,
     status role_status NOT NULL DEFAULT 'active',
@@ -112,7 +112,6 @@ CREATE TABLE IF NOT EXISTS students (
 -- Create parents table with additional details
 CREATE TABLE IF NOT EXISTS parents (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    full_name TEXT NOT NULL,
     status role_status NOT NULL DEFAULT 'active',
     archived_at TIMESTAMPTZ,
     archived_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -123,7 +122,6 @@ CREATE TABLE IF NOT EXISTS parents (
 -- Create teachers table with additional details
 CREATE TABLE IF NOT EXISTS teachers (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    full_name TEXT NOT NULL,
     status role_status NOT NULL DEFAULT 'active',
     archived_at TIMESTAMPTZ,
     archived_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
@@ -170,13 +168,11 @@ CREATE TABLE IF NOT EXISTS teacher_student_relations (
 );
 
 -- Create indexes for role tables
-CREATE INDEX IF NOT EXISTS idx_students_full_name ON students(full_name);
+CREATE INDEX IF NOT EXISTS idx_users_full_name ON users(full_name);
 CREATE INDEX IF NOT EXISTS idx_students_status ON students(status);
 CREATE INDEX IF NOT EXISTS idx_students_archived_at ON students(archived_at);
-CREATE INDEX IF NOT EXISTS idx_parents_full_name ON parents(full_name);
 CREATE INDEX IF NOT EXISTS idx_parents_status ON parents(status);
 CREATE INDEX IF NOT EXISTS idx_parents_archived_at ON parents(archived_at);
-CREATE INDEX IF NOT EXISTS idx_teachers_full_name ON teachers(full_name);
 CREATE INDEX IF NOT EXISTS idx_teachers_status ON teachers(status);
 CREATE INDEX IF NOT EXISTS idx_teachers_archived_at ON teachers(archived_at);
 CREATE INDEX IF NOT EXISTS idx_parent_student_parent ON parent_student_relations(parent_user_id);
@@ -295,20 +291,94 @@ CREATE INDEX IF NOT EXISTS idx_media_files_created_by ON media_files(created_by_
 CREATE INDEX IF NOT EXISTS idx_media_files_type ON media_files(media_type);
 
 -- ============================================================================
--- Chat (Matrix mapping)
+-- Chat System
 -- ============================================================================
 
-CREATE TABLE IF NOT EXISTS matrix_accounts (
-    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    matrix_user_id TEXT NOT NULL UNIQUE,
-    access_token TEXT,
-    device_id TEXT,
+-- Create message delivery state enum
+CREATE TYPE chat_message_state AS ENUM ('sent', 'delivered', 'read');
+
+-- Create chat_threads table
+-- For peer-to-peer chats: participant_a_id and participant_b_id are the two users
+-- For admin chats: participant_a_id is the user, participant_b_id is NULL (admin is abstract concept)
+CREATE TABLE IF NOT EXISTS chat_threads (
+    id SERIAL PRIMARY KEY,
+    participant_a_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    participant_b_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    is_admin_chat BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    -- Ensure admin chats have participant_b_id as NULL
+    CONSTRAINT admin_chat_no_participant_b CHECK (
+        (is_admin_chat = FALSE AND participant_b_id IS NOT NULL) OR
+        (is_admin_chat = TRUE AND participant_b_id IS NULL)
+    ),
+    -- Ensure no self-messaging in peer chats
+    CONSTRAINT no_self_peer_chat CHECK (
+        (is_admin_chat = TRUE) OR (participant_a_id != participant_b_id)
+    )
+);
+
+-- Create chat_messages table
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id SERIAL PRIMARY KEY,
+    thread_id INTEGER NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
+    sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body JSONB NOT NULL, -- Quill document JSON
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TRIGGER update_matrix_accounts_updated_at
-    BEFORE UPDATE ON matrix_accounts
+-- Create attachment type enum for chat messages
+CREATE TYPE chat_attachment_type AS ENUM ('image', 'audio', 'voice', 'video', 'file');
+
+-- Create chat_message_attachments table
+CREATE TABLE IF NOT EXISTS chat_message_attachments (
+    id SERIAL PRIMARY KEY,
+    message_id INTEGER NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+    media_id INTEGER NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
+    attachment_type chat_attachment_type NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Create message_receipts table for 3-state delivery tracking
+CREATE TABLE IF NOT EXISTS message_receipts (
+    id SERIAL PRIMARY KEY,
+    message_id INTEGER NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+    recipient_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    state chat_message_state NOT NULL DEFAULT 'sent',
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (message_id, recipient_id)
+);
+
+-- Create chat_presence table for online/offline status
+CREATE TABLE IF NOT EXISTS chat_presence (
+    user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    is_online BOOLEAN NOT NULL DEFAULT FALSE,
+    last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- Create indexes for chat tables
+CREATE INDEX IF NOT EXISTS idx_chat_threads_participant_a ON chat_threads(participant_a_id);
+CREATE INDEX IF NOT EXISTS idx_chat_threads_participant_b ON chat_threads(participant_b_id);
+CREATE INDEX IF NOT EXISTS idx_chat_threads_is_admin ON chat_threads(is_admin_chat);
+CREATE INDEX IF NOT EXISTS idx_chat_threads_updated_at ON chat_threads(updated_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages(thread_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_sender ON chat_messages(sender_id);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_message_attachments_message ON chat_message_attachments(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_receipts_message ON message_receipts(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_receipts_recipient ON message_receipts(recipient_id);
+CREATE INDEX IF NOT EXISTS idx_message_receipts_state ON message_receipts(state);
+CREATE INDEX IF NOT EXISTS idx_chat_presence_is_online ON chat_presence(is_online);
+
+-- Trigger for chat_threads updated_at
+CREATE TRIGGER update_chat_threads_updated_at
+    BEFORE UPDATE ON chat_threads
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_chat_messages_updated_at
+    BEFORE UPDATE ON chat_messages
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
@@ -364,6 +434,7 @@ CREATE TABLE IF NOT EXISTS feed_posts (
 CREATE TABLE IF NOT EXISTS feed_post_media (
     post_id INTEGER NOT NULL REFERENCES feed_posts(id) ON DELETE CASCADE,
     media_id INTEGER NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
+    attachment_type chat_attachment_type NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (post_id, media_id)
 );
@@ -389,6 +460,7 @@ CREATE TABLE IF NOT EXISTS feed_comments (
 CREATE TABLE IF NOT EXISTS feed_comment_media (
     comment_id INTEGER NOT NULL REFERENCES feed_comments(id) ON DELETE CASCADE,
     media_id INTEGER NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
+    attachment_type chat_attachment_type NOT NULL,
     sort_order INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (comment_id, media_id)
 );

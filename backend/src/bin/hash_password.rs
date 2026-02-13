@@ -1,3 +1,4 @@
+use log::{error, info};
 use argon2::{
     password_hash::{PasswordHasher, SaltString},
     Argon2,
@@ -6,10 +7,14 @@ use rand_core::OsRng;
 use std::env;
 
 fn main() {
+    env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or("info"),
+    )
+    .init();
     let args: Vec<String> = env::args().collect();
     
     if args.len() != 2 {
-        eprintln!("Usage: {} <password>", args[0]);
+        error!("Usage: {} <password>", args[0]);
         std::process::exit(1);
     }
     
@@ -21,5 +26,5 @@ fn main() {
         .hash_password(password.as_bytes(), &salt)
         .expect("Failed to hash password");
     
-    println!("{}", password_hash);
+    info!("{}", password_hash);
 }

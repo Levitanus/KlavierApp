@@ -6,6 +6,7 @@ use sha2::{Sha256, Digest};
 use uuid::Uuid;
 use argon2::{Argon2, PasswordHasher};
 use argon2::password_hash::{SaltString, rand_core::OsRng};
+use log::{error};
 
 use crate::AppState;
 use crate::users::verify_token;
@@ -183,7 +184,7 @@ async fn create_registration_token(
             })
         }
         Err(e) => {
-            eprintln!("Failed to create registration token: {}", e);
+            error!("Failed to create registration token: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to create registration token"
             }))
@@ -273,7 +274,7 @@ async fn create_parent_token_from_student(
             })
         }
         Err(e) => {
-            eprintln!("Failed to create parent registration token: {}", e);
+            error!("Failed to create parent registration token: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to create registration token"
             }))
@@ -351,7 +352,7 @@ async fn create_student_token_from_teacher(
             expires_at,
         }),
         Err(e) => {
-            eprintln!("Failed to create student registration token: {}", e);
+            error!("Failed to create student registration token: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to create registration token"
             }))
@@ -388,7 +389,7 @@ async fn get_token_info(
             });
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -418,7 +419,7 @@ async fn get_token_info(
     // Get related student info if exists
     let related_student = if let Some(student_id) = token_record.related_student_id {
         match sqlx::query_as::<_, (i32, String, String)>(
-            "SELECT u.id, u.username, s.full_name 
+            "SELECT u.id, u.username, u.full_name 
              FROM users u 
              INNER JOIN students s ON u.id = s.user_id 
              WHERE u.id = $1"
@@ -440,7 +441,7 @@ async fn get_token_info(
 
     let related_teacher = if let Some(teacher_id) = token_record.related_teacher_id {
         match sqlx::query_as::<_, (i32, String, String)>(
-            "SELECT u.id, u.username, t.full_name
+            "SELECT u.id, u.username, u.full_name
              FROM users u
              INNER JOIN teachers t ON u.id = t.user_id
              WHERE u.id = $1"
@@ -494,7 +495,7 @@ async fn register_with_token(
             }));
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -540,7 +541,7 @@ async fn register_with_token(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -549,10 +550,11 @@ async fn register_with_token(
     
     // Create user
     let user_id = match sqlx::query_scalar::<_, i32>(
-        "INSERT INTO users (username, password_hash, email, phone) 
-         VALUES ($1, $2, $3, $4) RETURNING id"
+        "INSERT INTO users (username, full_name, password_hash, email, phone) 
+         VALUES ($1, $2, $3, $4, $5) RETURNING id"
     )
     .bind(&register_req.username)
+    .bind(&register_req.full_name)
     .bind(&password_hash)
     .bind(&register_req.email)
     .bind(&register_req.phone)
@@ -561,7 +563,7 @@ async fn register_with_token(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to create user: {}", e);
+            error!("Failed to create user: {}", e);
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "Username already exists or database error"
             }));
@@ -578,7 +580,7 @@ async fn register_with_token(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to get role: {}", e);
+            error!("Failed to get role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Role not found"
@@ -595,7 +597,7 @@ async fn register_with_token(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to assign role: {}", e);
+        error!("Failed to assign role: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to assign role"
@@ -619,17 +621,16 @@ async fn register_with_token(
             };
             
             if let Err(e) = sqlx::query(
-                "INSERT INTO students (user_id, full_name, address, birthday) 
-                 VALUES ($1, $2, $3, $4)"
+                "INSERT INTO students (user_id, address, birthday) 
+                 VALUES ($1, $2, $3)"
             )
             .bind(user_id)
-            .bind(&register_req.full_name)
             .bind(register_req.address.as_ref().unwrap())
             .bind(birthday)
             .execute(&mut *tx)
             .await
             {
-                eprintln!("Failed to create student entry: {}", e);
+                error!("Failed to create student entry: {}", e);
                 let _ = tx.rollback().await;
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to create student"
@@ -653,7 +654,7 @@ async fn register_with_token(
                 .execute(&mut *tx)
                 .await
                 {
-                    eprintln!("Failed to create teacher-student relation: {}", e);
+                    error!("Failed to create teacher-student relation: {}", e);
                     let _ = tx.rollback().await;
                     return HttpResponse::InternalServerError().json(serde_json::json!({
                         "error": "Failed to create teacher-student relation"
@@ -663,14 +664,13 @@ async fn register_with_token(
         }
         "parent" => {
             if let Err(e) = sqlx::query(
-                "INSERT INTO parents (user_id, full_name) VALUES ($1, $2)"
+                "INSERT INTO parents (user_id) VALUES ($1)"
             )
             .bind(user_id)
-            .bind(&register_req.full_name)
             .execute(&mut *tx)
             .await
             {
-                eprintln!("Failed to create parent entry: {}", e);
+                error!("Failed to create parent entry: {}", e);
                 let _ = tx.rollback().await;
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to create parent"
@@ -696,7 +696,7 @@ async fn register_with_token(
                 .execute(&mut *tx)
                 .await
                 {
-                    eprintln!("Failed to create parent-student relation: {}", e);
+                    error!("Failed to create parent-student relation: {}", e);
                     let _ = tx.rollback().await;
                     return HttpResponse::InternalServerError().json(serde_json::json!({
                         "error": "Failed to create parent-student relation"
@@ -706,14 +706,13 @@ async fn register_with_token(
         }
         "teacher" => {
             if let Err(e) = sqlx::query(
-                "INSERT INTO teachers (user_id, full_name) VALUES ($1, $2)"
+                "INSERT INTO teachers (user_id) VALUES ($1)"
             )
             .bind(user_id)
-            .bind(&register_req.full_name)
             .execute(&mut *tx)
             .await
             {
-                eprintln!("Failed to create teacher entry: {}", e);
+                error!("Failed to create teacher entry: {}", e);
                 let _ = tx.rollback().await;
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to create teacher"
@@ -738,13 +737,13 @@ async fn register_with_token(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to mark token as used: {}", e);
+        error!("Failed to mark token as used: {}", e);
         // Don't rollback, just log the error
     }
     
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -776,7 +775,7 @@ async fn list_registration_tokens(
     {
         Ok(tokens) => HttpResponse::Ok().json(tokens),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }))

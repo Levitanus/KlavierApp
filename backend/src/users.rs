@@ -6,6 +6,7 @@ use sqlx::FromRow;
 use jsonwebtoken::{encode, decode, EncodingKey, DecodingKey, Header, Validation};
 use chrono::{Duration, Utc, NaiveDate};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
+use log::{error};
 
 use crate::{AppState, password_reset};
 use crate::storage::{MediaError, MediaService};
@@ -101,7 +102,7 @@ async fn login(
             });
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -112,7 +113,7 @@ async fn login(
     let parsed_hash = match PasswordHash::new(&user.password_hash) {
         Ok(hash) => hash,
         Err(e) => {
-            eprintln!("Failed to parse password hash: {}", e);
+            error!("Failed to parse password hash: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -142,7 +143,7 @@ async fn login(
     let roles = match roles_result {
         Ok(roles) => roles,
         Err(e) => {
-            eprintln!("Failed to fetch user roles: {}", e);
+            error!("Failed to fetch user roles: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -227,7 +228,7 @@ async fn login(
     ) {
         Ok(t) => t,
         Err(e) => {
-            eprintln!("JWT encoding error: {}", e);
+            error!("JWT encoding error: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Could not generate token".to_string(),
             });
@@ -235,6 +236,41 @@ async fn login(
     };
 
     HttpResponse::Ok().json(LoginResponse { token })
+}
+
+#[get("/validate")]
+async fn validate_token_endpoint(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+) -> impl Responder {
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let user_exists = sqlx::query_scalar::<_, i32>(
+        "SELECT id FROM users WHERE username = $1",
+    )
+    .bind(&claims.sub)
+    .fetch_optional(&app_state.db)
+    .await;
+
+    match user_exists {
+        Ok(Some(_)) => HttpResponse::Ok().json(serde_json::json!({
+            "valid": true,
+            "username": claims.sub,
+            "roles": claims.roles,
+        })),
+        Ok(None) => HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "User not found",
+        })),
+        Err(e) => {
+            error!("Database error: {}", e);
+            HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Internal server error",
+            }))
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -270,7 +306,7 @@ async fn forgot_password(
             })
         }
         Err(e) => {
-            eprintln!("Password reset request error: {}", e);
+            error!("Password reset request error: {}", e);
             // Always return success to prevent username enumeration
             HttpResponse::Ok().json(ForgotPasswordResponse {
                 message: "If your username exists and has an email, you will receive a password reset link. Otherwise, an admin will be notified.".to_string(),
@@ -329,7 +365,7 @@ async fn reset_password(
             }))
         }
         Err(e) => {
-            eprintln!("Password reset error: {}", e);
+            error!("Password reset error: {}", e);
             HttpResponse::BadRequest().json(ErrorResponse {
                 error: format!("Failed to reset password: {}", e),
             })
@@ -374,6 +410,7 @@ pub struct TeacherData {
 pub struct UserProfile {
     pub id: i32,
     pub username: String,
+    pub full_name: String,
     pub email: Option<String>,
     pub phone: Option<String>,
     pub profile_image: Option<String>,
@@ -421,7 +458,7 @@ async fn get_profile(
     };
 
     let mut profile = match sqlx::query_as::<_, UserProfile>(
-        "SELECT id, username, email, phone, profile_image, created_at FROM users WHERE username = $1"
+        "SELECT id, username, full_name, email, phone, profile_image, created_at FROM users WHERE username = $1"
     )
     .bind(&claims.sub)
     .fetch_optional(&app_state.db)
@@ -434,7 +471,7 @@ async fn get_profile(
             });
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -455,7 +492,10 @@ async fn get_profile(
     // Get student data if user is a student
     if profile.roles.contains(&"student".to_string()) {
         if let Ok(Some((full_name, address, birthday, status))) = sqlx::query_as::<_, (String, String, NaiveDate, String)>(
-            "SELECT full_name, address, birthday, status::text FROM students WHERE user_id = $1"
+            "SELECT u.full_name, s.address, s.birthday, s.status::text
+             FROM students s
+             INNER JOIN users u ON u.id = s.user_id
+             WHERE s.user_id = $1"
         )
         .bind(profile.id)
         .fetch_optional(&app_state.db)
@@ -473,7 +513,10 @@ async fn get_profile(
     // Get parent data if user is a parent
     if profile.roles.contains(&"parent".to_string()) {
         if let Ok(Some((full_name, status))) = sqlx::query_as::<_, (String, String)>(
-            "SELECT full_name, status::text FROM parents WHERE user_id = $1"
+            "SELECT u.full_name, p.status::text
+             FROM parents p
+             INNER JOIN users u ON u.id = p.user_id
+             WHERE p.user_id = $1"
         )
         .bind(profile.id)
         .fetch_optional(&app_state.db)
@@ -481,9 +524,9 @@ async fn get_profile(
         {
             // Get children
             let children: Vec<_> = sqlx::query_as::<_, (i32, String, String, String, NaiveDate, Option<String>, String)>(
-                "SELECT u.id, u.username, s.full_name, s.address, s.birthday, u.profile_image, s.status::text
-                 FROM users u
-                 INNER JOIN students s ON u.id = s.user_id
+                 "SELECT u.id, u.username, u.full_name, s.address, s.birthday, u.profile_image, s.status::text
+                  FROM users u
+                  INNER JOIN students s ON u.id = s.user_id
                  INNER JOIN parent_student_relations psr ON s.user_id = psr.student_user_id
                  WHERE psr.parent_user_id = $1"
             )
@@ -514,7 +557,10 @@ async fn get_profile(
     // Get teacher data if user is a teacher
     if profile.roles.contains(&"teacher".to_string()) {
         if let Ok(Some((full_name, status))) = sqlx::query_as::<_, (String, String)>(
-            "SELECT full_name, status::text FROM teachers WHERE user_id = $1"
+            "SELECT u.full_name, t.status::text
+             FROM teachers t
+             INNER JOIN users u ON u.id = t.user_id
+             WHERE t.user_id = $1"
         )
         .bind(profile.id)
         .fetch_optional(&app_state.db)
@@ -559,7 +605,7 @@ async fn update_profile(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Database error".to_string(),
             });
@@ -576,15 +622,30 @@ async fn update_profile(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to update user: {}", e);
+        error!("Failed to update user: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(ErrorResponse {
             error: "Failed to update profile".to_string(),
         });
     }
 
+    if let Some(ref full_name) = update_req.full_name {
+        if let Err(e) = sqlx::query("UPDATE users SET full_name = $1 WHERE id = $2")
+            .bind(full_name)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await
+        {
+            error!("Failed to update user full name: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to update profile".to_string(),
+            });
+        }
+    }
+
     // Update role-specific data if provided
-    if update_req.full_name.is_some() || update_req.address.is_some() || update_req.birthday.is_some() {
+    if update_req.address.is_some() || update_req.birthday.is_some() {
         // Check if user is a student
         let is_student = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
@@ -612,10 +673,6 @@ async fn update_profile(
                 None
             };
 
-            if update_req.full_name.is_some() {
-                updates.push(format!("full_name = ${}", bind_count));
-                bind_count += 1;
-            }
             if update_req.address.is_some() {
                 updates.push(format!("address = ${}", bind_count));
                 bind_count += 1;
@@ -634,9 +691,6 @@ async fn update_profile(
 
                 let mut q = sqlx::query(&query);
                 
-                if let Some(ref full_name) = update_req.full_name {
-                    q = q.bind(full_name);
-                }
                 if let Some(ref address) = update_req.address {
                     q = q.bind(address);
                 }
@@ -646,108 +700,20 @@ async fn update_profile(
                 q = q.bind(user_id);
 
                 if let Err(e) = q.execute(&mut *tx).await {
-                    eprintln!("Failed to update student data: {}", e);
+                    error!("Failed to update student data: {}", e);
                     let _ = tx.rollback().await;
                     return HttpResponse::InternalServerError().json(ErrorResponse {
                         error: "Failed to update student data".to_string(),
                     });
                 }
 
-                // Sync full_name to other role tables
-                if let Some(ref full_name) = update_req.full_name {
-                    let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
-                        .bind(full_name)
-                        .bind(user_id)
-                        .execute(&mut *tx)
-                        .await;
-                    
-                    let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
-                        .bind(full_name)
-                        .bind(user_id)
-                        .execute(&mut *tx)
-                        .await;
-                }
-            }
-        }
-
-        // Update parent data if user is a parent and full_name provided
-        if let Some(ref full_name) = update_req.full_name {
-            let is_parent = sqlx::query_scalar::<_, bool>(
-                "SELECT EXISTS(SELECT 1 FROM parents WHERE user_id = $1)"
-            )
-            .bind(user_id)
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap_or(false);
-
-            if is_parent {
-                if let Err(e) = sqlx::query(
-                    "UPDATE parents SET full_name = $1 WHERE user_id = $2"
-                )
-                .bind(full_name)
-                .bind(user_id)
-                .execute(&mut *tx)
-                .await
-                {
-                    eprintln!("Failed to update parent data: {}", e);
-                }
-
-                // Sync to other role tables
-                let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
-                    .bind(full_name)
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await;
-                
-                let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
-                    .bind(full_name)
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await;
-            }
-        }
-
-        // Update teacher data if user is a teacher and full_name provided
-        if let Some(ref full_name) = update_req.full_name {
-            let is_teacher = sqlx::query_scalar::<_, bool>(
-                "SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1)"
-            )
-            .bind(user_id)
-            .fetch_one(&mut *tx)
-            .await
-            .unwrap_or(false);
-
-            if is_teacher {
-                if let Err(e) = sqlx::query(
-                    "UPDATE teachers SET full_name = $1 WHERE user_id = $2"
-                )
-                .bind(full_name)
-                .bind(user_id)
-                .execute(&mut *tx)
-                .await
-                {
-                    eprintln!("Failed to update teacher data: {}", e);
-                }
-
-                // Sync to other role tables
-                let _ = sqlx::query("UPDATE students SET full_name = $1 WHERE user_id = $2")
-                    .bind(full_name)
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await;
-                
-                let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
-                    .bind(full_name)
-                    .bind(user_id)
-                    .execute(&mut *tx)
-                    .await;
             }
         }
     }
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(ErrorResponse {
             error: "Failed to save changes".to_string(),
         });
@@ -786,7 +752,7 @@ async fn change_password(
             });
         }
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -797,7 +763,7 @@ async fn change_password(
     let parsed_hash = match PasswordHash::new(&user.password_hash) {
         Ok(hash) => hash,
         Err(e) => {
-            eprintln!("Failed to parse password hash: {}", e);
+            error!("Failed to parse password hash: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Internal server error".to_string(),
             });
@@ -824,7 +790,7 @@ async fn change_password(
     let new_hash = match Argon2::default().hash_password(change_req.new_password.as_bytes(), &salt) {
         Ok(hash) => hash.to_string(),
         Err(e) => {
-            eprintln!("Failed to hash password: {}", e);
+            error!("Failed to hash password: {}", e);
             return HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Failed to hash password".to_string(),
             });
@@ -845,7 +811,7 @@ async fn change_password(
             "message": "Password changed successfully"
         })),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Failed to change password".to_string(),
             })
@@ -872,7 +838,7 @@ async fn upload_profile_image(
         let field = match item {
             Ok(field) => field,
             Err(e) => {
-                eprintln!("Multipart error: {}", e);
+                error!("Multipart error: {}", e);
                 return HttpResponse::BadRequest().json(ErrorResponse {
                     error: "Failed to read upload".to_string(),
                 });
@@ -919,7 +885,7 @@ async fn upload_profile_image(
                 })
             }
             Err(MediaError::Io(e)) => {
-                eprintln!("Failed to save file: {}", e);
+                error!("Failed to save file: {}", e);
                 return HttpResponse::InternalServerError().json(ErrorResponse {
                     error: "Failed to save file".to_string(),
                 });
@@ -938,7 +904,7 @@ async fn upload_profile_image(
             if !old_filename.is_empty() {
                 if let Err(e) = media_service.delete_profile_image(&old_filename).await {
                     if let MediaError::Io(err) = e {
-                        eprintln!("Failed to delete old profile image: {}", err);
+                        error!("Failed to delete old profile image: {}", err);
                     }
                 }
             }
@@ -961,7 +927,7 @@ async fn upload_profile_image(
                 }));
             }
             Err(e) => {
-                eprintln!("Database error: {}", e);
+                error!("Database error: {}", e);
                 let _ = media_service.delete_profile_image(&stored.key).await;
                 return HttpResponse::InternalServerError().json(ErrorResponse {
                     error: "Failed to update profile".to_string(),
@@ -999,7 +965,7 @@ async fn delete_profile_image(
             let media_service = MediaService::new(app_state.storage.clone());
             if let Err(e) = media_service.delete_profile_image(&old_filename).await {
                 if let MediaError::Io(err) = e {
-                    eprintln!("Failed to delete profile image: {}", err);
+                    error!("Failed to delete profile image: {}", err);
                 }
             }
         }
@@ -1018,7 +984,7 @@ async fn delete_profile_image(
             "message": "Profile image deleted"
         })),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(ErrorResponse {
                 error: "Failed to delete image".to_string(),
             })
@@ -1030,6 +996,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/auth")
             .service(login)
+            .service(validate_token_endpoint)
             .service(forgot_password)
             .service(validate_reset_token)
             .service(reset_password)

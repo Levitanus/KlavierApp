@@ -1,6 +1,38 @@
 part of '../profile_screen.dart';
 
 mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
+  Future<void> _startChatWithUser(int userId, String userName) async {
+    final chatService = Provider.of<ChatService>(context, listen: false);
+    
+    try {
+      final success = await chatService.startThread(userId);
+      if (success && mounted) {
+        final thread = chatService.threads.firstWhere(
+          (t) => (t.participantBId != null &&
+                  ((t.participantAId == _userId && t.participantBId == userId) ||
+                   (t.participantAId == userId && t.participantBId == _userId))),
+          orElse: () => throw Exception('Thread not found'),
+        );
+        
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => ChatConversationScreen(thread: thread),
+          ),
+        );
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to start chat: ${chatService.errorMessage}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error starting chat: $e')),
+        );
+      }
+    }
+  }
+
   Future<bool> _showLockedConfirmationDialog({
     required String title,
     required String content,
@@ -265,6 +297,15 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                     ],
                                   ),
                                 ),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.message),
+                                  label: const Text('Message'),
+                                  onPressed: () => _startChatWithUser(
+                                    parent['user_id'] as int,
+                                    parent['full_name'] as String,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
                                 OutlinedButton.icon(
                                   icon: const Icon(Icons.visibility),
                                   label: const Text('View Profile'),
@@ -702,6 +743,15 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                   ),
                                 ),
                                 OutlinedButton.icon(
+                                  icon: const Icon(Icons.message),
+                                  label: const Text('Message'),
+                                  onPressed: () => _startChatWithUser(
+                                    student['user_id'] as int,
+                                    student['full_name'] as String,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                OutlinedButton.icon(
                                   icon: const Icon(Icons.visibility),
                                   label: const Text('View Profile'),
                                   onPressed: () => _showStudentProfileDialog(student),
@@ -766,6 +816,14 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           ),
         ),
         actions: [
+          ElevatedButton.icon(
+            onPressed: () => _startChatWithUser(
+              parent['user_id'] as int,
+              parent['full_name'] as String,
+            ),
+            icon: const Icon(Icons.message),
+            label: const Text('Send Message'),
+          ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Close'),
@@ -792,7 +850,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
   }
 
   void _showMakeStudentDialog() {
-    final fullNameController = TextEditingController();
     final addressController = TextEditingController();
     final birthdayController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -807,16 +864,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  controller: fullNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Full Name',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: addressController,
                   decoration: const InputDecoration(
@@ -857,7 +904,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
               if (formKey.currentState!.validate()) {
                 Navigator.of(context).pop();
                 await _makeUserStudent(
-                  fullNameController.text,
                   addressController.text,
                   birthdayController.text,
                 );
@@ -871,7 +917,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
   }
 
   void _showMakeParentDialog() async {
-    final fullNameController = TextEditingController();
     final studentFilterController = TextEditingController();
     final formKey = GlobalKey<FormState>();
     final selectedStudents = <int>{};
@@ -906,16 +951,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    TextFormField(
-                      controller: fullNameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Full Name',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (value) =>
-                          value?.isEmpty ?? true ? 'Required' : null,
-                    ),
-                    const SizedBox(height: 16),
                     const Text(
                       'Select Students (at least one):',
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -998,7 +1033,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                   selectedStudents.isNotEmpty) {
                 Navigator.of(context).pop();
                 await _makeUserParent(
-                  fullNameController.text,
                   selectedStudents.toList(),
                 );
               }
@@ -1011,24 +1045,11 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
   }
 
   void _showMakeTeacherDialog() {
-    final fullNameController = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('Make $_username a Teacher'),
-        content: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: fullNameController,
-            decoration: const InputDecoration(
-              labelText: 'Full Name',
-              border: OutlineInputBorder(),
-            ),
-            validator: (value) => value?.isEmpty ?? true ? 'Required' : null,
-          ),
-        ),
+        content: const Text('This will grant teacher privileges to the user.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
@@ -1036,10 +1057,8 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           ),
           ElevatedButton(
             onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                Navigator.of(context).pop();
-                await _makeUserTeacher(fullNameController.text);
-              }
+              Navigator.of(context).pop();
+              await _makeUserTeacher();
             },
             child: const Text('Convert'),
           ),
@@ -1333,6 +1352,15 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                   Row(
                                     children: [
                                       OutlinedButton.icon(
+                                        icon: const Icon(Icons.message),
+                                        label: const Text('Message'),
+                                        onPressed: () => _startChatWithUser(
+                                          teacher['user_id'] as int,
+                                          teacher['full_name'] as String,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      OutlinedButton.icon(
                                         icon: const Icon(Icons.visibility),
                                         label: const Text('View Profile'),
                                         onPressed: () => _showTeacherProfileDialog(teacher),
@@ -1435,6 +1463,14 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                 TextButton(
                   onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Close'),
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _startChatWithUser(
+                    child['user_id'] as int,
+                    child['full_name'] as String,
+                  ),
+                  icon: const Icon(Icons.message),
+                  label: const Text('Message'),
                 ),
                 ElevatedButton.icon(
                   onPressed: () {

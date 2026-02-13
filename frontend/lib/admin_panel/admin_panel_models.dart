@@ -19,6 +19,7 @@ enum RoleStatus {
 class User {
   final int id;
   final String username;
+  final String fullName;
   final String? email;
   final String? phone;
   final List<String> roles;
@@ -29,6 +30,7 @@ class User {
   User({
     required this.id,
     required this.username,
+    required this.fullName,
     this.email,
     this.phone,
     required this.roles,
@@ -65,6 +67,7 @@ class User {
     return User(
       id: json['id'],
       username: json['username'],
+      fullName: json['full_name'] ?? '',
       email: json['email'],
       phone: json['phone'],
       roles: List<String>.from(json['roles'] ?? []),

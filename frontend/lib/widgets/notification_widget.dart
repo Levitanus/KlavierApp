@@ -8,6 +8,7 @@ import 'package:intl/intl.dart';
 void _navigateToRoute(BuildContext context, String route, Map<String, dynamic>? metadata) {
   // Parse the route and navigate accordingly
   final uri = Uri.parse(route);
+  final navigator = Navigator.of(context, rootNavigator: true);
   
   if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'admin') {
     if (uri.pathSegments.length >= 2 && uri.pathSegments[1] == 'users') {
@@ -15,47 +16,70 @@ void _navigateToRoute(BuildContext context, String route, Map<String, dynamic>? 
       final username = uri.pathSegments.length > 2 ? uri.pathSegments[2] : null;
       
       // Navigate to HomeScreen with admin panel opened for specific user
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => HomeScreen(adminUsername: username),
-        ),
-      );
+      final page = HomeScreen(adminUsername: username);
+      if (navigator.canPop()) {
+        navigator.pushReplacement(
+          MaterialPageRoute(builder: (context) => page),
+        );
+      } else {
+        navigator.push(
+          MaterialPageRoute(builder: (context) => page),
+        );
+      }
     } else {
       // Generic admin route - go back to home
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => const HomeScreen(),
-        ),
-      );
+      if (navigator.canPop()) {
+        navigator.pushReplacement(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      } else {
+        navigator.push(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+      }
     }
   } else if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'hometasks') {
     final rawStudentId = metadata?['student_id'];
     final studentId = rawStudentId is int ? rawStudentId : null;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => HomeScreen(initialStudentId: studentId),
-      ),
-    );
+    final page = HomeScreen(initialStudentId: studentId);
+    if (navigator.canPop()) {
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (context) => page),
+      );
+    } else {
+      navigator.push(
+        MaterialPageRoute(builder: (context) => page),
+      );
+    }
   } else if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'feeds') {
     final rawFeedId = metadata?['feed_id'];
     final rawPostId = metadata?['post_id'];
     final feedId = rawFeedId is int ? rawFeedId : null;
     final postId = rawPostId is int ? rawPostId : null;
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => HomeScreen(
-          initialFeedId: feedId,
-          initialPostId: postId,
-        ),
-      ),
+    final page = HomeScreen(
+      initialFeedId: feedId,
+      initialPostId: postId,
     );
+    if (navigator.canPop()) {
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (context) => page),
+      );
+    } else {
+      navigator.push(
+        MaterialPageRoute(builder: (context) => page),
+      );
+    }
   } else {
     // Handle other routes - just go back to home
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(
-        builder: (context) => const HomeScreen(),
-      ),
-    );
+    if (navigator.canPop()) {
+      navigator.pushReplacement(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    } else {
+      navigator.push(
+        MaterialPageRoute(builder: (context) => const HomeScreen()),
+      );
+    }
   }
 }
 

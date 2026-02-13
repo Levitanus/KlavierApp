@@ -1,5 +1,6 @@
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
 use chrono::NaiveDate;
+use log::{error};
 
 use super::helpers::{
     check_and_archive_parents, check_and_unarchive_parents, verify_admin_role,
@@ -34,7 +35,7 @@ pub(crate) async fn archive_student_role(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to start transaction"
             }));
@@ -50,7 +51,7 @@ pub(crate) async fn archive_student_role(
     .await {
         Ok(result) => result,
         Err(e) => {
-            eprintln!("Failed to get admin user ID: {}", e);
+            error!("Failed to get admin user ID: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to get admin user information"
             }));
@@ -85,7 +86,7 @@ pub(crate) async fn archive_student_role(
             }
             // Cascade to parents
             if let Err(e) = check_and_archive_parents(user_id, admin_user_id, &mut tx).await {
-                eprintln!("Failed to archive parents: {}", e);
+                error!("Failed to archive parents: {}", e);
                 let _ = tx.rollback().await;
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to update parent status"
@@ -97,7 +98,7 @@ pub(crate) async fn archive_student_role(
                     "message": "Student role archived successfully"
                 })),
                 Err(e) => {
-                    eprintln!("Failed to commit transaction: {}", e);
+                    error!("Failed to commit transaction: {}", e);
                     HttpResponse::InternalServerError().json(serde_json::json!({
                         "error": "Failed to archive student role"
                     }))
@@ -106,7 +107,7 @@ pub(crate) async fn archive_student_role(
         }
         Err(e) => {
             let _ = tx.rollback().await;
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to archive student role"
             }))
@@ -129,7 +130,7 @@ pub(crate) async fn unarchive_student_role(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to start transaction"
             }));
@@ -154,7 +155,7 @@ pub(crate) async fn unarchive_student_role(
             }
             // Cascade to parents
             if let Err(e) = check_and_unarchive_parents(user_id, &mut tx).await {
-                eprintln!("Failed to unarchive parents: {}", e);
+                error!("Failed to unarchive parents: {}", e);
                 let _ = tx.rollback().await;
                 return HttpResponse::InternalServerError().json(serde_json::json!({
                     "error": "Failed to update parent status"
@@ -166,7 +167,7 @@ pub(crate) async fn unarchive_student_role(
                     "message": "Student role unarchived successfully"
                 })),
                 Err(e) => {
-                    eprintln!("Failed to commit transaction: {}", e);
+                    error!("Failed to commit transaction: {}", e);
                     HttpResponse::InternalServerError().json(serde_json::json!({
                         "error": "Failed to unarchive student role"
                     }))
@@ -175,7 +176,7 @@ pub(crate) async fn unarchive_student_role(
         }
         Err(e) => {
             let _ = tx.rollback().await;
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to unarchive student role"
             }))
@@ -226,7 +227,7 @@ pub(crate) async fn create_student(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -235,10 +236,11 @@ pub(crate) async fn create_student(
 
     // Create user
     let user_id = match sqlx::query_scalar::<_, i32>(
-        "INSERT INTO users (username, password_hash, email, phone) 
-         VALUES ($1, $2, $3, $4) RETURNING id"
+        "INSERT INTO users (username, full_name, password_hash, email, phone) 
+            VALUES ($1, $2, $3, $4, $5) RETURNING id"
     )
     .bind(&student_req.username)
+        .bind(&student_req.full_name)
     .bind(&password_hash)
     .bind(&student_req.email)
     .bind(&student_req.phone)
@@ -247,7 +249,7 @@ pub(crate) async fn create_student(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to create user: {}", e);
+            error!("Failed to create user: {}", e);
             return HttpResponse::BadRequest().json(serde_json::json!({
                 "error": "Username already exists or database error"
             }));
@@ -263,7 +265,7 @@ pub(crate) async fn create_student(
     {
         Ok(id) => id,
         Err(e) => {
-            eprintln!("Failed to get student role: {}", e);
+            error!("Failed to get student role: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Student role not found"
@@ -280,7 +282,7 @@ pub(crate) async fn create_student(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to assign role: {}", e);
+        error!("Failed to assign role: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to assign role"
@@ -289,17 +291,16 @@ pub(crate) async fn create_student(
 
     // Create student entry
     if let Err(e) = sqlx::query(
-        "INSERT INTO students (user_id, full_name, address, birthday) 
-         VALUES ($1, $2, $3, $4)"
+        "INSERT INTO students (user_id, address, birthday) 
+           VALUES ($1, $2, $3)"
     )
     .bind(user_id)
-    .bind(&student_req.full_name)
     .bind(&student_req.address)
     .bind(birthday)
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to create student entry: {}", e);
+        error!("Failed to create student entry: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to create student"
@@ -308,7 +309,7 @@ pub(crate) async fn create_student(
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -335,10 +336,10 @@ pub(crate) async fn get_student(
 
     // Get student with user info
     let student = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, s.full_name, s.address, s.birthday, s.status::text
-         FROM users u
-         INNER JOIN students s ON u.id = s.user_id
-         WHERE u.id = $1"
+        "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.address, s.birthday, s.status::text
+        FROM users u
+        INNER JOIN students s ON u.id = s.user_id
+        WHERE u.id = $1"
     )
     .bind(user_id)
     .fetch_optional(&app_state.db)
@@ -361,7 +362,7 @@ pub(crate) async fn get_student(
             "error": "Student not found"
         })),
         Err(e) => {
-            eprintln!("Database error: {}", e);
+            error!("Database error: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }))
@@ -388,9 +389,9 @@ pub(crate) async fn list_students(
     }
 
     let students: Vec<StudentWithUserInfo> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, s.full_name, s.address, s.birthday, s.status::text
-         FROM users u
-         INNER JOIN students s ON u.id = s.user_id"
+        "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.address, s.birthday, s.status::text
+           FROM users u
+           INNER JOIN students s ON u.id = s.user_id"
     )
     .fetch_all(&app_state.db)
     .await
@@ -431,7 +432,7 @@ pub(crate) async fn update_student(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -439,10 +440,15 @@ pub(crate) async fn update_student(
     };
 
     // Update user table if email or phone changed
-    if update_req.email.is_some() || update_req.phone.is_some() {
+    if update_req.email.is_some() || update_req.phone.is_some() || update_req.full_name.is_some() {
         let mut query = String::from("UPDATE users SET ");
         let mut updates = Vec::new();
         let mut bind_count = 1;
+
+        if update_req.full_name.is_some() {
+            updates.push(format!("full_name = ${}", bind_count));
+            bind_count += 1;
+        }
 
         if update_req.email.is_some() {
             updates.push(format!("email = ${}", bind_count));
@@ -459,6 +465,10 @@ pub(crate) async fn update_student(
 
         let mut q = sqlx::query(&query);
 
+        if let Some(ref full_name) = update_req.full_name {
+            q = q.bind(full_name);
+        }
+
         if let Some(ref email) = update_req.email {
             q = q.bind(email);
         }
@@ -470,7 +480,7 @@ pub(crate) async fn update_student(
         q = q.bind(user_id);
 
         if let Err(e) = q.execute(&mut *tx).await {
-            eprintln!("Failed to update user: {}", e);
+            error!("Failed to update user: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to update user info"
@@ -479,7 +489,7 @@ pub(crate) async fn update_student(
     }
 
     // Update student table
-    if update_req.full_name.is_some() || update_req.address.is_some() || update_req.birthday.is_some() {
+    if update_req.address.is_some() || update_req.birthday.is_some() {
         let mut query = String::from("UPDATE students SET ");
         let mut updates = Vec::new();
         let mut bind_count = 1;
@@ -498,11 +508,6 @@ pub(crate) async fn update_student(
             None
         };
 
-        if update_req.full_name.is_some() {
-            updates.push(format!("full_name = ${}", bind_count));
-            bind_count += 1;
-        }
-
         if update_req.address.is_some() {
             updates.push(format!("address = ${}", bind_count));
             bind_count += 1;
@@ -518,10 +523,6 @@ pub(crate) async fn update_student(
 
         let mut q = sqlx::query(&query);
 
-        if let Some(ref full_name) = update_req.full_name {
-            q = q.bind(full_name);
-        }
-
         if let Some(ref address) = update_req.address {
             q = q.bind(address);
         }
@@ -533,32 +534,18 @@ pub(crate) async fn update_student(
         q = q.bind(user_id);
 
         if let Err(e) = q.execute(&mut *tx).await {
-            eprintln!("Failed to update student: {}", e);
+            error!("Failed to update student: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Failed to update student info"
             }));
         }
 
-        // Sync full_name to other role tables if updated
-        if let Some(ref full_name) = update_req.full_name {
-            let _ = sqlx::query("UPDATE parents SET full_name = $1 WHERE user_id = $2")
-                .bind(full_name)
-                .bind(user_id)
-                .execute(&mut *tx)
-                .await;
-
-            let _ = sqlx::query("UPDATE teachers SET full_name = $1 WHERE user_id = $2")
-                .bind(full_name)
-                .bind(user_id)
-                .execute(&mut *tx)
-                .await;
-        }
     }
 
     // Commit transaction
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to commit transaction"
         }));
@@ -582,7 +569,7 @@ pub(crate) async fn list_student_teachers(
     }
 
     let teachers: Vec<TeacherWithUserInfo> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, t.full_name, t.status::text
+        "SELECT u.id, u.username, u.email, u.phone, u.full_name, t.status::text
          FROM users u
          INNER JOIN teachers t ON u.id = t.user_id
          INNER JOIN teacher_student_relations tsr ON t.user_id = tsr.teacher_user_id
@@ -623,7 +610,7 @@ pub(crate) async fn remove_student_teacher_relation(
     let mut tx = match app_state.db.begin().await {
         Ok(tx) => tx,
         Err(e) => {
-            eprintln!("Failed to start transaction: {}", e);
+            error!("Failed to start transaction: {}", e);
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
             }));
@@ -641,7 +628,7 @@ pub(crate) async fn remove_student_teacher_relation(
     {
         Ok(result) => result,
         Err(e) => {
-            eprintln!("Failed to remove relation: {}", e);
+            error!("Failed to remove relation: {}", e);
             let _ = tx.rollback().await;
             return HttpResponse::InternalServerError().json(serde_json::json!({
                 "error": "Database error"
@@ -667,7 +654,7 @@ pub(crate) async fn remove_student_teacher_relation(
     .execute(&mut *tx)
     .await
     {
-        eprintln!("Failed to archive hometasks: {}", e);
+        error!("Failed to archive hometasks: {}", e);
         let _ = tx.rollback().await;
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Failed to archive hometasks"
@@ -675,7 +662,7 @@ pub(crate) async fn remove_student_teacher_relation(
     }
 
     if let Err(e) = tx.commit().await {
-        eprintln!("Failed to commit transaction: {}", e);
+        error!("Failed to commit transaction: {}", e);
         return HttpResponse::InternalServerError().json(serde_json::json!({
             "error": "Database error"
         }));
@@ -699,7 +686,7 @@ pub(crate) async fn list_student_parents(
     }
 
     let parents: Vec<ParentSummary> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, p.full_name, p.status::text
+        "SELECT u.id, u.username, u.email, u.phone, u.full_name, p.status::text
          FROM users u
          INNER JOIN parents p ON u.id = p.user_id
          INNER JOIN parent_student_relations psr ON p.user_id = psr.parent_user_id

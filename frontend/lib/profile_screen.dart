@@ -8,7 +8,9 @@ import 'dart:async';
 import 'package:file_picker/file_picker.dart';
 import 'auth.dart';
 import 'services/hometask_service.dart';
+import 'services/chat_service.dart';
 import 'models/hometask.dart';
+import 'screens/chat_conversation.dart';
 
 part 'profile_screen/profile_screen_data.dart';
 part 'profile_screen/profile_screen_dialogs.dart';
@@ -84,9 +86,9 @@ abstract class _ProfileScreenStateBase extends State<ProfileScreen> {
   Future<void> _removeTeacherFromStudent(int studentId, int teacherId);
   Future<void> _updateAdminRole();
   Future<void> _toggleRoleArchive(String role);
-  Future<void> _makeUserStudent(String fullName, String address, String birthday);
-  Future<void> _makeUserParent(String fullName, List<int> studentIds);
-  Future<void> _makeUserTeacher(String fullName);
+  Future<void> _makeUserStudent(String address, String birthday);
+  Future<void> _makeUserParent(List<int> studentIds);
+  Future<void> _makeUserTeacher();
   Future<void> _addChildrenToParent(List<int> studentIds);
   Future<void> _updateChildData(
     int childUserId,
@@ -255,6 +257,24 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                     isEditable: false,
                   ),
                   const SizedBox(height: 16),
+
+                  // Full Name
+                  if (_isEditing)
+                    _buildEditableField(
+                      label: 'Full Name',
+                      controller: _fullNameController,
+                      icon: Icons.badge_outlined,
+                    )
+                  else
+                    _buildProfileField(
+                      label: 'Full Name',
+                      value: _fullNameController.text.isNotEmpty
+                          ? _fullNameController.text
+                          : 'Not set',
+                      icon: Icons.badge_outlined,
+                      isEditable: true,
+                    ),
+                  const SizedBox(height: 16),
                   
                   // Email
                   if (_isEditing)
@@ -299,6 +319,33 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                     icon: Icons.calendar_today_outlined,
                     isEditable: false,
                   ),
+                  if (_isEditing) ...[
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: _isSaving ? null : _cancelEditing,
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton(
+                          onPressed: _isSaving ? null : _saveProfile,
+                          child: _isSaving
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Text('Save'),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -367,26 +414,6 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                     ),
                     const Divider(),
                     const SizedBox(height: 16),
-                    
-                    // Unified Full Name (appears once for all roles)
-                    if (_studentData != null || _parentData != null || _teacherData != null) ...[
-                      if (_isEditing)
-                        _buildEditableField(
-                          label: 'Full Name',
-                          controller: _fullNameController,
-                          icon: Icons.badge_outlined,
-                        )
-                      else
-                        _buildProfileField(
-                          label: 'Full Name',
-                          value: (_studentData?['full_name'] ?? 
-                                  _parentData?['full_name'] ?? 
-                                  _teacherData?['full_name']) ?? 'Not set',
-                          icon: Icons.badge_outlined,
-                          isEditable: true,
-                        ),
-                      const SizedBox(height: 16),
-                    ],
                     
                     // Student-specific fields
                     if (_studentData != null) ...[
@@ -518,6 +545,21 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                     'Address',
                                     child['address'],
                                   ),
+                                  const SizedBox(height: 12),
+                                  Row(
+                                    children: [
+                                      Expanded(
+                                        child: ElevatedButton.icon(
+                                          onPressed: () => _startChatWithUser(
+                                            child['user_id'] as int,
+                                            child['full_name'] as String,
+                                          ),
+                                          icon: const Icon(Icons.message),
+                                          label: const Text('Message'),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ],
                               ),
                             ),
@@ -589,6 +631,15 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                         icon: const Icon(Icons.assignment_add),
                                         label: const Text('Assign Hometask'),
                                         onPressed: () => _showAssignHometaskDialog(student),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      ElevatedButton.icon(
+                                        icon: const Icon(Icons.message),
+                                        label: const Text('Message'),
+                                        onPressed: () => _startChatWithUser(
+                                          student['user_id'] as int,
+                                          student['full_name'] as String,
+                                        ),
                                       ),
                                       const SizedBox(width: 8),
                                       TextButton.icon(
@@ -671,6 +722,15 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                         onPressed: () => _showTeacherProfileDialog(teacher),
                                       ),
                                       const SizedBox(width: 8),
+                                      ElevatedButton.icon(
+                                        icon: const Icon(Icons.message),
+                                        label: const Text('Message'),
+                                        onPressed: () => _startChatWithUser(
+                                          teacher['user_id'] as int,
+                                          teacher['full_name'] as String,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
                                       TextButton.icon(
                                         icon: const Icon(Icons.logout, color: Colors.red),
                                         label: const Text(
@@ -694,34 +754,6 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                         }).toList(),
                     ],
                     
-                    // Edit mode buttons at the bottom of role-specific area
-                    if (_isEditing) ...[
-                      const SizedBox(height: 16),
-                      const Divider(),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: _isSaving ? null : _cancelEditing,
-                            child: const Text('Cancel'),
-                          ),
-                          const SizedBox(width: 8),
-                          ElevatedButton(
-                            onPressed: _isSaving ? null : _saveProfile,
-                            child: _isSaving
-                                ? const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Save'),
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),

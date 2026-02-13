@@ -1,11 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 import 'auth.dart';
+import 'models/chat.dart';
 import 'models/feed.dart';
 import 'services/feed_service.dart';
+import 'widgets/quill_embed_builders.dart';
 import 'widgets/feed_preview_card.dart';
 
 class FeedsScreen extends StatefulWidget {
@@ -508,15 +512,19 @@ class FeedPostCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
             ],
-            quill.QuillEditor.basic(
-              controller: controller,
-              config: quill.QuillEditorConfig(
-                embedBuilders: [
-                  ImageEmbedBuilder(),
-                  VideoEmbedBuilder(),
-                  FileEmbedBuilder(),
-                ],
-                unknownEmbedBuilder: UnknownEmbedBuilder(),
+            IgnorePointer(
+              child: quill.QuillEditor.basic(
+                controller: controller,
+                config: quill.QuillEditorConfig(
+                  embedBuilders: [
+                    ImageEmbedBuilder(),
+                    VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
+                    FileEmbedBuilder(),
+                  ],
+                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -555,25 +563,39 @@ class FeedPostDetailScreen extends StatefulWidget {
 }
 
 class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
+  late FeedPost _post;
   List<FeedComment> _comments = [];
   bool _loading = true;
   bool _isDeleting = false;
   bool _loadingSubscription = true;
   bool _isSubscribed = false;
+  late FeedService _feedService;
 
   @override
   void initState() {
     super.initState();
+    _post = widget.post;
+    _feedService = context.read<FeedService>();
+    _feedService.addListener(_handleFeedUpdate);
+    _feedService.subscribeToPostComments(_post.id);
     _loadComments();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<FeedService>().markPostRead(widget.post.id);
+      _feedService.markPostRead(_post.id);
     });
     _loadSubscription();
   }
 
+  void _handleFeedUpdate() {
+    if (!mounted) return;
+    final updated = _feedService.commentsForPost(_post.id);
+    setState(() {
+      _comments = updated;
+    });
+  }
+
   Future<void> _loadSubscription() async {
     final service = context.read<FeedService>();
-    final subscribed = await service.getPostSubscription(widget.post.id);
+    final subscribed = await service.getPostSubscription(_post.id);
     if (!mounted) return;
     setState(() {
       _isSubscribed = subscribed ?? false;
@@ -590,9 +612,9 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     final service = context.read<FeedService>();
     bool success;
     if (_isSubscribed) {
-      success = await service.deletePostSubscription(widget.post.id);
+      success = await service.deletePostSubscription(_post.id);
     } else {
-      success = await service.updatePostSubscription(widget.post.id, true);
+      success = await service.updatePostSubscription(_post.id, true);
     }
 
     if (!mounted) return;
@@ -612,8 +634,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     setState(() {
       _loading = true;
     });
-    final service = context.read<FeedService>();
-    final comments = await service.fetchComments(widget.post.id);
+    final comments = await _feedService.fetchComments(_post.id);
     if (!mounted) return;
     setState(() {
       _comments = comments;
@@ -621,12 +642,18 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     });
   }
 
+  @override
+  void dispose() {
+    _feedService.removeListener(_handleFeedUpdate);
+    super.dispose();
+  }
+
   Future<void> _deletePost() async {
     final auth = context.read<AuthService>();
     
     // Check permissions: admin, feed owner, or post author
-    final canDelete = auth.isAdmin || 
-                      auth.userId == widget.post.authorUserId;
+    final canDelete = auth.isAdmin ||
+              auth.userId == _post.authorUserId;
     
     if (!canDelete) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -661,7 +688,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     });
 
     final service = context.read<FeedService>();
-    final success = await service.deletePost(widget.post.id);
+    final success = await service.deletePost(_post.id);
 
     if (!mounted) return;
 
@@ -686,17 +713,64 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     return map;
   }
 
+  List<ChatAttachment> _visibleAttachments(
+    List<dynamic> content,
+    List<ChatAttachment> attachments,
+  ) {
+    if (attachments.isEmpty) return [];
+    final body = jsonEncode(content);
+    return attachments.where((attachment) => !body.contains(attachment.url)).toList();
+  }
+
+  Widget _buildAttachmentWidget(ChatAttachment attachment) {
+    final url = normalizeMediaUrl(attachment.url);
+    switch (attachment.attachmentType) {
+      case 'image':
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 240),
+          child: Image.network(url, fit: BoxFit.contain),
+        );
+      case 'video':
+        return ChatVideoPlayer(url: url);
+      case 'audio':
+        return ChatAudioPlayer(url: url, label: 'Audio');
+      case 'voice':
+        return ChatAudioPlayer(url: url, label: 'Voice message');
+      case 'file':
+        return Row(
+          children: [
+            const Icon(Icons.insert_drive_file),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                url.split('/').last,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        );
+      default:
+        return Text('Unsupported attachment: ${attachment.attachmentType}');
+    }
+  }
+
   List<Widget> _buildCommentWidgets(
     Map<int?, List<FeedComment>> tree,
     int? parentId,
     int depth,
   ) {
     final items = tree[parentId] ?? [];
+    final auth = context.read<AuthService>();
     return items.expand((comment) {
       final controller = quill.QuillController(
         document: comment.toDocument(),
         selection: const TextSelection.collapsed(offset: 0),
         readOnly: true,
+      );
+      final commentAttachments = _visibleAttachments(
+        comment.content,
+        comment.attachments,
       );
 
       final children = _buildCommentWidgets(tree, comment.id, depth + 1);
@@ -712,27 +786,49 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            quill.QuillEditor.basic(
-              controller: controller,
-              config: quill.QuillEditorConfig(
-                embedBuilders: [
-                  ImageEmbedBuilder(),
-                  VideoEmbedBuilder(),
-                  FileEmbedBuilder(),
-                ],
-                unknownEmbedBuilder: UnknownEmbedBuilder(),
+            IgnorePointer(
+              child: quill.QuillEditor.basic(
+                controller: controller,
+                config: quill.QuillEditorConfig(
+                  embedBuilders: [
+                    ImageEmbedBuilder(),
+                    VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
+                    FileEmbedBuilder(),
+                  ],
+                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+                ),
               ),
             ),
+              if (commentAttachments.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                for (final attachment in commentAttachments)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: _buildAttachmentWidget(attachment),
+                  ),
+              ],
               const SizedBox(height: 8),
               Text(
-                'Posted ${comment.createdAt.toLocal()}'.split('.').first,
+                _formatTimestamp(comment.createdAt, comment.updatedAt),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => _openCommentComposer(comment.id),
-                  child: const Text('Reply'),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    if ((auth.userId ?? -1) == comment.authorUserId)
+                      TextButton(
+                        onPressed: () => _openCommentEditor(comment),
+                        child: const Text('Edit'),
+                      ),
+                    TextButton(
+                      onPressed: () => _openCommentComposer(comment.id),
+                      child: const Text('Reply'),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -744,12 +840,12 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   }
 
   Future<void> _openCommentComposer(int? parentCommentId) async {
-    if (!widget.post.allowComments) return;
+    if (!_post.allowComments) return;
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => FeedCommentComposer(
-        postId: widget.post.id,
+        postId: _post.id,
         parentCommentId: parentCommentId,
       ),
     );
@@ -759,13 +855,52 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     }
   }
 
+  String _formatTimestamp(DateTime createdAt, DateTime updatedAt) {
+    final base = 'Posted ${createdAt.toLocal()}'.split('.').first;
+    return updatedAt.isAfter(createdAt) ? '$base · edited' : base;
+  }
+
+  Future<void> _editPost() async {
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (_) => FeedPostEditor(feed: widget.feed, post: _post),
+    );
+
+    if (updated == true && mounted) {
+      final refreshed = await _feedService.fetchPost(_post.id);
+      if (refreshed != null && mounted) {
+        setState(() {
+          _post = refreshed;
+        });
+      }
+    }
+  }
+
+  Future<void> _openCommentEditor(FeedComment comment) async {
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (_) => FeedCommentEditor(
+        postId: _post.id,
+        comment: comment,
+      ),
+    );
+
+    if (updated == true) {
+      await _loadComments();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.read<AuthService>();
     final postController = quill.QuillController(
-      document: widget.post.toDocument(),
+      document: _post.toDocument(),
       selection: const TextSelection.collapsed(offset: 0),
       readOnly: true,
+    );
+    final postAttachments = _visibleAttachments(
+      _post.content,
+      _post.attachments,
     );
 
     final tree = _buildTree(_comments);
@@ -773,10 +908,13 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     // For school feeds, only admins can edit/delete
     // For personal/teacher feeds, admins or the post author can edit/delete
     final isSchoolFeed = widget.feed.ownerType.toLowerCase() == 'school';
-    final canEdit = (isSchoolFeed && auth.isAdmin) || 
-                    (!isSchoolFeed && (auth.isAdmin || (auth.userId ?? -1) == widget.post.authorUserId));
-    final canDelete = (isSchoolFeed && auth.isAdmin) || 
-                      (!isSchoolFeed && (auth.isAdmin || (auth.userId ?? -1) == widget.post.authorUserId));
+    final isAuthor = (auth.userId ?? -1) == _post.authorUserId;
+    final canEdit = isSchoolFeed
+      ? (auth.isAdmin || isAuthor)
+      : isAuthor;
+    final canDelete = isSchoolFeed
+      ? (auth.isAdmin || isAuthor)
+      : isAuthor;
 
     return Scaffold(
       appBar: AppBar(
@@ -785,12 +923,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           if (canEdit)
             IconButton(
               icon: const Icon(Icons.edit),
-              onPressed: () {
-                // TODO: Implement edit post
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Edit post coming soon')),
-                );
-              },
+              onPressed: _editPost,
             ),
           if (canDelete)
             IconButton(
@@ -804,23 +937,40 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                if (widget.post.title != null && widget.post.title!.isNotEmpty) ...[
+                if (_post.title != null && _post.title!.isNotEmpty) ...[
                   Text(
-                    widget.post.title!,
+                    _post.title!,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 12),
                 ],
-                quill.QuillEditor.basic(
-                  controller: postController,
-                  config: quill.QuillEditorConfig(
-                    embedBuilders: [
-                      ImageEmbedBuilder(),
-                      VideoEmbedBuilder(),
-                      FileEmbedBuilder(),
-                    ],
-                    unknownEmbedBuilder: UnknownEmbedBuilder(),
+                IgnorePointer(
+                  child: quill.QuillEditor.basic(
+                    controller: postController,
+                    config: quill.QuillEditorConfig(
+                      embedBuilders: [
+                        ImageEmbedBuilder(),
+                        VideoEmbedBuilder(),
+                        AudioEmbedBuilder(),
+                        VoiceEmbedBuilder(),
+                        FileEmbedBuilder(),
+                      ],
+                      unknownEmbedBuilder: UnknownEmbedBuilder(),
+                    ),
                   ),
+                ),
+                if (postAttachments.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  for (final attachment in postAttachments)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: _buildAttachmentWidget(attachment),
+                    ),
+                ],
+                const SizedBox(height: 8),
+                Text(
+                  _formatTimestamp(_post.createdAt, _post.updatedAt),
+                  style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const SizedBox(height: 16),
                 Align(
@@ -853,7 +1003,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                   ..._buildCommentWidgets(tree, null, 0),
               ],
             ),
-      floatingActionButton: widget.post.allowComments
+      floatingActionButton: _post.allowComments
           ? FloatingActionButton.extended(
               onPressed: () => _openCommentComposer(null),
               icon: const Icon(Icons.add_comment),
@@ -873,77 +1023,40 @@ class FeedPostComposer extends StatefulWidget {
   State<FeedPostComposer> createState() => _FeedPostComposerState();
 }
 
-class _FeedPostComposerState extends State<FeedPostComposer> {
-  final TextEditingController _titleController = TextEditingController();
-  final quill.QuillController _controller = quill.QuillController.basic();
+class FeedPostEditor extends StatefulWidget {
+  final Feed feed;
+  final FeedPost post;
+
+  const FeedPostEditor({super.key, required this.feed, required this.post});
+
+  @override
+  State<FeedPostEditor> createState() => _FeedPostEditorState();
+}
+
+class _FeedPostEditorState extends State<FeedPostEditor> {
+  late final TextEditingController _titleController;
+  late final quill.QuillController _controller;
   bool _isImportant = false;
   bool _allowComments = true;
   bool _isSubmitting = false;
-  final List<int> _mediaIds = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.post.title ?? '');
+    _controller = quill.QuillController(
+      document: widget.post.toDocument(),
+      selection: const TextSelection.collapsed(offset: 0),
+    );
+    _isImportant = widget.post.isImportant;
+    _allowComments = widget.post.allowComments;
+  }
 
   @override
   void dispose() {
     _titleController.dispose();
     _controller.dispose();
     super.dispose();
-  }
-
-  Future<void> _attachMedia() async {
-    final result = await FilePicker.platform.pickFiles(withData: true);
-    if (result == null || result.files.isEmpty) return;
-
-    final file = result.files.first;
-    if (file.bytes == null) return;
-
-    final extension = file.extension?.toLowerCase() ?? '';
-    String mediaType = 'file';
-
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension)) {
-      mediaType = 'image';
-    } else if (['mp3', 'wav', 'aac', 'm4a', 'ogg', 'opus'].contains(extension)) {
-      mediaType = 'audio';
-    } else if (['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v'].contains(extension)) {
-      mediaType = 'video';
-    }
-
-    final service = context.read<FeedService>();
-    final upload = await service.uploadMedia(
-      mediaType: mediaType,
-      bytes: file.bytes!,
-      filename: file.name,
-    );
-
-    if (upload == null) return;
-
-    setState(() {
-      _mediaIds.add(upload.id);
-    });
-
-    try {
-      // Ensure document has content - insert placeholder if empty
-      if (_controller.document.length <= 1) {
-        _controller.document.insert(0, '\n');
-      }
-
-      // Insert media at a safe position within the document
-      final insertIndex = _controller.document.length > 1 
-        ? _controller.document.length - 1  // Before final newline
-        : 0;  // Empty or minimal document
-      
-      if (mediaType == 'image') {
-        _controller.document.insert(insertIndex, quill.BlockEmbed.image(upload.url));
-      } else if (mediaType == 'video') {
-        _controller.document.insert(insertIndex, quill.BlockEmbed.video(upload.url));
-      } else {
-        _controller.document.insert(insertIndex, '\nAttachment: ${upload.url}\n');
-      }
-    } catch (e) {
-      print('Error inserting media: $e');
-      // Remove media ID if insertion failed
-      setState(() {
-        _mediaIds.removeLast();
-      });
-    }
   }
 
   Future<void> _submit() async {
@@ -956,6 +1069,293 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     final service = context.read<FeedService>();
     final content = _controller.document.toDelta().toJson();
 
+    final updated = await service.updatePost(
+      widget.post.id,
+      title: _titleController.text.trim().isEmpty
+          ? null
+          : _titleController.text.trim(),
+      content: content,
+      isImportant: _isImportant,
+      importantRank: widget.post.importantRank,
+      allowComments: _allowComments,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSubmitting = false;
+    });
+
+    if (updated != null) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authService = context.read<AuthService>();
+
+    return AlertDialog(
+      title: const Text('Edit post'),
+      content: SizedBox(
+        width: 600,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            const SizedBox(height: 12),
+            quill.QuillSimpleToolbar(
+              controller: _controller,
+              config: const quill.QuillSimpleToolbarConfig(
+                showAlignmentButtons: true,
+                showCodeBlock: false,
+                showQuote: false,
+              ),
+            ),
+            SizedBox(
+              height: 200,
+              child: quill.QuillEditor.basic(
+                controller: _controller,
+                config: quill.QuillEditorConfig(
+                  embedBuilders: [
+                    ImageEmbedBuilder(),
+                    VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
+                    FileEmbedBuilder(),
+                  ],
+                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Checkbox(
+                  value: _allowComments,
+                  onChanged: (value) {
+                    setState(() {
+                      _allowComments = value ?? true;
+                    });
+                  },
+                ),
+                const Text('Allow comments'),
+              ],
+            ),
+            if (authService.isAdmin || authService.roles.contains('teacher'))
+              Row(
+                children: [
+                  Checkbox(
+                    value: _isImportant,
+                    onChanged: (value) {
+                      setState(() {
+                        _isImportant = value ?? false;
+                      });
+                    },
+                  ),
+                  const Text('Mark as important'),
+                ],
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeedPostComposerState extends State<FeedPostComposer> {
+  final TextEditingController _titleController = TextEditingController();
+  final quill.QuillController _controller = quill.QuillController.basic();
+  bool _isImportant = false;
+  bool _allowComments = true;
+  bool _isSubmitting = false;
+  bool _isUploadingAttachment = false;
+  final List<_PendingAttachment> _pendingAttachments = [];
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _insertEmbed(String type, String url) {
+    final selection = _controller.selection;
+    final index = selection.baseOffset < 0 ? _controller.document.length : selection.baseOffset;
+
+    quill.BlockEmbed embed;
+    switch (type) {
+      case 'image':
+        embed = quill.BlockEmbed.image(url);
+        break;
+      case 'video':
+        embed = quill.BlockEmbed.video(url);
+        break;
+      case 'audio':
+      case 'voice':
+      case 'file':
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed(type, url),
+        );
+        break;
+      default:
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed('file', url),
+        );
+    }
+
+    _controller.document.insert(index, embed);
+    _controller.updateSelection(
+      TextSelection.collapsed(offset: index + 1),
+      quill.ChangeSource.local,
+    );
+  }
+
+  Future<void> _pickAttachment({
+    required String attachmentType,
+    required bool inline,
+  }) async {
+    if (_isUploadingAttachment) return;
+
+    final allowed = <String, List<String>>{
+      'image': ['jpg', 'jpeg', 'png', 'webp'],
+      'audio': ['mp3', 'm4a', 'ogg', 'opus', 'wav'],
+      'video': ['mp4', 'webm', 'mov', 'mkv'],
+      'file': [],
+    };
+
+    final type = attachmentType == 'file' ? FileType.any : FileType.custom;
+    final result = await FilePicker.platform.pickFiles(
+      type: type,
+      allowedExtensions: type == FileType.custom ? allowed[attachmentType] : null,
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+
+    setState(() {
+      _isUploadingAttachment = true;
+    });
+
+    final service = context.read<FeedService>();
+    final uploaded = await service.uploadMedia(
+      mediaType: attachmentType,
+      bytes: bytes,
+      filename: file.name,
+    );
+
+    if (!mounted) return;
+
+    if (uploaded == null) {
+      setState(() {
+        _isUploadingAttachment = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to upload media')),
+      );
+      return;
+    }
+
+    final attachment = _PendingAttachment(
+      input: ChatAttachmentInput(
+        mediaId: uploaded.id,
+        attachmentType: attachmentType,
+      ),
+      url: uploaded.url,
+      attachmentType: attachmentType,
+      inline: inline,
+    );
+
+    setState(() {
+      _pendingAttachments.add(attachment);
+      _isUploadingAttachment = false;
+    });
+
+    if (inline) {
+      _insertEmbed(attachmentType, uploaded.url);
+    }
+  }
+
+  void _showAttachmentMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image),
+                title: const Text('Image'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'image', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.video_library),
+                title: const Text('Video'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'video', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.audiotrack),
+                title: const Text('Audio'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'audio', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.insert_drive_file),
+                title: const Text('File'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'file', inline: false);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    final service = context.read<FeedService>();
+    final content = _controller.document.toDelta().toJson();
+    final attachments = _pendingAttachments.map((a) => a.input).toList();
+
     final created = await service.createPost(
       widget.feed.id,
       title: _titleController.text.trim().isEmpty
@@ -964,7 +1364,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
       content: content,
       isImportant: _isImportant,
       allowComments: _allowComments,
-      mediaIds: _mediaIds.isEmpty ? null : _mediaIds,
+      attachments: attachments.isEmpty ? null : attachments,
     );
 
     if (!mounted) return;
@@ -994,6 +1394,28 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
               decoration: const InputDecoration(labelText: 'Title'),
             ),
             const SizedBox(height: 12),
+            if (_pendingAttachments.isNotEmpty)
+              SizedBox(
+                height: 48,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _pendingAttachments.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  itemBuilder: (context, index) {
+                    final item = _pendingAttachments[index];
+                    return Chip(
+                      label: Text(item.label),
+                      onDeleted: () {
+                        setState(() {
+                          _pendingAttachments.removeAt(index);
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            if (_pendingAttachments.isNotEmpty) const SizedBox(height: 12),
             quill.QuillSimpleToolbar(
               controller: _controller,
               config: const quill.QuillSimpleToolbarConfig(
@@ -1010,6 +1432,8 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                   embedBuilders: [
                     ImageEmbedBuilder(),
                     VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
                     FileEmbedBuilder(),
                   ],
                   unknownEmbedBuilder: UnknownEmbedBuilder(),
@@ -1020,8 +1444,12 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
             Row(
               children: [
                 ElevatedButton.icon(
-                  onPressed: _attachMedia,
-                  icon: const Icon(Icons.attach_file),
+                  onPressed: _isUploadingAttachment ? null : _showAttachmentMenu,
+                  icon: Icon(
+                    _isUploadingAttachment
+                        ? Icons.hourglass_top
+                        : Icons.attach_file,
+                  ),
                   label: const Text('Attach'),
                 ),
                 const Spacer(),
@@ -1087,73 +1515,37 @@ class FeedCommentComposer extends StatefulWidget {
   State<FeedCommentComposer> createState() => _FeedCommentComposerState();
 }
 
-class _FeedCommentComposerState extends State<FeedCommentComposer> {
-  final quill.QuillController _controller = quill.QuillController.basic();
+class FeedCommentEditor extends StatefulWidget {
+  final int postId;
+  final FeedComment comment;
+
+  const FeedCommentEditor({
+    super.key,
+    required this.postId,
+    required this.comment,
+  });
+
+  @override
+  State<FeedCommentEditor> createState() => _FeedCommentEditorState();
+}
+
+class _FeedCommentEditorState extends State<FeedCommentEditor> {
+  late final quill.QuillController _controller;
   bool _isSubmitting = false;
-  final List<int> _mediaIds = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = quill.QuillController(
+      document: widget.comment.toDocument(),
+      selection: const TextSelection.collapsed(offset: 0),
+    );
+  }
 
   @override
   void dispose() {
     _controller.dispose();
     super.dispose();
-  }
-
-  Future<void> _attachMedia() async {
-    final result = await FilePicker.platform.pickFiles(withData: true);
-    if (result == null || result.files.isEmpty) return;
-
-    final file = result.files.first;
-    if (file.bytes == null) return;
-
-    final extension = file.extension?.toLowerCase() ?? '';
-    String mediaType = 'file';
-
-    if (['jpg', 'jpeg', 'png', 'gif', 'webp'].contains(extension)) {
-      mediaType = 'image';
-    } else if (['mp3', 'wav', 'aac', 'm4a', 'ogg', 'opus'].contains(extension)) {
-      mediaType = 'audio';
-    } else if (['mp4', 'mov', 'webm', 'mkv', 'avi', 'm4v'].contains(extension)) {
-      mediaType = 'video';
-    }
-
-    final service = context.read<FeedService>();
-    final upload = await service.uploadMedia(
-      mediaType: mediaType,
-      bytes: file.bytes!,
-      filename: file.name,
-    );
-
-    if (upload == null) return;
-
-    setState(() {
-      _mediaIds.add(upload.id);
-    });
-
-    try {
-      // Ensure document has content - insert placeholder if empty
-      if (_controller.document.length <= 1) {
-        _controller.document.insert(0, '\n');
-      }
-
-      // Insert media at a safe position within the document
-      final insertIndex = _controller.document.length > 1 
-        ? _controller.document.length - 1  // Before final newline
-        : 0;  // Empty or minimal document
-      
-      if (mediaType == 'image') {
-        _controller.document.insert(insertIndex, quill.BlockEmbed.image(upload.url));
-      } else if (mediaType == 'video') {
-        _controller.document.insert(insertIndex, quill.BlockEmbed.video(upload.url));
-      } else {
-        _controller.document.insert(insertIndex, '\nAttachment: ${upload.url}\n');
-      }
-    } catch (e) {
-      print('Error inserting media: $e');
-      // Remove media ID if insertion failed
-      setState(() {
-        _mediaIds.removeLast();
-      });
-    }
   }
 
   Future<void> _submit() async {
@@ -1166,11 +1558,254 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
     final service = context.read<FeedService>();
     final content = _controller.document.toDelta().toJson();
 
+    final updated = await service.updateComment(
+      widget.postId,
+      widget.comment.id,
+      content: content,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSubmitting = false;
+    });
+
+    if (updated != null) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit comment'),
+      content: SizedBox(
+        width: 600,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            quill.QuillSimpleToolbar(
+              controller: _controller,
+              config: const quill.QuillSimpleToolbarConfig(
+                showAlignmentButtons: true,
+                showCodeBlock: false,
+                showQuote: false,
+              ),
+            ),
+            SizedBox(
+              height: 180,
+              child: quill.QuillEditor.basic(
+                controller: _controller,
+                config: quill.QuillEditorConfig(
+                  embedBuilders: [
+                    ImageEmbedBuilder(),
+                    VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
+                    FileEmbedBuilder(),
+                  ],
+                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
+    );
+  }
+}
+
+class _FeedCommentComposerState extends State<FeedCommentComposer> {
+  final quill.QuillController _controller = quill.QuillController.basic();
+  bool _isSubmitting = false;
+  bool _isUploadingAttachment = false;
+  final List<_PendingAttachment> _pendingAttachments = [];
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _insertEmbed(String type, String url) {
+    final selection = _controller.selection;
+    final index = selection.baseOffset < 0 ? _controller.document.length : selection.baseOffset;
+
+    quill.BlockEmbed embed;
+    switch (type) {
+      case 'image':
+        embed = quill.BlockEmbed.image(url);
+        break;
+      case 'video':
+        embed = quill.BlockEmbed.video(url);
+        break;
+      case 'audio':
+      case 'voice':
+      case 'file':
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed(type, url),
+        );
+        break;
+      default:
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed('file', url),
+        );
+    }
+
+    _controller.document.insert(index, embed);
+    _controller.updateSelection(
+      TextSelection.collapsed(offset: index + 1),
+      quill.ChangeSource.local,
+    );
+  }
+
+  Future<void> _pickAttachment({
+    required String attachmentType,
+    required bool inline,
+  }) async {
+    if (_isUploadingAttachment) return;
+
+    final allowed = <String, List<String>>{
+      'image': ['jpg', 'jpeg', 'png', 'webp'],
+      'audio': ['mp3', 'm4a', 'ogg', 'opus', 'wav'],
+      'video': ['mp4', 'webm', 'mov', 'mkv'],
+      'file': [],
+    };
+
+    final type = attachmentType == 'file' ? FileType.any : FileType.custom;
+    final result = await FilePicker.platform.pickFiles(
+      type: type,
+      allowedExtensions: type == FileType.custom ? allowed[attachmentType] : null,
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+
+    setState(() {
+      _isUploadingAttachment = true;
+    });
+
+    final service = context.read<FeedService>();
+    final uploaded = await service.uploadMedia(
+      mediaType: attachmentType,
+      bytes: bytes,
+      filename: file.name,
+    );
+
+    if (!mounted) return;
+
+    if (uploaded == null) {
+      setState(() {
+        _isUploadingAttachment = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to upload media')),
+      );
+      return;
+    }
+
+    final attachment = _PendingAttachment(
+      input: ChatAttachmentInput(
+        mediaId: uploaded.id,
+        attachmentType: attachmentType,
+      ),
+      url: uploaded.url,
+      attachmentType: attachmentType,
+      inline: inline,
+    );
+
+    setState(() {
+      _pendingAttachments.add(attachment);
+      _isUploadingAttachment = false;
+    });
+
+    if (inline) {
+      _insertEmbed(attachmentType, uploaded.url);
+    }
+  }
+
+  void _showAttachmentMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image),
+                title: const Text('Image'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'image', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.video_library),
+                title: const Text('Video'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'video', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.audiotrack),
+                title: const Text('Audio'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'audio', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.insert_drive_file),
+                title: const Text('File'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'file', inline: false);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    final service = context.read<FeedService>();
+    final content = _controller.document.toDelta().toJson();
+    final attachments = _pendingAttachments.map((a) => a.input).toList();
+
     final created = await service.createComment(
       widget.postId,
       parentCommentId: widget.parentCommentId,
       content: content,
-      mediaIds: _mediaIds.isEmpty ? null : _mediaIds,
+      attachments: attachments.isEmpty ? null : attachments,
     );
 
     if (!mounted) return;
@@ -1193,6 +1828,28 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (_pendingAttachments.isNotEmpty)
+              SizedBox(
+                height: 48,
+                child: ListView.separated(
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _pendingAttachments.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 6),
+                  itemBuilder: (context, index) {
+                    final item = _pendingAttachments[index];
+                    return Chip(
+                      label: Text(item.label),
+                      onDeleted: () {
+                        setState(() {
+                          _pendingAttachments.removeAt(index);
+                        });
+                      },
+                    );
+                  },
+                ),
+              ),
+            if (_pendingAttachments.isNotEmpty) const SizedBox(height: 12),
             quill.QuillSimpleToolbar(
               controller: _controller,
               config: const quill.QuillSimpleToolbarConfig(
@@ -1209,6 +1866,8 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
                   embedBuilders: [
                     ImageEmbedBuilder(),
                     VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
                     FileEmbedBuilder(),
                   ],
                   unknownEmbedBuilder: UnknownEmbedBuilder(),
@@ -1219,8 +1878,12 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
             Align(
               alignment: Alignment.centerLeft,
               child: ElevatedButton.icon(
-                onPressed: _attachMedia,
-                icon: const Icon(Icons.attach_file),
+                onPressed: _isUploadingAttachment ? null : _showAttachmentMenu,
+                icon: Icon(
+                  _isUploadingAttachment
+                      ? Icons.hourglass_top
+                      : Icons.attach_file,
+                ),
                 label: const Text('Attach'),
               ),
             ),
@@ -1245,6 +1908,22 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
       ],
     );
   }
+}
+
+class _PendingAttachment {
+  final ChatAttachmentInput input;
+  final String url;
+  final String attachmentType;
+  final bool inline;
+
+  _PendingAttachment({
+    required this.input,
+    required this.url,
+    required this.attachmentType,
+    required this.inline,
+  });
+
+  String get label => inline ? '$attachmentType (inline)' : attachmentType;
 }
 
 class FeedSettingsDialog extends StatefulWidget {
@@ -1362,136 +2041,3 @@ class _FeedSettingsDialogState extends State<FeedSettingsDialog> {
   }
 }
 
-class ImageEmbedBuilder extends quill.EmbedBuilder {
-  @override
-  String get key => 'image';
-
-  String _normalizeUrl(String url) {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-    return 'http://localhost:8080$url';
-  }
-
-  @override
-  Widget build(BuildContext context, quill.EmbedContext embedContext) {
-    final url = embedContext.node.value.data as String;
-    final absoluteUrl = _normalizeUrl(url);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: GestureDetector(
-        onTap: () {
-          // Could open image in full screen
-        },
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxHeight: 300),
-          child: Image.network(
-            absoluteUrl,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              return Container(
-                color: Colors.grey[200],
-                child: const Center(
-                  child: Icon(Icons.broken_image),
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class VideoEmbedBuilder extends quill.EmbedBuilder {
-  @override
-  String get key => 'video';
-
-  String _normalizeUrl(String url) {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-    return 'http://localhost:8080$url';
-  }
-
-  @override
-  Widget build(BuildContext context, quill.EmbedContext embedContext) {
-    final url = embedContext.node.value.data as String;
-    final absoluteUrl = _normalizeUrl(url);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Container(
-        color: Colors.grey[200],
-        height: 200,
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.video_library, size: 48),
-              const SizedBox(height: 8),
-              Text(
-                'Video: ${absoluteUrl.split('/').last}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class FileEmbedBuilder extends quill.EmbedBuilder {
-  @override
-  String get key => 'file';
-
-  String _normalizeUrl(String url) {
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-    return 'http://localhost:8080$url';
-  }
-
-  @override
-  Widget build(BuildContext context, quill.EmbedContext embedContext) {
-    final url = embedContext.node.value.data as String;
-    final absoluteUrl = _normalizeUrl(url);
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Row(
-        children: [
-          const Icon(Icons.file_present),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              absoluteUrl.split('/').last,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class UnknownEmbedBuilder extends quill.EmbedBuilder {
-  @override
-  String get key => 'unknown';
-
-  @override
-  Widget build(BuildContext context, quill.EmbedContext embedContext) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: Container(
-        color: Colors.orange[100],
-        padding: const EdgeInsets.all(8),
-        child: Text(
-          'Unsupported embed: ${embedContext.node.value.data}',
-          style: const TextStyle(fontStyle: FontStyle.italic),
-        ),
-      ),
-    );
-  }
-}
