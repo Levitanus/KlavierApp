@@ -308,6 +308,42 @@ class FeedService extends ChangeNotifier {
     return null;
   }
 
+  Future<FeedPost?> updatePost(
+    int postId, {
+    String? title,
+    required List<dynamic> content,
+    bool isImportant = false,
+    int? importantRank,
+    bool allowComments = true,
+  }) async {
+    if (authService.token == null) return null;
+
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/feeds/posts/$postId'),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'title': title,
+          'content': content,
+          'is_important': isImportant,
+          'important_rank': importantRank,
+          'allow_comments': allowComments,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        return FeedPost.fromJson(json.decode(response.body));
+      }
+    } catch (e) {
+      debugPrint('Error updating post: $e');
+    }
+
+    return null;
+  }
+
   Future<List<FeedComment>> fetchComments(int postId) async {
     if (authService.token == null) return [];
 
@@ -365,9 +401,13 @@ class FeedService extends ChangeNotifier {
     try {
       final comment = FeedComment.fromJson(wsMessage.data);
       final existing = _commentsByPost[postId] ?? [];
-      if (existing.any((item) => item.id == comment.id)) return;
-
-      final updated = [...existing, comment];
+      final index = existing.indexWhere((item) => item.id == comment.id);
+      final updated = List<FeedComment>.from(existing);
+      if (index == -1) {
+        updated.add(comment);
+      } else {
+        updated[index] = comment;
+      }
       updated.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       _commentsByPost[postId] = updated;
       notifyListeners();
@@ -410,6 +450,47 @@ class FeedService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('Error creating comment: $e');
+    }
+
+    return null;
+  }
+
+  Future<FeedComment?> updateComment(
+    int postId,
+    int commentId, {
+    required List<dynamic> content,
+  }) async {
+    if (authService.token == null) return null;
+
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/feeds/posts/$postId/comments/$commentId'),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'content': content,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final comment = FeedComment.fromJson(json.decode(response.body));
+        final existing = _commentsByPost[postId] ?? [];
+        final index = existing.indexWhere((item) => item.id == comment.id);
+        final updated = List<FeedComment>.from(existing);
+        if (index == -1) {
+          updated.add(comment);
+        } else {
+          updated[index] = comment;
+        }
+        updated.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+        _commentsByPost[postId] = updated;
+        notifyListeners();
+        return comment;
+      }
+    } catch (e) {
+      debugPrint('Error updating comment: $e');
     }
 
     return null;

@@ -324,7 +324,8 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     thread_id INTEGER NOT NULL REFERENCES chat_threads(id) ON DELETE CASCADE,
     sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     body JSONB NOT NULL, -- Quill document JSON
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- Create attachment type enum for chat messages
@@ -373,6 +374,11 @@ CREATE INDEX IF NOT EXISTS idx_chat_presence_is_online ON chat_presence(is_onlin
 -- Trigger for chat_threads updated_at
 CREATE TRIGGER update_chat_threads_updated_at
     BEFORE UPDATE ON chat_threads
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_chat_messages_updated_at
+    BEFORE UPDATE ON chat_messages
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 

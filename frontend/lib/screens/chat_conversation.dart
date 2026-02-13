@@ -565,6 +565,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               message: message,
               isOwn: isOwn,
               showSenderName: showSenderName,
+              onEdit: isOwn ? () => _editMessage(message) : null,
             );
           },
         );
@@ -859,6 +860,75 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       ),
     );
   }
+
+  Future<void> _editMessage(ChatMessage message) async {
+    final controller = quill.QuillController(
+      document: message.quillController.document,
+      selection: const TextSelection.collapsed(offset: 0),
+    );
+
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit message'),
+        content: SizedBox(
+          width: 600,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              quill.QuillSimpleToolbar(
+                controller: controller,
+                config: const quill.QuillSimpleToolbarConfig(
+                  showAlignmentButtons: true,
+                  showCodeBlock: false,
+                  showQuote: false,
+                ),
+              ),
+              SizedBox(
+                height: 180,
+                child: quill.QuillEditor.basic(
+                  controller: controller,
+                  config: quill.QuillEditorConfig(
+                    embedBuilders: [
+                      ImageEmbedBuilder(),
+                      VideoEmbedBuilder(),
+                      AudioEmbedBuilder(),
+                      VoiceEmbedBuilder(),
+                      FileEmbedBuilder(),
+                    ],
+                    unknownEmbedBuilder: UnknownEmbedBuilder(),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+
+    if (updated != true || !mounted) return;
+
+    final chatService = context.read<ChatService>();
+    final body = controller.document.toDelta().toJson();
+    final result = await chatService.updateMessage(message.id, {'ops': body});
+
+    if (!mounted) return;
+    if (result == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to update message')),
+      );
+    }
+  }
 }
 
 enum _FormatType { bold, italic, underline, link }
@@ -896,11 +966,13 @@ class _MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool isOwn;
   final bool showSenderName;
+  final VoidCallback? onEdit;
 
   const _MessageBubble({
     required this.message,
     required this.isOwn,
     required this.showSenderName,
+    required this.onEdit,
   });
 
   @override
@@ -940,21 +1012,36 @@ class _MessageBubble extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    quill.QuillEditor.basic(
-                      controller: controller,
-                      config: quill.QuillEditorConfig(
-                        scrollable: false,
-                        autoFocus: false,
-                        padding: EdgeInsets.zero,
-                        embedBuilders: [
-                          ImageEmbedBuilder(),
-                          VideoEmbedBuilder(),
-                          AudioEmbedBuilder(),
-                          VoiceEmbedBuilder(),
-                          FileEmbedBuilder(),
-                        ],
-                        unknownEmbedBuilder: UnknownEmbedBuilder(),
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: IgnorePointer(
+                            child: quill.QuillEditor.basic(
+                              controller: controller,
+                              config: quill.QuillEditorConfig(
+                                scrollable: false,
+                                autoFocus: false,
+                                padding: EdgeInsets.zero,
+                                embedBuilders: [
+                                  ImageEmbedBuilder(),
+                                  VideoEmbedBuilder(),
+                                  AudioEmbedBuilder(),
+                                  VoiceEmbedBuilder(),
+                                  FileEmbedBuilder(),
+                                ],
+                                unknownEmbedBuilder: UnknownEmbedBuilder(),
+                              ),
+                            ),
+                          ),
+                        ),
+                        if (onEdit != null)
+                          IconButton(
+                            icon: const Icon(Icons.edit, size: 16),
+                            tooltip: 'Edit message',
+                            onPressed: onEdit,
+                          ),
+                      ],
                     ),
                     if (attachments.isNotEmpty) ...[
                       const SizedBox(height: 8),
@@ -972,7 +1059,7 @@ class _MessageBubble extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              _formatTime(message.createdAt),
+              _formatTime(message.createdAt, isEdited: message.isEdited),
               style: const TextStyle(fontSize: 10, color: Colors.grey),
             ),
           ],
@@ -1049,20 +1136,21 @@ class _MessageBubble extends StatelessWidget {
     return Icon(icon, size: 14, color: color);
   }
 
-  String _formatTime(DateTime dateTime) {
+  String _formatTime(DateTime dateTime, {required bool isEdited}) {
     final now = DateTime.now();
     final diff = now.difference(dateTime);
+    final suffix = isEdited ? ' · edited' : '';
 
     if (diff.inMinutes < 1) {
-      return 'now';
+      return 'now$suffix';
     } else if (diff.inHours < 1) {
-      return '${diff.inMinutes}m ago';
+      return '${diff.inMinutes}m ago$suffix';
     } else if (diff.inDays < 1) {
-      return '${diff.inHours}h ago';
+      return '${diff.inHours}h ago$suffix';
     } else if (dateTime.year == now.year) {
-      return '${dateTime.month}/${dateTime.day}';
+      return '${dateTime.month}/${dateTime.day}$suffix';
     } else {
-      return '${dateTime.year}/${dateTime.month}/${dateTime.day}';
+      return '${dateTime.year}/${dateTime.month}/${dateTime.day}$suffix';
     }
   }
 }

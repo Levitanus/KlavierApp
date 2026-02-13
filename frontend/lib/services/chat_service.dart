@@ -33,6 +33,7 @@ class ChatService extends ChangeNotifier {
   Set<int> subscribedThreads = {};
   bool _wsListenersRegistered = false;
   late final WsMessageCallback _chatMessageCallback = _handleNewMessage;
+  late final WsMessageCallback _messageUpdatedCallback = _handleMessageUpdated;
   late final WsMessageCallback _receiptCallback = _handleReceiptUpdate;
   late final WsMessageCallback _typingCallback = _handleTyping;
   late final WsConnectionCallback _connectionCallback = _handleConnectionChange;
@@ -183,6 +184,7 @@ class ChatService extends ChangeNotifier {
               senderName: message.senderName,
               bodyJson: message.bodyJson,
               createdAt: message.createdAt,
+              updatedAt: message.updatedAt,
               receipts: mergedReceipts,
               attachments: message.attachments,
             ));
@@ -240,6 +242,7 @@ class ChatService extends ChangeNotifier {
 
     // Listen for new messages
     wsService.on('chat_message', _chatMessageCallback);
+    wsService.on('chat_message_updated', _messageUpdatedCallback);
 
     // Listen for receipt updates
     wsService.on('receipt', _receiptCallback);
@@ -276,6 +279,9 @@ class ChatService extends ChangeNotifier {
         senderName: senderName,
         bodyJson: bodyJson,
         createdAt: DateTime.parse(messageData['created_at'] as String),
+        updatedAt: DateTime.parse(
+          (messageData['updated_at'] as String?) ?? (messageData['created_at'] as String),
+        ),
         receipts: const [],
         attachments: attachments,
       );
@@ -300,6 +306,78 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       print('Error handling new message: $e');
+    }
+  }
+
+  void _handleMessageUpdated(WsMessage wsMessage) {
+    final threadId = wsMessage.threadId;
+    if (threadId == null) return;
+
+    try {
+      final messageData = wsMessage.data;
+      final bodyJson = messageData['body'] as Map<String, dynamic>? ?? {};
+      final senderName = messageData['sender_name'] as String? ?? 'Unknown';
+      final attachmentsData = (messageData['attachments'] as List?) ?? [];
+      final attachments = attachmentsData
+          .map((a) => ChatAttachment.fromJson(a as Map<String, dynamic>))
+          .toList();
+
+      final updatedMessage = ChatMessage(
+        id: messageData['message_id'] as int,
+        senderId: messageData['sender_id'] as int,
+        senderName: senderName,
+        bodyJson: bodyJson,
+        createdAt: DateTime.parse(messageData['created_at'] as String),
+        updatedAt: DateTime.parse(
+          (messageData['updated_at'] as String?) ?? (messageData['created_at'] as String),
+        ),
+        receipts: const [],
+        attachments: attachments,
+      );
+
+      final existing = messagesByThread[threadId];
+      if (existing != null) {
+        final index = existing.indexWhere((message) => message.id == updatedMessage.id);
+        if (index != -1) {
+          final current = existing[index];
+          existing[index] = ChatMessage(
+            id: updatedMessage.id,
+            senderId: updatedMessage.senderId,
+            senderName: updatedMessage.senderName,
+            bodyJson: updatedMessage.bodyJson,
+            createdAt: updatedMessage.createdAt,
+            updatedAt: updatedMessage.updatedAt,
+            receipts: current.receipts,
+            attachments: updatedMessage.attachments,
+          );
+        }
+      }
+
+      void updateThreadList(List<ChatThread> list) {
+        final index = list.indexWhere((thread) => thread.id == threadId);
+        if (index == -1) return;
+        final thread = list[index];
+        if (thread.lastMessage?.id != updatedMessage.id) return;
+        list[index] = ChatThread(
+          id: thread.id,
+          participantAId: thread.participantAId,
+          participantBId: thread.participantBId,
+          peerUserId: thread.peerUserId,
+          peerName: thread.peerName,
+          isAdminChat: thread.isAdminChat,
+          lastMessage: updatedMessage,
+          updatedAt: thread.updatedAt,
+          unreadCount: thread.unreadCount,
+        );
+      }
+
+      updateThreadList(threads);
+      updateThreadList(personalThreads);
+      updateThreadList(adminThreads);
+
+      notifyListeners();
+    } catch (e) {
+      print('Error handling message update: $e');
     }
   }
 
@@ -415,6 +493,7 @@ class ChatService extends ChangeNotifier {
             senderName: message.senderName,
             bodyJson: message.bodyJson,
             createdAt: message.createdAt,
+            updatedAt: message.updatedAt,
             receipts: receipts,
             attachments: message.attachments,
           );
@@ -529,6 +608,56 @@ class ChatService extends ChangeNotifier {
     } catch (e) {
       errorMessage = 'Error sending message: $e';
       return false;
+    }
+  }
+
+  Future<ChatMessage?> updateMessage(int messageId, Map<String, dynamic> quillJson) async {
+    errorMessage = null;
+
+    try {
+      final response = await http.patch(
+        Uri.parse('$_baseUrl/messages/$messageId'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({'body': quillJson}),
+      );
+
+      if (response.statusCode == 200) {
+        final updated = ChatMessage.fromJson(json.decode(response.body));
+        final entry = messagesByThread.entries.firstWhere(
+          (entry) => entry.value.any((message) => message.id == messageId),
+          orElse: () => MapEntry(-1, []),
+        );
+
+        if (entry.key != -1) {
+          final list = entry.value;
+          final index = list.indexWhere((message) => message.id == messageId);
+          if (index != -1) {
+            final current = list[index];
+            list[index] = ChatMessage(
+              id: updated.id,
+              senderId: updated.senderId,
+              senderName: updated.senderName,
+              bodyJson: updated.bodyJson,
+              createdAt: updated.createdAt,
+              updatedAt: updated.updatedAt,
+              receipts: current.receipts,
+              attachments: updated.attachments,
+            );
+            notifyListeners();
+          }
+        }
+
+        return updated;
+      } else {
+        errorMessage = 'Failed to update message: ${response.statusCode}';
+        return null;
+      }
+    } catch (e) {
+      errorMessage = 'Error updating message: $e';
+      return null;
     }
   }
 

@@ -183,6 +183,7 @@ pub struct ChatMessage {
     pub sender_id: i32,
     pub body: serde_json::Value, // Quill JSON
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Serialize, FromRow, Clone)]
@@ -222,6 +223,7 @@ pub struct ChatMessageResponse {
     pub sender_name: String,
     pub body: serde_json::Value,
     pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
     pub receipts: Vec<ReceiptResponse>,
     pub attachments: Vec<ChatAttachmentResponse>,
 }
@@ -274,6 +276,11 @@ pub struct AvailableChatUser {
 pub struct CreateMessageRequest {
     pub body: serde_json::Value, // Quill JSON
     pub attachments: Option<Vec<ChatAttachmentInput>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateMessageRequest {
+    pub body: serde_json::Value, // Quill JSON
 }
 
 #[derive(Debug, Deserialize)]
@@ -735,7 +742,7 @@ async fn list_threads(
         };
 
         let last_message = sqlx::query_as::<_, ChatMessage>(
-            "SELECT id, thread_id, sender_id, body, created_at
+            "SELECT id, thread_id, sender_id, body, created_at, updated_at
              FROM chat_messages
              WHERE thread_id = $1
              ORDER BY created_at DESC
@@ -783,6 +790,7 @@ async fn list_threads(
                 sender_name,
                 body: msg.body,
                 created_at: msg.created_at,
+                updated_at: msg.updated_at,
                 receipts: receipts
                     .into_iter()
                     .map(|r| ReceiptResponse {
@@ -853,7 +861,7 @@ async fn get_thread_messages(
     let offset = query.offset.unwrap_or(0);
 
     let messages = sqlx::query_as::<_, ChatMessage>(
-        "SELECT id, thread_id, sender_id, body, created_at
+        "SELECT id, thread_id, sender_id, body, created_at, updated_at
          FROM chat_messages
          WHERE thread_id = $1
          ORDER BY created_at DESC
@@ -902,6 +910,7 @@ async fn get_thread_messages(
             sender_name,
             body: msg.body,
             created_at: msg.created_at,
+            updated_at: msg.updated_at,
             receipts: receipts
                 .into_iter()
                 .map(|r| ReceiptResponse {
@@ -1046,10 +1055,10 @@ async fn send_message(
     };
 
     // Insert message
-    let message_id = sqlx::query_scalar::<_, i32>(
+    let (message_id, created_at, updated_at) = sqlx::query_as::<_, (i32, DateTime<Utc>, DateTime<Utc>)>(
         "INSERT INTO chat_messages (thread_id, sender_id, body)
          VALUES ($1, $2, $3)
-         RETURNING id",
+         RETURNING id, created_at, updated_at",
     )
     .bind(thread_id)
     .bind(user_id)
@@ -1096,7 +1105,8 @@ async fn send_message(
         "sender_name": sender_name,
         "body": payload.body,
         "attachments": attachments,
-        "created_at": chrono::Utc::now().to_rfc3339(),
+        "created_at": created_at.to_rfc3339(),
+        "updated_at": updated_at.to_rfc3339(),
     });
     
     let ws_message = websockets::WsMessage {
@@ -1150,10 +1160,10 @@ async fn send_admin_message(
     };
 
     // Insert message
-    let message_id = sqlx::query_scalar::<_, i32>(
+    let (message_id, created_at, updated_at) = sqlx::query_as::<_, (i32, DateTime<Utc>, DateTime<Utc>)>(
         "INSERT INTO chat_messages (thread_id, sender_id, body)
          VALUES ($1, $2, $3)
-         RETURNING id",
+         RETURNING id, created_at, updated_at",
     )
     .bind(thread_id)
     .bind(user_id)
@@ -1211,7 +1221,8 @@ async fn send_admin_message(
         "sender_name": sender_name,
         "body": payload.body,
         "attachments": attachments,
-        "created_at": chrono::Utc::now().to_rfc3339(),
+        "created_at": created_at.to_rfc3339(),
+        "updated_at": updated_at.to_rfc3339(),
     });
 
     let ws_message = websockets::WsMessage {
@@ -1227,7 +1238,9 @@ async fn send_admin_message(
     Ok(HttpResponse::Created().json(json!({
         "message_id": message_id,
         "thread_id": thread_id,
-        "attachments": attachments
+        "attachments": attachments,
+        "created_at": created_at,
+        "updated_at": updated_at
     })))
 }
 
@@ -1313,6 +1326,106 @@ async fn update_receipt(
     Ok(HttpResponse::Ok().json(json!({"state": payload.state})))
 }
 
+/// Update a chat message body (author only)
+async fn update_message(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    message_id: web::Path<i32>,
+    payload: web::Json<UpdateMessageRequest>,
+) -> Result<HttpResponse> {
+    let user_id = extract_user_id_from_token(&req, &app_state).await?;
+    let message_id = message_id.into_inner();
+
+    let message = sqlx::query_as::<_, ChatMessage>(
+        "SELECT id, thread_id, sender_id, body, created_at, updated_at
+         FROM chat_messages
+         WHERE id = $1",
+    )
+    .bind(message_id)
+    .fetch_optional(&app_state.db)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?
+    .ok_or_else(|| actix_web::error::ErrorNotFound("Message not found"))?;
+
+    if message.sender_id != user_id {
+        return Ok(HttpResponse::Forbidden().json(json!({
+            "error": "Not allowed"
+        })));
+    }
+
+    let updated_message = sqlx::query_as::<_, ChatMessage>(
+        "UPDATE chat_messages
+         SET body = $1
+         WHERE id = $2
+         RETURNING id, thread_id, sender_id, body, created_at, updated_at",
+    )
+    .bind(&payload.body)
+    .bind(message_id)
+    .fetch_one(&app_state.db)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
+    let sender_name = fetch_user_display_name(&app_state.db, user_id).await;
+    let receipts = sqlx::query_as::<_, MessageReceipt>(
+        "SELECT id, message_id, recipient_id, state, updated_at
+         FROM message_receipts
+         WHERE message_id = $1",
+    )
+    .bind(updated_message.id)
+    .fetch_all(&app_state.db)
+    .await
+    .ok()
+    .unwrap_or_default();
+
+    let attachments = load_attachments_for_messages(&app_state.db, &[updated_message.id])
+        .await
+        .ok()
+        .and_then(|map| map.get(&updated_message.id).cloned())
+        .unwrap_or_default();
+
+    let response = ChatMessageResponse {
+        id: updated_message.id,
+        sender_id: updated_message.sender_id,
+        sender_name: sender_name.clone(),
+        body: updated_message.body,
+        created_at: updated_message.created_at,
+        updated_at: updated_message.updated_at,
+        receipts: receipts
+            .into_iter()
+            .map(|r| ReceiptResponse {
+                recipient_id: r.recipient_id,
+                state: r.state,
+                updated_at: r.updated_at,
+            })
+            .collect(),
+        attachments: attachments.clone(),
+    };
+
+    let ws_message = websockets::WsMessage {
+        msg_type: "chat_message_updated".to_string(),
+        user_id: Some(user_id),
+        thread_id: Some(updated_message.thread_id),
+        post_id: None,
+        data: serde_json::json!({
+            "message_id": response.id,
+            "thread_id": updated_message.thread_id,
+            "sender_id": response.sender_id,
+            "sender_name": response.sender_name,
+            "body": response.body,
+            "attachments": response.attachments,
+            "created_at": response.created_at.to_rfc3339(),
+            "updated_at": response.updated_at.to_rfc3339(),
+        }),
+    };
+
+    app_state
+        .ws_server
+        .broadcast_to_thread(updated_message.thread_id, ws_message)
+        .await;
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
 /// Get related teachers for current user (for toolbar)
 async fn get_related_teachers_handler(
     req: HttpRequest,
@@ -1375,6 +1488,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/threads", web::post().to(start_thread))
             .route("/threads/{thread_id}/messages", web::get().to(get_thread_messages))
             .route("/threads/{thread_id}/messages", web::post().to(send_message))
+            .route("/messages/{message_id}", web::patch().to(update_message))
             .route("/messages/{message_id}/receipt", web::patch().to(update_receipt))
             .route("/admin/message", web::post().to(send_admin_message))
             .route("/related-teachers", web::get().to(get_related_teachers_handler))

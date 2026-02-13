@@ -61,6 +61,7 @@ class ChatMessage {
   final String senderName;
   final Map<String, dynamic> bodyJson; // Quill JSON
   final DateTime createdAt;
+  final DateTime updatedAt;
   final List<MessageReceipt> receipts;
   final List<ChatAttachment> attachments;
 
@@ -70,9 +71,12 @@ class ChatMessage {
     required this.senderName,
     required this.bodyJson,
     required this.createdAt,
+    required this.updatedAt,
     required this.receipts,
     required this.attachments,
   });
+
+  bool get isEdited => updatedAt.isAfter(createdAt);
 
   // Convert Quill JSON to QuillController for editing
   quill.QuillController get quillController {
@@ -113,6 +117,9 @@ class ChatMessage {
       senderName: json['sender_name'] as String? ?? 'Unknown',
       bodyJson: json['body'] as Map<String, dynamic>? ?? {},
       createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: DateTime.parse(
+        (json['updated_at'] as String?) ?? (json['created_at'] as String),
+      ),
       receipts: (json['receipts'] as List?)
               ?.map((r) =>
                   MessageReceipt.fromJson(r as Map<String, dynamic>))
@@ -133,6 +140,7 @@ class ChatMessage {
       'sender_name': senderName,
       'body': bodyJson,
       'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
       'receipts': receipts.map((r) => r.toJson()).toList(),
       'attachments': attachments.map((a) => a.toJson()).toList(),
     };

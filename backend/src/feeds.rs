@@ -118,6 +118,22 @@ pub struct CreateCommentRequest {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct UpdatePostRequest {
+    pub title: Option<String>,
+    pub content: Option<JsonValue>,
+    pub is_important: Option<bool>,
+    pub important_rank: Option<i32>,
+    pub allow_comments: Option<bool>,
+    pub attachments: Option<Vec<ChatAttachmentInput>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct UpdateCommentRequest {
+    pub content: Option<JsonValue>,
+    pub attachments: Option<Vec<ChatAttachmentInput>>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct UpdateFeedSettingsRequest {
     pub allow_student_posts: bool,
 }
@@ -503,6 +519,14 @@ async fn ensure_feed_owner(_app_state: &AppState, feed: &Feed, user_id: i32, cla
     }
 
     Err(actix_web::error::ErrorForbidden("Not allowed"))
+}
+
+fn can_edit_post(feed: &Feed, post_author_id: i32, user_id: i32, claims: &crate::users::Claims) -> bool {
+    if feed.owner_type == "school" {
+        return is_admin(claims) || post_author_id == user_id;
+    }
+
+    post_author_id == user_id
 }
 
 pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Result<HttpResponse> {
@@ -1297,6 +1321,281 @@ pub async fn create_comment(
     Ok(HttpResponse::Created().json(comment_response))
 }
 
+pub async fn update_post(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    post_id: web::Path<i32>,
+    payload: web::Json<UpdatePostRequest>,
+) -> Result<HttpResponse> {
+    let claims = verify_token(&req, &app_state)
+        .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
+    let user_id = extract_user_id_from_token(&req, &app_state).await?;
+
+    let post = sqlx::query_as::<_, FeedPost>(
+        "SELECT fp.id, fp.feed_id, fp.author_user_id, fp.title, fp.content, fp.is_important, fp.important_rank, fp.allow_comments, fp.created_at, fp.updated_at, (fpr.read_at IS NOT NULL) AS is_read FROM feed_posts fp LEFT JOIN feed_post_reads fpr ON fpr.post_id = fp.id AND fpr.user_id = $2 WHERE fp.id = $1"
+    )
+    .bind(*post_id)
+    .bind(user_id)
+    .fetch_optional(&app_state.db)
+    .await
+    .map_err(|e| {
+        error!("Database error fetching post: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to update post")
+    })?
+    .ok_or_else(|| actix_web::error::ErrorNotFound("Post not found"))?;
+
+    let feed = fetch_feed(&app_state, post.feed_id).await?;
+    ensure_feed_access(&app_state, &feed, user_id, &claims).await?;
+
+    if !can_edit_post(&feed, post.author_user_id, user_id, &claims) {
+        return Err(actix_web::error::ErrorForbidden("Not allowed"));
+    }
+
+    let new_title = payload.title.clone().or(post.title);
+    let new_content = payload.content.clone().unwrap_or(post.content);
+    let new_is_important = payload.is_important.unwrap_or(post.is_important);
+    let new_important_rank = if payload.is_important == Some(false) {
+        None
+    } else {
+        payload.important_rank.or(post.important_rank)
+    };
+    let new_allow_comments = payload.allow_comments.unwrap_or(post.allow_comments);
+
+    let mut tx = app_state.db.begin().await.map_err(|e| {
+        error!("Database error starting transaction: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to update post")
+    })?;
+
+    let attachments = if let Some(items) = payload.attachments.as_deref() {
+        sqlx::query("DELETE FROM feed_post_media WHERE post_id = $1")
+            .bind(post.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| {
+                error!("Database error clearing post media: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Failed to update post")
+            })?;
+
+        match store_post_attachments(&mut *tx, user_id, post.id, items).await {
+            Ok(saved) => Some(saved),
+            Err(response) => return Ok(response),
+        }
+    } else {
+        None
+    };
+
+    sqlx::query(
+        r#"
+        UPDATE feed_posts
+        SET title = $1,
+            content = $2,
+            is_important = $3,
+            important_rank = $4,
+            allow_comments = $5
+        WHERE id = $6
+        "#,
+    )
+    .bind(&new_title)
+    .bind(&new_content)
+    .bind(new_is_important)
+    .bind(new_important_rank)
+    .bind(new_allow_comments)
+    .bind(post.id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| {
+        error!("Database error updating post: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to update post")
+    })?;
+
+    let updated_post = sqlx::query_as::<_, FeedPost>(
+        "SELECT fp.id, fp.feed_id, fp.author_user_id, fp.title, fp.content, fp.is_important, fp.important_rank, fp.allow_comments, fp.created_at, fp.updated_at, (fpr.read_at IS NOT NULL) AS is_read FROM feed_posts fp LEFT JOIN feed_post_reads fpr ON fpr.post_id = fp.id AND fpr.user_id = $2 WHERE fp.id = $1"
+    )
+    .bind(post.id)
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|e| {
+        error!("Database error fetching updated post: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to update post")
+    })?;
+
+    tx.commit().await.map_err(|e| {
+        error!("Database error committing post update: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to update post")
+    })?;
+
+    let final_attachments = if let Some(saved) = attachments {
+        saved
+    } else {
+        load_attachments_for_posts(&app_state.db, &[post.id])
+            .await
+            .map_err(|e| {
+                error!("Database error fetching post attachments: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Failed to fetch post attachments")
+            })?
+            .get(&post.id)
+            .cloned()
+            .unwrap_or_default()
+    };
+
+    let response = FeedPostResponse {
+        id: updated_post.id,
+        feed_id: updated_post.feed_id,
+        author_user_id: updated_post.author_user_id,
+        title: updated_post.title,
+        content: updated_post.content,
+        is_important: updated_post.is_important,
+        important_rank: updated_post.important_rank,
+        allow_comments: updated_post.allow_comments,
+        created_at: updated_post.created_at,
+        updated_at: updated_post.updated_at,
+        is_read: updated_post.is_read,
+        attachments: final_attachments,
+    };
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
+pub async fn update_comment(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<(i32, i32)>,
+    payload: web::Json<UpdateCommentRequest>,
+) -> Result<HttpResponse> {
+    let claims = verify_token(&req, &app_state)
+        .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
+    let user_id = extract_user_id_from_token(&req, &app_state).await?;
+    let (post_id, comment_id) = path.into_inner();
+
+    let comment = sqlx::query_as::<_, FeedComment>(
+        "SELECT id, post_id, author_user_id, parent_comment_id, content, created_at, updated_at FROM feed_comments WHERE id = $1"
+    )
+    .bind(comment_id)
+    .fetch_optional(&app_state.db)
+    .await
+    .map_err(|e| {
+        error!("Database error fetching comment: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to update comment")
+    })?
+    .ok_or_else(|| actix_web::error::ErrorNotFound("Comment not found"))?;
+
+    if comment.author_user_id != user_id {
+        return Err(actix_web::error::ErrorForbidden("Not allowed"));
+    }
+
+    if comment.post_id != post_id {
+        return Err(actix_web::error::ErrorNotFound("Comment not found"));
+    }
+
+    let feed = sqlx::query_as::<_, Feed>(
+        r#"
+        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.title, f.created_at
+        FROM feeds f
+        JOIN feed_posts p ON p.feed_id = f.id
+        WHERE p.id = $1
+        "#
+    )
+    .bind(comment.post_id)
+    .fetch_optional(&app_state.db)
+    .await
+    .map_err(|e| {
+        error!("Database error fetching feed for comment: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to update comment")
+    })?
+    .ok_or_else(|| actix_web::error::ErrorNotFound("Post not found"))?;
+
+    ensure_feed_access(&app_state, &feed, user_id, &claims).await?;
+
+    let new_content = payload.content.clone().unwrap_or(comment.content);
+
+    let mut tx = app_state.db.begin().await.map_err(|e| {
+        error!("Database error starting transaction: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to update comment")
+    })?;
+
+    let attachments = if let Some(items) = payload.attachments.as_deref() {
+        sqlx::query("DELETE FROM feed_comment_media WHERE comment_id = $1")
+            .bind(comment.id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| {
+                error!("Database error clearing comment media: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Failed to update comment")
+            })?;
+
+        match store_comment_attachments(&mut *tx, user_id, comment.id, items).await {
+            Ok(saved) => Some(saved),
+            Err(response) => return Ok(response),
+        }
+    } else {
+        None
+    };
+
+    let updated_comment = sqlx::query_as::<_, FeedComment>(
+        r#"
+        UPDATE feed_comments
+        SET content = $1
+        WHERE id = $2
+        RETURNING id, post_id, author_user_id, parent_comment_id, content, created_at, updated_at
+        "#
+    )
+    .bind(&new_content)
+    .bind(comment.id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|e| {
+        error!("Database error updating comment: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to update comment")
+    })?;
+
+    tx.commit().await.map_err(|e| {
+        error!("Database error committing comment update: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to update comment")
+    })?;
+
+    let final_attachments = if let Some(saved) = attachments {
+        saved
+    } else {
+        load_attachments_for_comments(&app_state.db, &[comment.id])
+            .await
+            .map_err(|e| {
+                error!("Database error fetching comment attachments: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Failed to fetch comment attachments")
+            })?
+            .get(&comment.id)
+            .cloned()
+            .unwrap_or_default()
+    };
+
+    let response = FeedCommentResponse {
+        id: updated_comment.id,
+        post_id: updated_comment.post_id,
+        author_user_id: updated_comment.author_user_id,
+        parent_comment_id: updated_comment.parent_comment_id,
+        content: updated_comment.content,
+        created_at: updated_comment.created_at,
+        updated_at: updated_comment.updated_at,
+        attachments: final_attachments,
+    };
+
+    let comment_data = serde_json::to_value(&response)
+        .unwrap_or_else(|_| serde_json::json!({}));
+    let ws_message = websockets::WsMessage {
+        msg_type: "comment".to_string(),
+        user_id: Some(user_id),
+        thread_id: None,
+        post_id: Some(updated_comment.post_id),
+        data: comment_data,
+    };
+    app_state
+        .ws_server
+        .broadcast_to_post(updated_comment.post_id, ws_message)
+        .await;
+
+    Ok(HttpResponse::Ok().json(response))
+}
+
 pub async fn update_post_subscription(
     req: HttpRequest,
     app_state: web::Data<AppState>,
@@ -1463,9 +1762,8 @@ pub async fn delete_post(
     })?
     .ok_or_else(|| actix_web::error::ErrorNotFound("Post not found"))?;
 
-    // Check if user is admin or post author
-    let is_admin = claims.roles.iter().any(|r| r == "admin");
-    if !is_admin && post.author_user_id != user_id {
+    let feed = fetch_feed(&app_state, post.feed_id).await?;
+    if !can_edit_post(&feed, post.author_user_id, user_id, &claims) {
         return Err(actix_web::error::ErrorForbidden("You do not have permission to delete this post"));
     }
 
@@ -1500,10 +1798,12 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/{feed_id}/posts", web::post().to(create_post))
             .route("/{feed_id}/read", web::post().to(mark_feed_read))
             .route("/posts/{post_id}", web::get().to(get_post))
+            .route("/posts/{post_id}", web::put().to(update_post))
             .route("/posts/{post_id}", web::delete().to(delete_post))
             .route("/posts/{post_id}/read", web::post().to(mark_post_read))
             .route("/posts/{post_id}/comments", web::get().to(list_comments))
             .route("/posts/{post_id}/comments", web::post().to(create_comment))
+            .route("/posts/{post_id}/comments/{comment_id}", web::put().to(update_comment))
             .route("/posts/{post_id}/subscribe", web::get().to(get_post_subscription))
             .route("/posts/{post_id}/subscribe", web::put().to(update_post_subscription))
             .route("/posts/{post_id}/subscribe", web::delete().to(delete_post_subscription))

@@ -512,17 +512,19 @@ class FeedPostCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
             ],
-            quill.QuillEditor.basic(
-              controller: controller,
-              config: quill.QuillEditorConfig(
-                embedBuilders: [
-                  ImageEmbedBuilder(),
-                  VideoEmbedBuilder(),
-                  AudioEmbedBuilder(),
-                  VoiceEmbedBuilder(),
-                  FileEmbedBuilder(),
-                ],
-                unknownEmbedBuilder: UnknownEmbedBuilder(),
+            IgnorePointer(
+              child: quill.QuillEditor.basic(
+                controller: controller,
+                config: quill.QuillEditorConfig(
+                  embedBuilders: [
+                    ImageEmbedBuilder(),
+                    VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
+                    FileEmbedBuilder(),
+                  ],
+                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -561,6 +563,7 @@ class FeedPostDetailScreen extends StatefulWidget {
 }
 
 class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
+  late FeedPost _post;
   List<FeedComment> _comments = [];
   bool _loading = true;
   bool _isDeleting = false;
@@ -571,19 +574,20 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   @override
   void initState() {
     super.initState();
+    _post = widget.post;
     _feedService = context.read<FeedService>();
     _feedService.addListener(_handleFeedUpdate);
-    _feedService.subscribeToPostComments(widget.post.id);
+    _feedService.subscribeToPostComments(_post.id);
     _loadComments();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _feedService.markPostRead(widget.post.id);
+      _feedService.markPostRead(_post.id);
     });
     _loadSubscription();
   }
 
   void _handleFeedUpdate() {
     if (!mounted) return;
-    final updated = _feedService.commentsForPost(widget.post.id);
+    final updated = _feedService.commentsForPost(_post.id);
     setState(() {
       _comments = updated;
     });
@@ -591,7 +595,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
 
   Future<void> _loadSubscription() async {
     final service = context.read<FeedService>();
-    final subscribed = await service.getPostSubscription(widget.post.id);
+    final subscribed = await service.getPostSubscription(_post.id);
     if (!mounted) return;
     setState(() {
       _isSubscribed = subscribed ?? false;
@@ -608,9 +612,9 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     final service = context.read<FeedService>();
     bool success;
     if (_isSubscribed) {
-      success = await service.deletePostSubscription(widget.post.id);
+      success = await service.deletePostSubscription(_post.id);
     } else {
-      success = await service.updatePostSubscription(widget.post.id, true);
+      success = await service.updatePostSubscription(_post.id, true);
     }
 
     if (!mounted) return;
@@ -630,7 +634,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     setState(() {
       _loading = true;
     });
-    final comments = await _feedService.fetchComments(widget.post.id);
+    final comments = await _feedService.fetchComments(_post.id);
     if (!mounted) return;
     setState(() {
       _comments = comments;
@@ -648,8 +652,8 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     final auth = context.read<AuthService>();
     
     // Check permissions: admin, feed owner, or post author
-    final canDelete = auth.isAdmin || 
-                      auth.userId == widget.post.authorUserId;
+    final canDelete = auth.isAdmin ||
+              auth.userId == _post.authorUserId;
     
     if (!canDelete) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -684,7 +688,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     });
 
     final service = context.read<FeedService>();
-    final success = await service.deletePost(widget.post.id);
+    final success = await service.deletePost(_post.id);
 
     if (!mounted) return;
 
@@ -757,6 +761,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     int depth,
   ) {
     final items = tree[parentId] ?? [];
+    final auth = context.read<AuthService>();
     return items.expand((comment) {
       final controller = quill.QuillController(
         document: comment.toDocument(),
@@ -781,17 +786,19 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            quill.QuillEditor.basic(
-              controller: controller,
-              config: quill.QuillEditorConfig(
-                embedBuilders: [
-                  ImageEmbedBuilder(),
-                  VideoEmbedBuilder(),
-                  AudioEmbedBuilder(),
-                  VoiceEmbedBuilder(),
-                  FileEmbedBuilder(),
-                ],
-                unknownEmbedBuilder: UnknownEmbedBuilder(),
+            IgnorePointer(
+              child: quill.QuillEditor.basic(
+                controller: controller,
+                config: quill.QuillEditorConfig(
+                  embedBuilders: [
+                    ImageEmbedBuilder(),
+                    VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
+                    FileEmbedBuilder(),
+                  ],
+                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+                ),
               ),
             ),
               if (commentAttachments.isNotEmpty) ...[
@@ -804,14 +811,24 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
               ],
               const SizedBox(height: 8),
               Text(
-                'Posted ${comment.createdAt.toLocal()}'.split('.').first,
+                _formatTimestamp(comment.createdAt, comment.updatedAt),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               Align(
                 alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => _openCommentComposer(comment.id),
-                  child: const Text('Reply'),
+                child: Wrap(
+                  spacing: 8,
+                  children: [
+                    if ((auth.userId ?? -1) == comment.authorUserId)
+                      TextButton(
+                        onPressed: () => _openCommentEditor(comment),
+                        child: const Text('Edit'),
+                      ),
+                    TextButton(
+                      onPressed: () => _openCommentComposer(comment.id),
+                      child: const Text('Reply'),
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -823,12 +840,12 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   }
 
   Future<void> _openCommentComposer(int? parentCommentId) async {
-    if (!widget.post.allowComments) return;
+    if (!_post.allowComments) return;
 
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => FeedCommentComposer(
-        postId: widget.post.id,
+        postId: _post.id,
         parentCommentId: parentCommentId,
       ),
     );
@@ -838,17 +855,52 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     }
   }
 
+  String _formatTimestamp(DateTime createdAt, DateTime updatedAt) {
+    final base = 'Posted ${createdAt.toLocal()}'.split('.').first;
+    return updatedAt.isAfter(createdAt) ? '$base · edited' : base;
+  }
+
+  Future<void> _editPost() async {
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (_) => FeedPostEditor(feed: widget.feed, post: _post),
+    );
+
+    if (updated == true && mounted) {
+      final refreshed = await _feedService.fetchPost(_post.id);
+      if (refreshed != null && mounted) {
+        setState(() {
+          _post = refreshed;
+        });
+      }
+    }
+  }
+
+  Future<void> _openCommentEditor(FeedComment comment) async {
+    final updated = await showDialog<bool>(
+      context: context,
+      builder: (_) => FeedCommentEditor(
+        postId: _post.id,
+        comment: comment,
+      ),
+    );
+
+    if (updated == true) {
+      await _loadComments();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.read<AuthService>();
     final postController = quill.QuillController(
-      document: widget.post.toDocument(),
+      document: _post.toDocument(),
       selection: const TextSelection.collapsed(offset: 0),
       readOnly: true,
     );
     final postAttachments = _visibleAttachments(
-      widget.post.content,
-      widget.post.attachments,
+      _post.content,
+      _post.attachments,
     );
 
     final tree = _buildTree(_comments);
@@ -856,10 +908,13 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     // For school feeds, only admins can edit/delete
     // For personal/teacher feeds, admins or the post author can edit/delete
     final isSchoolFeed = widget.feed.ownerType.toLowerCase() == 'school';
-    final canEdit = (isSchoolFeed && auth.isAdmin) || 
-                    (!isSchoolFeed && (auth.isAdmin || (auth.userId ?? -1) == widget.post.authorUserId));
-    final canDelete = (isSchoolFeed && auth.isAdmin) || 
-                      (!isSchoolFeed && (auth.isAdmin || (auth.userId ?? -1) == widget.post.authorUserId));
+    final isAuthor = (auth.userId ?? -1) == _post.authorUserId;
+    final canEdit = isSchoolFeed
+      ? (auth.isAdmin || isAuthor)
+      : isAuthor;
+    final canDelete = isSchoolFeed
+      ? (auth.isAdmin || isAuthor)
+      : isAuthor;
 
     return Scaffold(
       appBar: AppBar(
@@ -868,12 +923,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           if (canEdit)
             IconButton(
               icon: const Icon(Icons.edit),
-              onPressed: () {
-                // TODO: Implement edit post
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Edit post coming soon')),
-                );
-              },
+              onPressed: _editPost,
             ),
           if (canDelete)
             IconButton(
@@ -887,24 +937,26 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                if (widget.post.title != null && widget.post.title!.isNotEmpty) ...[
+                if (_post.title != null && _post.title!.isNotEmpty) ...[
                   Text(
-                    widget.post.title!,
+                    _post.title!,
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 12),
                 ],
-                quill.QuillEditor.basic(
-                  controller: postController,
-                  config: quill.QuillEditorConfig(
-                    embedBuilders: [
-                      ImageEmbedBuilder(),
-                      VideoEmbedBuilder(),
-                      AudioEmbedBuilder(),
-                      VoiceEmbedBuilder(),
-                      FileEmbedBuilder(),
-                    ],
-                    unknownEmbedBuilder: UnknownEmbedBuilder(),
+                IgnorePointer(
+                  child: quill.QuillEditor.basic(
+                    controller: postController,
+                    config: quill.QuillEditorConfig(
+                      embedBuilders: [
+                        ImageEmbedBuilder(),
+                        VideoEmbedBuilder(),
+                        AudioEmbedBuilder(),
+                        VoiceEmbedBuilder(),
+                        FileEmbedBuilder(),
+                      ],
+                      unknownEmbedBuilder: UnknownEmbedBuilder(),
+                    ),
                   ),
                 ),
                 if (postAttachments.isNotEmpty) ...[
@@ -915,6 +967,11 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                       child: _buildAttachmentWidget(attachment),
                     ),
                 ],
+                const SizedBox(height: 8),
+                Text(
+                  _formatTimestamp(_post.createdAt, _post.updatedAt),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
                 const SizedBox(height: 16),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -946,7 +1003,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                   ..._buildCommentWidgets(tree, null, 0),
               ],
             ),
-      floatingActionButton: widget.post.allowComments
+      floatingActionButton: _post.allowComments
           ? FloatingActionButton.extended(
               onPressed: () => _openCommentComposer(null),
               icon: const Icon(Icons.add_comment),
@@ -964,6 +1021,165 @@ class FeedPostComposer extends StatefulWidget {
 
   @override
   State<FeedPostComposer> createState() => _FeedPostComposerState();
+}
+
+class FeedPostEditor extends StatefulWidget {
+  final Feed feed;
+  final FeedPost post;
+
+  const FeedPostEditor({super.key, required this.feed, required this.post});
+
+  @override
+  State<FeedPostEditor> createState() => _FeedPostEditorState();
+}
+
+class _FeedPostEditorState extends State<FeedPostEditor> {
+  late final TextEditingController _titleController;
+  late final quill.QuillController _controller;
+  bool _isImportant = false;
+  bool _allowComments = true;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleController = TextEditingController(text: widget.post.title ?? '');
+    _controller = quill.QuillController(
+      document: widget.post.toDocument(),
+      selection: const TextSelection.collapsed(offset: 0),
+    );
+    _isImportant = widget.post.isImportant;
+    _allowComments = widget.post.allowComments;
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    final service = context.read<FeedService>();
+    final content = _controller.document.toDelta().toJson();
+
+    final updated = await service.updatePost(
+      widget.post.id,
+      title: _titleController.text.trim().isEmpty
+          ? null
+          : _titleController.text.trim(),
+      content: content,
+      isImportant: _isImportant,
+      importantRank: widget.post.importantRank,
+      allowComments: _allowComments,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSubmitting = false;
+    });
+
+    if (updated != null) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authService = context.read<AuthService>();
+
+    return AlertDialog(
+      title: const Text('Edit post'),
+      content: SizedBox(
+        width: 600,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            const SizedBox(height: 12),
+            quill.QuillSimpleToolbar(
+              controller: _controller,
+              config: const quill.QuillSimpleToolbarConfig(
+                showAlignmentButtons: true,
+                showCodeBlock: false,
+                showQuote: false,
+              ),
+            ),
+            SizedBox(
+              height: 200,
+              child: quill.QuillEditor.basic(
+                controller: _controller,
+                config: quill.QuillEditorConfig(
+                  embedBuilders: [
+                    ImageEmbedBuilder(),
+                    VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
+                    FileEmbedBuilder(),
+                  ],
+                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Checkbox(
+                  value: _allowComments,
+                  onChanged: (value) {
+                    setState(() {
+                      _allowComments = value ?? true;
+                    });
+                  },
+                ),
+                const Text('Allow comments'),
+              ],
+            ),
+            if (authService.isAdmin || authService.roles.contains('teacher'))
+              Row(
+                children: [
+                  Checkbox(
+                    value: _isImportant,
+                    onChanged: (value) {
+                      setState(() {
+                        _isImportant = value ?? false;
+                      });
+                    },
+                  ),
+                  const Text('Mark as important'),
+                ],
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
+    );
+  }
 }
 
 class _FeedPostComposerState extends State<FeedPostComposer> {
@@ -1297,6 +1513,122 @@ class FeedCommentComposer extends StatefulWidget {
 
   @override
   State<FeedCommentComposer> createState() => _FeedCommentComposerState();
+}
+
+class FeedCommentEditor extends StatefulWidget {
+  final int postId;
+  final FeedComment comment;
+
+  const FeedCommentEditor({
+    super.key,
+    required this.postId,
+    required this.comment,
+  });
+
+  @override
+  State<FeedCommentEditor> createState() => _FeedCommentEditorState();
+}
+
+class _FeedCommentEditorState extends State<FeedCommentEditor> {
+  late final quill.QuillController _controller;
+  bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = quill.QuillController(
+      document: widget.comment.toDocument(),
+      selection: const TextSelection.collapsed(offset: 0),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_isSubmitting) return;
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    final service = context.read<FeedService>();
+    final content = _controller.document.toDelta().toJson();
+
+    final updated = await service.updateComment(
+      widget.postId,
+      widget.comment.id,
+      content: content,
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isSubmitting = false;
+    });
+
+    if (updated != null) {
+      Navigator.of(context).pop(true);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Edit comment'),
+      content: SizedBox(
+        width: 600,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            quill.QuillSimpleToolbar(
+              controller: _controller,
+              config: const quill.QuillSimpleToolbarConfig(
+                showAlignmentButtons: true,
+                showCodeBlock: false,
+                showQuote: false,
+              ),
+            ),
+            SizedBox(
+              height: 180,
+              child: quill.QuillEditor.basic(
+                controller: _controller,
+                config: quill.QuillEditorConfig(
+                  embedBuilders: [
+                    ImageEmbedBuilder(),
+                    VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
+                    FileEmbedBuilder(),
+                  ],
+                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _isSubmitting ? null : _submit,
+          child: _isSubmitting
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save'),
+        ),
+      ],
+    );
+  }
 }
 
 class _FeedCommentComposerState extends State<FeedCommentComposer> {
