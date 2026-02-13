@@ -62,6 +62,7 @@ class ChatMessage {
   final Map<String, dynamic> bodyJson; // Quill JSON
   final DateTime createdAt;
   final List<MessageReceipt> receipts;
+  final List<ChatAttachment> attachments;
 
   ChatMessage({
     required this.id,
@@ -70,6 +71,7 @@ class ChatMessage {
     required this.bodyJson,
     required this.createdAt,
     required this.receipts,
+    required this.attachments,
   });
 
   // Convert Quill JSON to QuillController for editing
@@ -116,6 +118,11 @@ class ChatMessage {
                   MessageReceipt.fromJson(r as Map<String, dynamic>))
               .toList() ??
           [],
+      attachments: (json['attachments'] as List?)
+              ?.map((a) =>
+                  ChatAttachment.fromJson(a as Map<String, dynamic>))
+              .toList() ??
+          [],
     );
   }
 
@@ -127,6 +134,60 @@ class ChatMessage {
       'body': bodyJson,
       'created_at': createdAt.toIso8601String(),
       'receipts': receipts.map((r) => r.toJson()).toList(),
+      'attachments': attachments.map((a) => a.toJson()).toList(),
+    };
+  }
+}
+
+class ChatAttachment {
+  final int mediaId;
+  final String attachmentType;
+  final String url;
+  final String mimeType;
+  final int sizeBytes;
+
+  ChatAttachment({
+    required this.mediaId,
+    required this.attachmentType,
+    required this.url,
+    required this.mimeType,
+    required this.sizeBytes,
+  });
+
+  factory ChatAttachment.fromJson(Map<String, dynamic> json) {
+    return ChatAttachment(
+      mediaId: json['media_id'] as int,
+      attachmentType: json['attachment_type'] as String? ?? 'file',
+      url: json['url'] as String,
+      mimeType: json['mime_type'] as String? ?? 'application/octet-stream',
+      sizeBytes: json['size_bytes'] as int? ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'media_id': mediaId,
+      'attachment_type': attachmentType,
+      'url': url,
+      'mime_type': mimeType,
+      'size_bytes': sizeBytes,
+    };
+  }
+}
+
+class ChatAttachmentInput {
+  final int mediaId;
+  final String attachmentType;
+
+  ChatAttachmentInput({
+    required this.mediaId,
+    required this.attachmentType,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'media_id': mediaId,
+      'attachment_type': attachmentType,
     };
   }
 }

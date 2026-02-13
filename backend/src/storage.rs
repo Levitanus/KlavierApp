@@ -128,8 +128,8 @@ impl MediaService {
             provider,
             max_profile_image_size: 5 * 1024 * 1024,
             max_image_size: 10 * 1024 * 1024,
-            max_audio_size: 25 * 1024 * 1024,
-            max_video_size: 100 * 1024 * 1024,
+            max_audio_size: 200 * 1024 * 1024,
+            max_video_size: 1024 * 1024 * 1024,
             max_file_size: 25 * 1024 * 1024,
         }
     }
@@ -215,7 +215,7 @@ impl MediaService {
             ),
             MediaKind::Audio => (
                 self.max_audio_size,
-                vec!["mp3", "wav", "aac", "m4a", "ogg", "opus"],
+                vec!["mp3", "wav", "aac", "m4a", "ogg", "opus", "webm"],
             ),
             MediaKind::Video => (
                 self.max_video_size,

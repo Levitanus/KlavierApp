@@ -4,7 +4,7 @@ use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::{FromRow, PgPool};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::users::verify_token;
 use crate::websockets;
@@ -48,6 +48,120 @@ async fn fetch_user_display_name(db: &PgPool, user_id: i32) -> String {
     .unwrap_or_else(|| "Unknown".to_string())
 }
 
+fn is_valid_attachment_type(value: &str) -> bool {
+    matches!(value, "image" | "audio" | "voice" | "video" | "file")
+}
+
+async fn load_attachments_for_messages(
+    db: &PgPool,
+    message_ids: &[i32],
+) -> Result<HashMap<i32, Vec<ChatAttachmentResponse>>, sqlx::Error> {
+    if message_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let rows = sqlx::query_as::<_, ChatAttachmentRow>(
+        "SELECT cma.message_id,
+                cma.media_id,
+                cma.attachment_type::text as attachment_type,
+                mf.public_url,
+                mf.mime_type,
+                mf.size_bytes
+         FROM chat_message_attachments cma
+         JOIN media_files mf ON cma.media_id = mf.id
+         WHERE cma.message_id = ANY($1)
+         ORDER BY cma.id",
+    )
+    .bind(message_ids)
+    .fetch_all(db)
+    .await?;
+
+    let mut map: HashMap<i32, Vec<ChatAttachmentResponse>> = HashMap::new();
+    for row in rows {
+        map.entry(row.message_id)
+            .or_default()
+            .push(ChatAttachmentResponse {
+                media_id: row.media_id,
+                attachment_type: row.attachment_type,
+                url: row.public_url,
+                mime_type: row.mime_type,
+                size_bytes: row.size_bytes,
+            });
+    }
+
+    Ok(map)
+}
+
+async fn store_message_attachments(
+    db: &PgPool,
+    user_id: i32,
+    message_id: i32,
+    attachments: &[ChatAttachmentInput],
+) -> Result<Vec<ChatAttachmentResponse>, HttpResponse> {
+    if attachments.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut stored = Vec::new();
+
+    for attachment in attachments {
+        if !is_valid_attachment_type(&attachment.attachment_type) {
+            return Err(HttpResponse::BadRequest().json(json!({
+                "error": "Invalid attachment type"
+            })));
+        }
+
+        let media = sqlx::query_as::<_, MediaRow>(
+            "SELECT id, public_url, mime_type, size_bytes, media_type::text as media_type
+             FROM media_files
+             WHERE id = $1 AND created_by_user_id = $2",
+        )
+        .bind(attachment.media_id)
+        .bind(user_id)
+        .fetch_optional(db)
+        .await
+        .map_err(|e| HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to load media: {}", e)
+        })))?
+        .ok_or_else(|| HttpResponse::BadRequest().json(json!({
+            "error": "Media not found"
+        })))?;
+
+        let is_voice = attachment.attachment_type == "voice";
+        let matches_type = attachment.attachment_type == media.media_type
+            || (is_voice && media.media_type == "audio")
+            || attachment.attachment_type == "file";
+
+        if !matches_type {
+            return Err(HttpResponse::BadRequest().json(json!({
+                "error": "Attachment type does not match media type"
+            })));
+        }
+
+        sqlx::query(
+            "INSERT INTO chat_message_attachments (message_id, media_id, attachment_type)
+             VALUES ($1, $2, $3::chat_attachment_type)",
+        )
+        .bind(message_id)
+        .bind(media.id)
+        .bind(&attachment.attachment_type)
+        .execute(db)
+        .await
+        .map_err(|e| HttpResponse::InternalServerError().json(json!({
+            "error": format!("Failed to save attachment: {}", e)
+        })))?;
+
+        stored.push(ChatAttachmentResponse {
+            media_id: media.id,
+            attachment_type: attachment.attachment_type.clone(),
+            url: media.public_url,
+            mime_type: media.mime_type,
+            size_bytes: media.size_bytes,
+        });
+    }
+
+    Ok(stored)
+}
 // ============================================================================
 // Models
 // ============================================================================
@@ -109,6 +223,7 @@ pub struct ChatMessageResponse {
     pub body: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub receipts: Vec<ReceiptResponse>,
+    pub attachments: Vec<ChatAttachmentResponse>,
 }
 
 #[derive(Debug, Serialize, Clone)]
@@ -116,6 +231,34 @@ pub struct ReceiptResponse {
     pub recipient_id: i32,
     pub state: String,
     pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct ChatAttachmentResponse {
+    pub media_id: i32,
+    pub attachment_type: String,
+    pub url: String,
+    pub mime_type: String,
+    pub size_bytes: i32,
+}
+
+#[derive(Debug, FromRow)]
+struct ChatAttachmentRow {
+    pub message_id: i32,
+    pub media_id: i32,
+    pub attachment_type: String,
+    pub public_url: String,
+    pub mime_type: String,
+    pub size_bytes: i32,
+}
+
+#[derive(Debug, FromRow)]
+struct MediaRow {
+    pub id: i32,
+    pub public_url: String,
+    pub mime_type: String,
+    pub size_bytes: i32,
+    pub media_type: String,
 }
 
 #[derive(Debug, Serialize, Clone, FromRow)]
@@ -130,6 +273,13 @@ pub struct AvailableChatUser {
 #[derive(Debug, Deserialize)]
 pub struct CreateMessageRequest {
     pub body: serde_json::Value, // Quill JSON
+    pub attachments: Option<Vec<ChatAttachmentInput>>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct ChatAttachmentInput {
+    pub media_id: i32,
+    pub attachment_type: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -621,6 +771,12 @@ async fn list_threads(
             .ok()
             .unwrap_or_default();
 
+            let attachments = load_attachments_for_messages(&app_state.db, &[msg.id])
+                .await
+                .ok()
+                .and_then(|map| map.get(&msg.id).cloned())
+                .unwrap_or_default();
+
             Some(ChatMessageResponse {
                 id: msg.id,
                 sender_id: msg.sender_id,
@@ -635,6 +791,7 @@ async fn list_threads(
                         updated_at: r.updated_at,
                     })
                     .collect(),
+                attachments,
             })
         } else {
             None
@@ -709,6 +866,11 @@ async fn get_thread_messages(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
+    let message_ids: Vec<i32> = messages.iter().map(|msg| msg.id).collect();
+    let attachments_map = load_attachments_for_messages(&app_state.db, &message_ids)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+
     let mut responses = Vec::new();
     for msg in messages {
         let sender_name = sqlx::query_scalar::<_, Option<String>>(
@@ -748,6 +910,7 @@ async fn get_thread_messages(
                     updated_at: r.updated_at,
                 })
                 .collect(),
+            attachments: attachments_map.get(&msg.id).cloned().unwrap_or_default(),
         });
     }
 
@@ -895,6 +1058,15 @@ async fn send_message(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
+    let attachments = if let Some(items) = payload.attachments.as_deref() {
+        match store_message_attachments(&app_state.db, user_id, message_id, items).await {
+            Ok(items) => items,
+            Err(response) => return Ok(response),
+        }
+    } else {
+        Vec::new()
+    };
+
     // Insert receipts for each recipient
     for recipient_id in &recipients {
         sqlx::query(
@@ -923,6 +1095,7 @@ async fn send_message(
         "sender_id": user_id,
         "sender_name": sender_name,
         "body": payload.body,
+        "attachments": attachments,
         "created_at": chrono::Utc::now().to_rfc3339(),
     });
     
@@ -938,7 +1111,8 @@ async fn send_message(
 
     Ok(HttpResponse::Created().json(json!({
         "message_id": message_id,
-        "recipients": recipients
+        "recipients": recipients,
+        "attachments": attachments
     })))
 }
 
@@ -988,6 +1162,15 @@ async fn send_admin_message(
     .await
     .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
+    let attachments = if let Some(items) = payload.attachments.as_deref() {
+        match store_message_attachments(&app_state.db, user_id, message_id, items).await {
+            Ok(items) => items,
+            Err(response) => return Ok(response),
+        }
+    } else {
+        Vec::new()
+    };
+
     // Get all admin users as recipients
     let admin_recipients = sqlx::query_scalar::<_, i32>(
         "SELECT DISTINCT ur.user_id
@@ -1027,6 +1210,7 @@ async fn send_admin_message(
         "sender_id": user_id,
         "sender_name": sender_name,
         "body": payload.body,
+        "attachments": attachments,
         "created_at": chrono::Utc::now().to_rfc3339(),
     });
 
@@ -1042,7 +1226,8 @@ async fn send_admin_message(
 
     Ok(HttpResponse::Created().json(json!({
         "message_id": message_id,
-        "thread_id": thread_id
+        "thread_id": thread_id,
+        "attachments": attachments
     })))
 }
 

@@ -327,6 +327,18 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Create attachment type enum for chat messages
+CREATE TYPE chat_attachment_type AS ENUM ('image', 'audio', 'voice', 'video', 'file');
+
+-- Create chat_message_attachments table
+CREATE TABLE IF NOT EXISTS chat_message_attachments (
+    id SERIAL PRIMARY KEY,
+    message_id INTEGER NOT NULL REFERENCES chat_messages(id) ON DELETE CASCADE,
+    media_id INTEGER NOT NULL REFERENCES media_files(id) ON DELETE CASCADE,
+    attachment_type chat_attachment_type NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- Create message_receipts table for 3-state delivery tracking
 CREATE TABLE IF NOT EXISTS message_receipts (
     id SERIAL PRIMARY KEY,
@@ -352,6 +364,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_threads_updated_at ON chat_threads(updated_a
 CREATE INDEX IF NOT EXISTS idx_chat_messages_thread ON chat_messages(thread_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_sender ON chat_messages(sender_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_message_attachments_message ON chat_message_attachments(message_id);
 CREATE INDEX IF NOT EXISTS idx_message_receipts_message ON message_receipts(message_id);
 CREATE INDEX IF NOT EXISTS idx_message_receipts_recipient ON message_receipts(recipient_id);
 CREATE INDEX IF NOT EXISTS idx_message_receipts_state ON message_receipts(state);

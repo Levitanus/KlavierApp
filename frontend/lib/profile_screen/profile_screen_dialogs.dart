@@ -1,7 +1,6 @@
 part of '../profile_screen.dart';
 
 mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
-  @override
   Future<void> _startChatWithUser(int userId, String userName) async {
     final chatService = Provider.of<ChatService>(context, listen: false);
     

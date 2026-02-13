@@ -184,6 +184,7 @@ class ChatService extends ChangeNotifier {
               bodyJson: message.bodyJson,
               createdAt: message.createdAt,
               receipts: mergedReceipts,
+              attachments: message.attachments,
             ));
           }
           messagesByThread[threadId] = mergedMessages;
@@ -262,7 +263,11 @@ class ChatService extends ChangeNotifier {
     try {
       final messageData = wsMessage.data;
       final bodyJson = messageData['body'] as Map<String, dynamic>? ?? {};
-      final senderName = messageData['sender_name'] as String? ?? 'Unknown';
+        final senderName = messageData['sender_name'] as String? ?? 'Unknown';
+        final attachmentsData = (messageData['attachments'] as List?) ?? [];
+        final attachments = attachmentsData
+          .map((a) => ChatAttachment.fromJson(a as Map<String, dynamic>))
+          .toList();
       
       // Parse the incoming message
       final newMessage = ChatMessage(
@@ -272,6 +277,7 @@ class ChatService extends ChangeNotifier {
         bodyJson: bodyJson,
         createdAt: DateTime.parse(messageData['created_at'] as String),
         receipts: const [],
+        attachments: attachments,
       );
 
       final isOwn = _currentUserId != null && newMessage.senderId == _currentUserId;
@@ -410,6 +416,7 @@ class ChatService extends ChangeNotifier {
             bodyJson: message.bodyJson,
             createdAt: message.createdAt,
             receipts: receipts,
+            attachments: message.attachments,
           );
           
           final index = messagesByThread[threadId]!.indexOf(message);
@@ -525,6 +532,41 @@ class ChatService extends ChangeNotifier {
     }
   }
 
+  Future<bool> sendMessageWithAttachments(
+    int threadId,
+    Map<String, dynamic> quillJson, {
+    List<ChatAttachmentInput> attachments = const [],
+  }) async {
+    errorMessage = null;
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/threads/$threadId/messages'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+        },
+        body: json.encode({
+          'body': quillJson,
+          'attachments': attachments.map((a) => a.toJson()).toList(),
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        if (!messagesByThread.containsKey(threadId)) {
+          await loadThreadMessages(threadId);
+        }
+        return true;
+      } else {
+        errorMessage = 'Failed to send message: ${response.statusCode}';
+        return false;
+      }
+    } catch (e) {
+      errorMessage = 'Error sending message: $e';
+      return false;
+    }
+  }
+
   Future<ChatThread?> getOrCreateAdminThread() async {
     errorMessage = null;
 
@@ -570,7 +612,10 @@ class ChatService extends ChangeNotifier {
     }
   }
 
-  Future<int?> sendAdminMessage(Map<String, dynamic> quillJson) async {
+  Future<int?> sendAdminMessage(
+    Map<String, dynamic> quillJson, {
+    List<ChatAttachmentInput> attachments = const [],
+  }) async {
     errorMessage = null;
 
     try {
@@ -580,7 +625,10 @@ class ChatService extends ChangeNotifier {
           'Authorization': 'Bearer $_token',
           'Content-Type': 'application/json',
         },
-        body: json.encode({'body': quillJson}),
+        body: json.encode({
+          'body': quillJson,
+          'attachments': attachments.map((a) => a.toJson()).toList(),
+        }),
       );
 
       if (response.statusCode == 201) {
@@ -599,6 +647,45 @@ class ChatService extends ChangeNotifier {
       errorMessage = 'Error sending message: $e';
       return null;
     }
+  }
+
+  Future<ChatAttachment?> uploadMedia({
+    required String mediaType,
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    if (_token.isEmpty) return null;
+
+    try {
+      final uri = Uri.parse('http://localhost:8080/api/media/upload')
+          .replace(queryParameters: {'type': mediaType});
+      final request = http.MultipartRequest('POST', uri);
+
+      request.headers['Authorization'] = 'Bearer $_token';
+      request.files.add(http.MultipartFile.fromBytes(
+        'file',
+        bytes,
+        filename: filename,
+      ));
+
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+
+      if (response.statusCode == 200) {
+        final data = json.decode(responseBody) as Map<String, dynamic>;
+        return ChatAttachment(
+          mediaId: data['id'] as int,
+          attachmentType: mediaType,
+          url: data['url'] as String,
+          mimeType: data['mime_type'] as String? ?? 'application/octet-stream',
+          sizeBytes: data['size_bytes'] as int? ?? 0,
+        );
+      }
+    } catch (e) {
+      errorMessage = 'Error uploading media: $e';
+    }
+
+    return null;
   }
 
   Future<void> updateMessageReceipt(int messageId, String state) async {

@@ -1,11 +1,16 @@
+import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import '../auth.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
+import '../widgets/quill_embed_builders.dart';
+import '../utils/voice_recorder.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   final ChatThread thread;
@@ -28,6 +33,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   bool _hasMore = true;
   final Set<int> _readMarkedMessageIds = {};
   static const int _pageSize = 50;
+  final List<_PendingAttachment> _pendingAttachments = [];
+  final VoiceRecorder _voiceRecorder = VoiceRecorder();
+  bool _isUploadingAttachment = false;
 
   @override
   void initState() {
@@ -196,6 +204,169 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     });
   }
 
+  void _insertEmbed(String type, String url) {
+    final selection = _editorController.selection;
+    final index = selection.baseOffset < 0
+        ? _editorController.document.length
+        : selection.baseOffset;
+
+    quill.BlockEmbed embed;
+    switch (type) {
+      case 'image':
+        embed = quill.BlockEmbed.image(url);
+        break;
+      case 'video':
+        embed = quill.BlockEmbed.video(url);
+        break;
+      case 'audio':
+      case 'voice':
+      case 'file':
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed(type, url),
+        );
+        break;
+      default:
+        embed = quill.BlockEmbed.custom(
+          quill.CustomBlockEmbed('file', url),
+        );
+    }
+
+    _editorController.document.insert(index, embed);
+    _editorController.updateSelection(
+      TextSelection.collapsed(offset: index + 1),
+      quill.ChangeSource.local,
+    );
+  }
+
+  Future<void> _pickAttachment({
+    required String attachmentType,
+    required bool inline,
+  }) async {
+    if (_isUploadingAttachment) return;
+
+    final allowed = <String, List<String>>{
+      'image': ['jpg', 'jpeg', 'png', 'webp'],
+      'audio': ['mp3', 'm4a', 'ogg', 'opus', 'wav'],
+      'voice': ['ogg', 'opus', 'm4a', 'mp3', 'wav'],
+      'video': ['mp4', 'webm', 'mov', 'mkv'],
+      'file': [],
+    };
+
+    final type = attachmentType == 'file' ? FileType.any : FileType.custom;
+    final result = await FilePicker.platform.pickFiles(
+      type: type,
+      allowedExtensions: type == FileType.custom ? allowed[attachmentType] : null,
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+
+    setState(() {
+      _isUploadingAttachment = true;
+    });
+
+    final chatService = context.read<ChatService>();
+    final mediaType = attachmentType == 'voice' ? 'audio' : attachmentType;
+    final uploaded = await chatService.uploadMedia(
+      mediaType: mediaType,
+      bytes: bytes,
+      filename: file.name,
+    );
+
+    if (!mounted) return;
+
+    if (uploaded == null) {
+      setState(() {
+        _isUploadingAttachment = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to upload media')),
+      );
+      return;
+    }
+
+    final attachment = _PendingAttachment(
+      input: ChatAttachmentInput(
+        mediaId: uploaded.mediaId,
+        attachmentType: attachmentType,
+      ),
+      url: uploaded.url,
+      attachmentType: attachmentType,
+      inline: inline,
+    );
+
+    setState(() {
+      _pendingAttachments.add(attachment);
+      _isUploadingAttachment = false;
+    });
+
+    if (inline) {
+      _insertEmbed(attachmentType, uploaded.url);
+    }
+  }
+
+  Future<void> _toggleVoiceRecording() async {
+    if (_voiceRecorder.isRecording) {
+      final audio = await _voiceRecorder.stop();
+      if (audio == null) return;
+
+      setState(() {
+        _isUploadingAttachment = true;
+      });
+
+      final chatService = context.read<ChatService>();
+      final uploaded = await chatService.uploadMedia(
+        mediaType: 'audio',
+        bytes: audio.bytes,
+        filename: 'voice.${audio.extension}',
+      );
+
+      if (!mounted) return;
+
+      if (uploaded == null) {
+        setState(() {
+          _isUploadingAttachment = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(chatService.errorMessage ?? 'Failed to upload voice message')),
+        );
+        return;
+      }
+
+      final attachment = _PendingAttachment(
+        input: ChatAttachmentInput(
+          mediaId: uploaded.mediaId,
+          attachmentType: 'voice',
+        ),
+        url: uploaded.url,
+        attachmentType: 'voice',
+        inline: true,
+      );
+
+      setState(() {
+        _pendingAttachments.add(attachment);
+        _isUploadingAttachment = false;
+      });
+
+      _insertEmbed('voice', uploaded.url);
+      return;
+    }
+
+    final available = await _voiceRecorder.isAvailable();
+    if (!available) {
+      _pickAttachment(attachmentType: 'voice', inline: true);
+      return;
+    }
+
+    await _voiceRecorder.start();
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   Future<void> _sendMessage() async {
     final chatService = context.read<ChatService>();
     
@@ -212,16 +383,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
     // Get Quill JSON
     final quillJson = _editorController.document.toDelta().toJson();
+    final attachments = _pendingAttachments.map((a) => a.input).toList();
 
     bool success = false;
     
     // Only use admin message endpoint for virtual threads (user creating first message to admin)
     if (widget.thread.isAdminChat && widget.thread.id == -1) {
       // Non-admin user sending first message to admin
-      final threadId = await chatService.sendAdminMessage({'ops': quillJson});
+      final threadId = await chatService.sendAdminMessage(
+        {'ops': quillJson},
+        attachments: attachments,
+      );
       success = threadId != null;
       
-      if (success && threadId != null) {
+      if (success) {
         // Thread was just created, navigate to the real thread
         final realThread = chatService.personalThreads.firstWhere(
           (t) => t.id == threadId,
@@ -238,7 +413,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       }
     } else {
       // All other cases: regular peer chat, admin replying in admin chat
-      success = await chatService.sendMessage(widget.thread.id, {'ops': quillJson});
+      success = await chatService.sendMessageWithAttachments(
+        widget.thread.id,
+        {'ops': quillJson},
+        attachments: attachments,
+      );
     }
 
     if (mounted) {
@@ -248,6 +427,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
       if (success) {
         _editorController.clear();
+        setState(() {
+          _pendingAttachments.clear();
+        });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(chatService.errorMessage ?? 'Failed to send message')),
@@ -404,6 +586,27 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (_pendingAttachments.isNotEmpty)
+            SizedBox(
+              height: 48,
+              child: ListView.separated(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                scrollDirection: Axis.horizontal,
+                itemCount: _pendingAttachments.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (context, index) {
+                  final item = _pendingAttachments[index];
+                  return Chip(
+                    label: Text(item.label),
+                    onDeleted: () {
+                      setState(() {
+                        _pendingAttachments.removeAt(index);
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 8),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
@@ -498,6 +701,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             },
                             child: quill.QuillEditor.basic(
                               controller: _editorController,
+                              config: quill.QuillEditorConfig(
+                                embedBuilders: [
+                                  ImageEmbedBuilder(),
+                                  VideoEmbedBuilder(),
+                                  AudioEmbedBuilder(),
+                                  VoiceEmbedBuilder(),
+                                  FileEmbedBuilder(),
+                                ],
+                                unknownEmbedBuilder: UnknownEmbedBuilder(),
+                              ),
                             ),
                           ),
                         ),
@@ -513,6 +726,21 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     onPressed: _showFormatMenu,
                   ),
                 ],
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: 'Attach',
+                  icon: Icon(_isUploadingAttachment ? Icons.hourglass_top : Icons.attach_file),
+                  onPressed: _isUploadingAttachment ? null : _showAttachmentMenu,
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: _voiceRecorder.isRecording ? 'Stop recording' : 'Record voice',
+                  icon: Icon(
+                    _voiceRecorder.isRecording ? Icons.stop_circle : Icons.mic,
+                    color: _voiceRecorder.isRecording ? Colors.red : null,
+                  ),
+                  onPressed: _toggleVoiceRecording,
+                ),
                 const SizedBox(width: 4),
                 IconButton(
                   onPressed: _isSending ? null : _sendMessage,
@@ -584,6 +812,53 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       ),
     );
   }
+
+  void _showAttachmentMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image),
+                title: const Text('Image'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'image', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.video_library),
+                title: const Text('Video'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'video', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.audiotrack),
+                title: const Text('Audio'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'audio', inline: true);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.insert_drive_file),
+                title: const Text('File'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachment(attachmentType: 'file', inline: false);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 enum _FormatType { bold, italic, underline, link }
@@ -599,6 +874,22 @@ class _SendIntent extends Intent {
 
 class _NewlineIntent extends Intent {
   const _NewlineIntent();
+}
+
+class _PendingAttachment {
+  final ChatAttachmentInput input;
+  final String url;
+  final String attachmentType;
+  final bool inline;
+
+  _PendingAttachment({
+    required this.input,
+    required this.url,
+    required this.attachmentType,
+    required this.inline,
+  });
+
+  String get label => inline ? '$attachmentType (inline)' : attachmentType;
 }
 
 class _MessageBubble extends StatelessWidget {
@@ -619,6 +910,7 @@ class _MessageBubble extends StatelessWidget {
     final name = message.senderName;
     final controller = _buildReadOnlyController();
     final maxWidth = MediaQuery.of(context).size.width * 0.72;
+    final attachments = _visibleAttachments();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -650,12 +942,28 @@ class _MessageBubble extends StatelessWidget {
                   children: [
                     quill.QuillEditor.basic(
                       controller: controller,
-                      config: const quill.QuillEditorConfig(
+                      config: quill.QuillEditorConfig(
                         scrollable: false,
                         autoFocus: false,
                         padding: EdgeInsets.zero,
+                        embedBuilders: [
+                          ImageEmbedBuilder(),
+                          VideoEmbedBuilder(),
+                          AudioEmbedBuilder(),
+                          VoiceEmbedBuilder(),
+                          FileEmbedBuilder(),
+                        ],
+                        unknownEmbedBuilder: UnknownEmbedBuilder(),
                       ),
                     ),
+                    if (attachments.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      for (final attachment in attachments)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 6),
+                          child: _buildAttachmentWidget(attachment),
+                        ),
+                    ],
                     const SizedBox(height: 4),
                     if (isOwn) _buildReceiptStatus(message.receipts),
                   ],
@@ -684,6 +992,47 @@ class _MessageBubble extends StatelessWidget {
       );
     } catch (_) {
       return quill.QuillController.basic();
+    }
+  }
+
+  List<ChatAttachment> _visibleAttachments() {
+    if (message.attachments.isEmpty) return [];
+    final body = jsonEncode(message.bodyJson);
+    return message.attachments
+        .where((attachment) => !body.contains(attachment.url))
+        .toList();
+  }
+
+  Widget _buildAttachmentWidget(ChatAttachment attachment) {
+    final url = normalizeMediaUrl(attachment.url);
+    switch (attachment.attachmentType) {
+      case 'image':
+        return ConstrainedBox(
+          constraints: const BoxConstraints(maxHeight: 240),
+          child: Image.network(url, fit: BoxFit.contain),
+        );
+      case 'video':
+        return ChatVideoPlayer(url: url);
+      case 'audio':
+        return ChatAudioPlayer(url: url, label: 'Audio');
+      case 'voice':
+        return ChatAudioPlayer(url: url, label: 'Voice message');
+      case 'file':
+        return Row(
+          children: [
+            const Icon(Icons.insert_drive_file),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                url.split('/').last,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        );
+      default:
+        return Text('Unsupported attachment: ${attachment.attachmentType}');
     }
   }
 
