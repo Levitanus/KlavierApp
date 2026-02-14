@@ -264,10 +264,13 @@ class _ThreadListTile extends StatelessWidget {
       ),
       trailing: thread.unreadCount > 0
           ? CircleAvatar(
-              backgroundColor: Colors.blue,
+              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
               child: Text(
                 thread.unreadCount.toString(),
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  fontSize: 12,
+                ),
               ),
             )
           : null,
@@ -292,11 +295,13 @@ class _BottomChatToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: Colors.grey[300]!)),
-        color: Colors.white,
+        border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
+        color: isDark ? colorScheme.outline : colorScheme.surface,
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:convert';
 import 'auth.dart';
 import 'home_screen.dart';
@@ -179,6 +180,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final logoAsset = isDark
+      ? 'assets/branding/logo bright.svg'
+      : 'assets/branding/logo dark.svg';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Login'),
@@ -196,19 +202,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // Logo or App Title
-                    const Icon(
-                      Icons.piano,
-                      size: 80,
-                      color: Colors.blue,
+                    SvgPicture.asset(
+                      'assets/branding/icon.svg',
+                      height: 72,
+                      width: 72,
                     ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Klavier',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
+                    const SizedBox(height: 12),
+                    SvgPicture.asset(
+                      logoAsset,
+                      height: 32,
                     ),
                     const SizedBox(height: 48),
 

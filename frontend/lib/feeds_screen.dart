@@ -850,7 +850,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           margin: EdgeInsets.only(left: depth * 16.0, bottom: 12),
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: Colors.grey.shade100,
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(

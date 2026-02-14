@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_svg/flutter_svg.dart';
 import 'auth.dart';
 import 'login_screen.dart';
 import 'admin_panel.dart';
@@ -207,10 +208,17 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final logoAsset = isDark
+        ? 'assets/branding/logo bright.svg'
+        : 'assets/branding/logo dark.svg';
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Klavier'),
+        title: SvgPicture.asset(
+          logoAsset,
+          height: 28,
+        ),
         automaticallyImplyLeading: false,
         actions: [
           Builder(
@@ -234,6 +242,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  SvgPicture.asset(
+                    logoAsset,
+                    height: 22,
+                  ),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       CircleAvatar(
@@ -398,7 +411,7 @@ class _NotificationNavIcon extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red,
+                  color: Theme.of(context).colorScheme.secondaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 constraints: const BoxConstraints(
@@ -407,8 +420,8 @@ class _NotificationNavIcon extends StatelessWidget {
                 ),
                 child: Text(
                   unreadCount > 99 ? '99+' : unreadCount.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
                   ),
@@ -453,7 +466,7 @@ class _ChatNavIcon extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red,
+                  color: Theme.of(context).colorScheme.secondaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 constraints: const BoxConstraints(
@@ -462,8 +475,8 @@ class _ChatNavIcon extends StatelessWidget {
                 ),
                 child: Text(
                   unreadCount > 99 ? '99+' : unreadCount.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
                   ),

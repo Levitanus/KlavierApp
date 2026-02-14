@@ -292,19 +292,6 @@ class NotificationTile extends StatelessWidget {
     required this.onDelete,
   });
 
-  Color _getPriorityColor() {
-    switch (notification.priority) {
-      case 'urgent':
-        return Colors.red;
-      case 'high':
-        return Colors.orange;
-      case 'low':
-        return Colors.grey;
-      default:
-        return Colors.blue;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Dismissible(
@@ -326,7 +313,7 @@ class NotificationTile extends StatelessWidget {
                 : Colors.transparent,
             border: Border(
               left: BorderSide(
-                color: _getPriorityColor(),
+                color: Theme.of(context).colorScheme.secondary,
                 width: 4,
               ),
             ),

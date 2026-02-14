@@ -8,6 +8,8 @@ import '../config/app_config.dart';
 
 String get _baseUrl => '${AppConfig.instance.baseUrl}/chat';
 
+const Duration _chatNetworkTimeout = Duration(seconds: 12);
+
 class ChatService extends ChangeNotifier {
   String _token;
   int? _currentUserId;
@@ -161,7 +163,7 @@ class ChatService extends ChangeNotifier {
       final response = await http.get(
         Uri.parse('$_baseUrl/threads/$threadId/messages?limit=$limit&offset=$offset'),
         headers: {'Authorization': 'Bearer $_token'},
-      );
+      ).timeout(_chatNetworkTimeout);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -595,11 +597,11 @@ class ChatService extends ChangeNotifier {
           'Content-Type': 'application/json',
         },
         body: json.encode({'body': quillJson}),
-      );
+      ).timeout(_chatNetworkTimeout);
 
       if (response.statusCode == 201) {
         if (!messagesByThread.containsKey(threadId)) {
-          await loadThreadMessages(threadId);
+          unawaited(loadThreadMessages(threadId));
         }
         return true;
       } else {
@@ -680,12 +682,12 @@ class ChatService extends ChangeNotifier {
           'body': quillJson,
           'attachments': attachments.map((a) => a.toJson()).toList(),
         }),
-      );
+      ).timeout(_chatNetworkTimeout);
 
       if (response.statusCode == 201) {
         // Reload thread messages to ensure the new message appears
         // This is a fallback in case websocket doesn't update immediately
-        await loadThreadMessages(threadId, limit: 50, offset: 0, append: false);
+        unawaited(loadThreadMessages(threadId, limit: 50, offset: 0, append: false));
         return true;
       } else {
         errorMessage = 'Failed to send message: ${response.statusCode}';
@@ -759,14 +761,14 @@ class ChatService extends ChangeNotifier {
           'body': quillJson,
           'attachments': attachments.map((a) => a.toJson()).toList(),
         }),
-      );
+      ).timeout(_chatNetworkTimeout);
 
       if (response.statusCode == 201) {
         final data = json.decode(response.body);
         final threadId = data['thread_id'] as int?;
         
         // Reload personal threads to get the new/updated thread
-        await loadThreads(mode: 'personal', setCurrent: false);
+        unawaited(loadThreads(mode: 'personal', setCurrent: false));
         
         return threadId;
       } else {

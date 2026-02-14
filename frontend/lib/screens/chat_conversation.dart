@@ -312,7 +312,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   Future<void> _sendMessage() async {
     final chatService = context.read<ChatService>();
-    
+
     if (_editorController.document.isEmpty()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Message cannot be empty')),
@@ -324,64 +324,67 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       _isSending = true;
     });
 
-    // Get Quill JSON
-    final quillJson = _editorController.document.toDelta().toJson();
-    final attachments = _pendingAttachments.map((a) => a.input).toList();
-
     bool success = false;
-    
-    // Only use admin message endpoint for virtual threads (user creating first message to admin)
-    if (widget.thread.isAdminChat && widget.thread.id == -1) {
-      // Non-admin user sending first message to admin
-      final threadId = await chatService.sendAdminMessage(
-        {'ops': quillJson},
-        attachments: attachments,
-      );
-      success = threadId != null;
-      
-      if (success) {
-        // Thread was just created, navigate to the real thread
-        final realThread = chatService.personalThreads.firstWhere(
-          (t) => t.id == threadId,
-          orElse: () => widget.thread,
+    try {
+      // Get Quill JSON
+      final quillJson = _editorController.document.toDelta().toJson();
+      final attachments = _pendingAttachments.map((a) => a.input).toList();
+
+      // Only use admin message endpoint for virtual threads (user creating first message to admin)
+      if (widget.thread.isAdminChat && widget.thread.id == -1) {
+        // Non-admin user sending first message to admin
+        final threadId = await chatService.sendAdminMessage(
+          {'ops': quillJson},
+          attachments: attachments,
         );
-        if (mounted && realThread.id != -1) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => ChatConversationScreen(thread: realThread),
-            ),
+        success = threadId != null;
+
+        if (success) {
+          // Thread was just created, navigate to the real thread
+          final realThread = chatService.personalThreads.firstWhere(
+            (t) => t.id == threadId,
+            orElse: () => widget.thread,
           );
-          return;
+          if (mounted && realThread.id != -1) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => ChatConversationScreen(thread: realThread),
+              ),
+            );
+            return;
+          }
         }
+      } else {
+        // All other cases: regular peer chat, admin replying in admin chat
+        success = await chatService.sendMessageWithAttachments(
+          widget.thread.id,
+          {'ops': quillJson},
+          attachments: attachments,
+        );
       }
-    } else {
-      // All other cases: regular peer chat, admin replying in admin chat
-      success = await chatService.sendMessageWithAttachments(
-        widget.thread.id,
-        {'ops': quillJson},
-        attachments: attachments,
-      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
     }
 
-    if (mounted) {
-      setState(() {
-        _isSending = false;
-      });
+    if (!mounted) return;
 
-      if (success) {
-        _editorController.clear();
-        setState(() {
-          _pendingAttachments.clear();
-        });
-        // Scroll to bottom to show the new message
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottom();
-        });
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(chatService.errorMessage ?? 'Failed to send message')),
-        );
-      }
+    if (success) {
+      _editorController.clear();
+      setState(() {
+        _pendingAttachments.clear();
+      });
+      // Scroll to bottom to show the new message
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to send message')),
+      );
     }
   }
 
@@ -697,7 +700,10 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bubbleColor = isOwn ? Colors.blue.shade100 : Colors.grey.shade100;
+    final colorScheme = Theme.of(context).colorScheme;
+    final bubbleColor = isOwn
+        ? colorScheme.secondaryContainer
+        : colorScheme.surfaceContainerHigh;
     final align = isOwn ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final name = message.senderName;
     final controller = _buildReadOnlyController();
