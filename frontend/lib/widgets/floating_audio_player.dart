@@ -85,7 +85,7 @@ class _FloatingAudioPlayerState extends State<FloatingAudioPlayer> {
                     min: 0,
                     max: maxSeconds,
                     onChanged: (val) => service.seekTo(
-                      Duration(milliseconds: val.round()),
+                      Duration(milliseconds: val.toInt()),
                     ),
                   ),
                 ),
