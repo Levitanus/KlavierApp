@@ -6,7 +6,7 @@ users:
     shell: /bin/bash
     sudo: ["ALL=(ALL) NOPASSWD:ALL"]
     ssh_authorized_keys:
-      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICzHjlfttUlTZPpyZBDT8uYUfdlN1q5ubZWjhQCNUpjY musikschule-deploy
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIJCOHswG3jks+ijrosBHkgKs329oa4ypxgXnhGt9y2pG musikschule-deploy
 
 package_update: true
 package_upgrade: true

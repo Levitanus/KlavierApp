@@ -17,3 +17,7 @@ node_modules/
 deploy/.env
 musikschule_app
 musikschule_app.pub
+
+musikschule
+
+musikschule.pub
