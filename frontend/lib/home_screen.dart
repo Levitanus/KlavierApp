@@ -168,10 +168,17 @@ class _HomeScreenState extends State<HomeScreen> {
       case 3:
         return const ChatScreen();
       case 4:
-        return const NotificationsScreen();
+        return const ProfileScreen();
       default:
         return const DashboardScreen();
     }
+  }
+
+  void _navigateToPage(Widget page) {
+    setState(() {
+      _currentPage = page;
+      _selectedDrawerIndex = null;
+    });
   }
 
   Future<void> _handleLogout() async {
@@ -212,6 +219,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final logoAsset = isDark
         ? 'assets/branding/logo bright.svg'
         : 'assets/branding/logo dark.svg';
+    final isNotificationsPage = _currentPage is NotificationsScreen;
     
     return Scaffold(
       appBar: AppBar(
@@ -221,6 +229,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: _NotificationNavIcon(active: isNotificationsPage),
+            tooltip: 'Notifications',
+            onPressed: () => _navigateToPage(const NotificationsScreen()),
+          ),
           Builder(
             builder: (context) => IconButton(
               icon: const Icon(Icons.menu),
@@ -324,17 +337,11 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const Divider(),
             if (authService.isAdmin) ...[
-              ExpansionTile(
-                leading: const Icon(Icons.admin_panel_settings),
-                title: const Text('Admin'),
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.people),
-                    title: const Text('User Management'),
-                    selected: _selectedDrawerIndex == 100,
-                    onTap: () => _navigateTo(const AdminPanel(), 100),
-                  ),
-                ],
+              ListTile(
+                leading: const Icon(Icons.people),
+                title: const Text('User Management'),
+                selected: _selectedDrawerIndex == 100,
+                onTap: () => _navigateTo(const AdminPanel(), 100),
               ),
               const Divider(),
             ],
@@ -373,9 +380,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Chats',
           ),
           BottomNavigationBarItem(
-            icon: _NotificationNavIcon(active: false),
-            activeIcon: _NotificationNavIcon(active: true),
-            label: 'Notifications',
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
       ),

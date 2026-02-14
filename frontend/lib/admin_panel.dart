@@ -99,130 +99,90 @@ class _AdminPanelState extends _AdminPanelStateBase
             ),
           ),
           Expanded(
-            child: Row(
-              children: [
-                Container(
-                  width: 220,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    border: Border(
-                      right: BorderSide(color: Colors.grey[300]!),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Text(
-                          'Module',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.grey,
-                          ),
-                        ),
+                      const Text(
+                        'User Management',
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                       ),
-                      ListTile(
-                        leading: const Icon(Icons.people),
-                        title: const Text('User Management'),
-                        selected: true,
-                        onTap: () {},
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.refresh),
+                        onPressed: _loadUsers,
+                        tooltip: 'Refresh',
                       ),
                     ],
                   ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            const Text(
-                              'User Management',
-                              style: TextStyle(
-                                  fontSize: 20, fontWeight: FontWeight.bold),
-                            ),
-                            const Spacer(),
-                            IconButton(
-                              icon: const Icon(Icons.refresh),
-                              onPressed: _loadUsers,
-                              tooltip: 'Refresh',
-                            ),
-                          ],
-                        ),
-                        if (_errorMessage != null)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 12.0),
-                            child: Text(
-                              _errorMessage!,
-                              style: const TextStyle(color: Colors.red),
-                            ),
-                          ),
-                        Expanded(
-                          child: _isLoading
-                              ? const Center(child: CircularProgressIndicator())
-                              : _users.isEmpty
-                                  ? const Center(child: Text('No users found'))
-                                  : SingleChildScrollView(
-                                      scrollDirection: Axis.horizontal,
-                                      child: SingleChildScrollView(
-                                        child: DataTable(
-                                          dataRowMinHeight: 48,
-                                          dataRowMaxHeight: double.infinity,
-                                          columns: const [
-                                            DataColumn(label: Text('Full Name')),
-                                            DataColumn(label: Text('Username')),
-                                            DataColumn(label: Text('Actions')),
-                                          ],
-                                          rows: _users.map((user) {
-                                            return DataRow(
-                                              cells: [
-                                                DataCell(
-                                                  Text(user.fullName.isNotEmpty ? user.fullName : '-'),
+                  if (_errorMessage != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 12.0),
+                      child: Text(
+                        _errorMessage!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
+                    ),
+                  Expanded(
+                    child: _isLoading
+                        ? const Center(child: CircularProgressIndicator())
+                        : _users.isEmpty
+                            ? const Center(child: Text('No users found'))
+                            : SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: SingleChildScrollView(
+                                  child: DataTable(
+                                    dataRowMinHeight: 48,
+                                    dataRowMaxHeight: double.infinity,
+                                    columns: const [
+                                      DataColumn(label: Text('Full Name')),
+                                      DataColumn(label: Text('Username')),
+                                      DataColumn(label: Text('Actions')),
+                                    ],
+                                    rows: _users.map((user) {
+                                      return DataRow(
+                                        cells: [
+                                          DataCell(
+                                            Text(user.fullName.isNotEmpty ? user.fullName : '-'),
+                                          ),
+                                          DataCell(Text(user.username)),
+                                          DataCell(
+                                            Wrap(
+                                              spacing: 8,
+                                              runSpacing: 4,
+                                              children: [
+                                                OutlinedButton.icon(
+                                                  icon: const Icon(Icons.link, size: 16),
+                                                  label: const Text('Reset Link'),
+                                                  onPressed: () => _generateResetLink(user),
                                                 ),
-                                                DataCell(Text(user.username)),
-                                                DataCell(
-                                                  Wrap(
-                                                    spacing: 8,
-                                                    runSpacing: 4,
-                                                    children: [
-                                                      OutlinedButton.icon(
-                                                        icon: const Icon(Icons.link, size: 16),
-                                                        label: const Text('Reset Link'),
-                                                        onPressed: () =>
-                                                            _generateResetLink(user),
+                                                ElevatedButton.icon(
+                                                  icon: const Icon(Icons.edit, size: 16),
+                                                  label: const Text('Edit User'),
+                                                  onPressed: () {
+                                                    Navigator.of(context).push(
+                                                      MaterialPageRoute(
+                                                        builder: (context) =>
+                                                            AdminUserProfilePage(userId: user.id),
                                                       ),
-                                                      ElevatedButton.icon(
-                                                        icon: const Icon(Icons.edit, size: 16),
-                                                        label: const Text('Edit User'),
-                                                        onPressed: () {
-                                                          Navigator.of(context).push(
-                                                            MaterialPageRoute(
-                                                              builder: (context) =>
-                                                                  AdminUserProfilePage(userId: user.id),
-                                                            ),
-                                                          );
-                                                        },
-                                                      ),
-                                                    ],
-                                                  ),
+                                                    );
+                                                  },
                                                 ),
                                               ],
-                                            );
-                                          }).toList(),
-                                        ),
-                                      ),
-                                    ),
-                        ),
-                      ],
-                    ),
+                                            ),
+                                          ),
+                                        ],
+                                      );
+                                    }).toList(),
+                                  ),
+                                ),
+                              ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           Container(
