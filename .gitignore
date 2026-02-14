@@ -15,3 +15,5 @@ node_modules/
 /.env.test
 /uploads/
 deploy/.env
+musikschule_app
+musikschule_app.pub
