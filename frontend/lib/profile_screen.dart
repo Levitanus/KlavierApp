@@ -9,6 +9,8 @@ import 'package:file_picker/file_picker.dart';
 import 'auth.dart';
 import 'services/hometask_service.dart';
 import 'services/chat_service.dart';
+import 'services/app_data_cache_service.dart';
+import 'services/media_cache_service.dart';
 import 'models/hometask.dart';
 import 'screens/chat_conversation.dart';
 import 'config/app_config.dart';

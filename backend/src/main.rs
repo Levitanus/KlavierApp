@@ -1,6 +1,6 @@
 use actix_web::{web, HttpServer};
-use klavierapp_backend::{create_app, init_db, AppState, email::EmailService, websockets};
-use klavierapp_backend::storage::LocalStorage;
+use music_school_app_backend::{create_app, init_db, AppState, email::EmailService, websockets};
+use music_school_app_backend::storage::LocalStorage;
 use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;

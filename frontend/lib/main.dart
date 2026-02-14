@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'l10n/app_localizations.dart';
 import 'config/app_config.dart';
 import 'auth.dart';
 import 'services/notification_service.dart';
@@ -161,7 +162,8 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'Klavier',
+        onGenerateTitle: (context) =>
+            AppLocalizations.of(context)?.appTitle ?? 'Music School App',
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: _lightColorScheme,
@@ -185,15 +187,14 @@ class MyApp extends StatelessWidget {
           ),
         ),
         themeMode: ThemeMode.system,
-        localizationsDelegates: const [
+        localizationsDelegates: [
+          AppLocalizations.delegate,
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
           quill.FlutterQuillLocalizations.delegate,
         ],
-        supportedLocales: const [
-          Locale('en'),
-        ],
+        supportedLocales: AppLocalizations.supportedLocales,
         onGenerateRoute: (settings) {
           final name = settings.name ?? '/';
           final uri = Uri.parse(name);

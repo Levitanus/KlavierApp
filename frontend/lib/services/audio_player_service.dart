@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
+import 'media_cache_audio.dart';
 
 class AudioPlayerService extends ChangeNotifier {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
@@ -23,7 +24,12 @@ class AudioPlayerService extends ChangeNotifier {
       // If switching to a different URL, stop and reset first
       if (_currentUrl != url) {
         await _player.stop();
-        await _player.setUrl(url);
+        final cachedPath = await resolveCachedAudioPath(url);
+        if (cachedPath != null) {
+          await _player.setFilePath(cachedPath);
+        } else {
+          await _player.setUrl(url);
+        }
         _currentUrl = url;
         _currentLabel = label;
         notifyListeners();
@@ -32,7 +38,9 @@ class AudioPlayerService extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       print('Error playing audio: $e');
-      rethrow;
+      _currentUrl = null;
+      _currentLabel = null;
+      notifyListeners();
     }
   }
 
@@ -60,7 +68,9 @@ class AudioPlayerService extends ChangeNotifier {
     await _player.seek(Duration(milliseconds: clamped));
   }
 
-  Future<void> dispose() async {
-    await _player.dispose();
+  @override
+  void dispose() {
+    _player.dispose();
+    super.dispose();
   }
 }

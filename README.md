@@ -1,6 +1,6 @@
-# KlavierApp
+# Music School App
 
-Monorepo for Klavier music school application.
+Monorepo for the Musikschule am Thomas-Mann-Platz application.
 
 Structure:
 - `backend/` — Rust + actix-web API

@@ -10,6 +10,7 @@ import 'models/chat.dart';
 import 'models/feed.dart';
 import 'services/feed_service.dart';
 import 'services/audio_player_service.dart';
+import 'services/media_cache_service.dart';
 import 'utils/media_download.dart';
 import 'widgets/quill_embed_builders.dart';
 import 'widgets/quill_editor_composer.dart';
@@ -735,7 +736,10 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
       case 'image':
         content = ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 240),
-          child: Image.network(url, fit: BoxFit.contain),
+          child: MediaCacheService.instance.cachedImage(
+            url: url,
+            fit: BoxFit.contain,
+          ),
         );
         break;
       case 'video':
@@ -807,7 +811,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     final result = await downloadMedia(
       url: url,
       filename: filename,
-      appFolderName: 'klavierapp',
+      appFolderName: 'music_school_app',
     );
 
     if (!mounted) return;
@@ -1382,9 +1386,6 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
       showQuote: false,
       showLineHeightButton: false,
       showDirection: false,
-      showClipboardCut: false,
-      showClipboardCopy: false,
-      showClipboardPaste: false,
       customButtons: isAttachments
           ? [
               quill.QuillToolbarCustomButtonOptions(
@@ -2007,9 +2008,6 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
       showQuote: false,
       showLineHeightButton: false,
       showDirection: false,
-      showClipboardCut: false,
-      showClipboardCopy: false,
-      showClipboardPaste: false,
       customButtons: isAttachments
           ? [
               quill.QuillToolbarCustomButtonOptions(

@@ -6,7 +6,7 @@ import 'media_download_stub.dart'
 Future<MediaDownloadResult> downloadMedia({
 	required String url,
 	String? filename,
-	String appFolderName = 'klavierapp',
+	String appFolderName = 'music_school_app',
 }) {
 	return downloadMediaImpl(
 		url: url,

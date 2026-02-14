@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'auth.dart';
 import 'models/chat.dart';
 import 'services/chat_service.dart';
+import 'services/media_cache_service.dart';
 import 'screens/chat_conversation.dart';
 import 'config/app_config.dart';
 
@@ -488,7 +489,8 @@ class _NewChatDialogState extends State<_NewChatDialog> {
   ImageProvider? _avatarImage(ChatUserOption user) {
     final profileImage = user.profileImage;
     if (profileImage == null || profileImage.isEmpty) return null;
-    return NetworkImage('$_baseUrl/uploads/profile_images/$profileImage');
+    return MediaCacheService.instance
+        .imageProvider('$_baseUrl/uploads/profile_images/$profileImage');
   }
 
   @override

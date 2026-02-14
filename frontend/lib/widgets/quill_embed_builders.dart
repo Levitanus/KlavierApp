@@ -4,11 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
-import 'package:just_audio/just_audio.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import '../config/app_config.dart';
 import '../services/audio_player_service.dart';
+import '../services/media_cache_service.dart';
 import '../utils/media_download.dart';
 
 String normalizeMediaUrl(String url) {
@@ -30,17 +30,15 @@ class ImageEmbedBuilder extends quill.EmbedBuilder {
       onTap: () {},
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxHeight: 300),
-        child: Image.network(
-          absoluteUrl,
+        child: MediaCacheService.instance.cachedImage(
+          url: absoluteUrl,
           fit: BoxFit.contain,
-          errorBuilder: (context, error, stackTrace) {
-            return Container(
-              color: Colors.grey[200],
-              child: const Center(
-                child: Icon(Icons.broken_image),
-              ),
-            );
-          },
+          errorWidget: Container(
+            color: Colors.grey[200],
+            child: const Center(
+              child: Icon(Icons.broken_image),
+            ),
+          ),
         ),
       ),
     );
@@ -612,7 +610,7 @@ Future<void> _downloadAttachment(BuildContext context, String url) async {
   final result = await downloadMedia(
     url: url,
     filename: filename,
-    appFolderName: 'klavierapp',
+    appFolderName: 'music_school_app',
   );
 
   if (!context.mounted) return;
@@ -668,56 +666,6 @@ class ChatAudioPlayer extends StatefulWidget {
 }
 
 class _ChatAudioPlayerState extends State<ChatAudioPlayer> {
-  AudioPlayer? _player;
-  bool _ready = false;
-  bool _failed = false;
-  StreamSubscription<Duration?>? _durationSub;
-  Duration? _duration;
-
-  @override
-  void initState() {
-    super.initState();
-    if (kIsWeb ||
-        defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS) {
-      _player = AudioPlayer();
-      _init();
-    } else {
-      _failed = true;
-    }
-  }
-
-  Future<void> _init() async {
-    try {
-      await _player?.setUrl(widget.url);
-      _durationSub = _player?.durationStream.listen((duration) {
-        if (!mounted) return;
-        setState(() {
-          _duration = duration;
-        });
-      });
-      if (mounted) {
-        setState(() {
-          _ready = true;
-        });
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() {
-          _ready = false;
-          _failed = true;
-        });
-      }
-    }
-  }
-
-  @override
-  void dispose() {
-    _durationSub?.cancel();
-    _player?.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     // Unreachable: audio embeds now use simplified inline widget + floating player

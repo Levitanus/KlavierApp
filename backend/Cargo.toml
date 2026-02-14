@@ -1,14 +1,14 @@
 [package]
-name = "klavierapp_backend"
+name = "music_school_app_backend"
 version = "0.1.0"
 edition = "2021"
-default-run = "klavierapp_backend"
+default-run = "music_school_app_backend"
 
 [lib]
 path = "src/lib.rs"
 
 [[bin]]
-name = "klavierapp_backend"
+name = "music_school_app_backend"
 path = "src/main.rs"
 
 [dependencies]

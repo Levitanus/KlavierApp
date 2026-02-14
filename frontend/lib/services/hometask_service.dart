@@ -4,10 +4,12 @@ import 'package:http/http.dart' as http;
 import '../auth.dart';
 import '../models/hometask.dart';
 import '../config/app_config.dart';
+import 'app_data_cache_service.dart';
 
 class HometaskService extends ChangeNotifier {
   final AuthService authService;
   final String baseUrl;
+  final AppDataCacheService _cache = AppDataCacheService.instance;
 
   List<Hometask> _hometasks = [];
   bool _isLoading = false;
@@ -27,6 +29,10 @@ class HometaskService extends ChangeNotifier {
   List<Hometask> get hometasks => _hometasks;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+
+  String _hometasksCacheKey(int studentId, String status) {
+    return 'hometasks:$studentId:$status';
+  }
 
   void syncAuth() {
     final token = authService.token;
@@ -66,9 +72,22 @@ class HometaskService extends ChangeNotifier {
   }) async {
     if (authService.token == null) return;
 
+    final cacheKey = _hometasksCacheKey(studentId, status);
+
     _isLoading = true;
     _errorMessage = null;
     notifyListeners();
+
+    if (_hometasks.isEmpty) {
+      final cached = await _cache.readJsonList(cacheKey, authService.userId);
+      if (cached != null && cached.isNotEmpty) {
+        _hometasks = cached
+            .whereType<Map<String, dynamic>>()
+            .map((item) => Hometask.fromJson(item))
+            .toList();
+        notifyListeners();
+      }
+    }
 
     try {
       final uri = Uri.parse('$baseUrl/api/students/$studentId/hometasks')
@@ -85,6 +104,7 @@ class HometaskService extends ChangeNotifier {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         _hometasks = data.map((item) => Hometask.fromJson(item)).toList();
+        await _cache.writeJson(cacheKey, authService.userId, data);
       } else {
         _errorMessage = 'Failed to load hometasks: ${response.statusCode}';
       }
@@ -94,6 +114,13 @@ class HometaskService extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  void clearLocalCache() {
+    _hometasks = [];
+    _errorMessage = null;
+    _isLoading = false;
+    notifyListeners();
   }
 
   Future<bool> markCompleted(int hometaskId) async {

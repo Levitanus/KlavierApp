@@ -1404,38 +1404,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "klavierapp_backend"
-version = "0.1.0"
-dependencies = [
- "actix",
- "actix-cors",
- "actix-files",
- "actix-multipart",
- "actix-web",
- "actix-web-actors",
- "argon2",
- "async-trait",
- "base64 0.21.7",
- "bytes",
- "chrono",
- "dotenv",
- "env_logger",
- "futures-util",
- "jsonwebtoken",
- "lettre",
- "log",
- "rand 0.8.5",
- "rand_core 0.6.4",
- "serde",
- "serde_json",
- "sha2",
- "sqlx",
- "tokio",
- "tokio-util",
- "uuid",
-]
-
-[[package]]
 name = "language-tags"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1611,6 +1579,38 @@ dependencies = [
  "log",
  "wasi",
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "music_school_app_backend"
+version = "0.1.0"
+dependencies = [
+ "actix",
+ "actix-cors",
+ "actix-files",
+ "actix-multipart",
+ "actix-web",
+ "actix-web-actors",
+ "argon2",
+ "async-trait",
+ "base64 0.21.7",
+ "bytes",
+ "chrono",
+ "dotenv",
+ "env_logger",
+ "futures-util",
+ "jsonwebtoken",
+ "lettre",
+ "log",
+ "rand 0.8.5",
+ "rand_core 0.6.4",
+ "serde",
+ "serde_json",
+ "sha2",
+ "sqlx",
+ "tokio",
+ "tokio-util",
+ "uuid",
 ]
 
 [[package]]

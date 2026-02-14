@@ -1,11 +1,11 @@
 {
-    "name": "klavierapp_frontend",
-    "short_name": "klavierapp_frontend",
+    "name": "Musikschule am Thomas-Mann-Platz",
+    "short_name": "Musikschule",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Music school app for Musikschule am Thomas-Mann-Platz.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -9,7 +9,7 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
             radius: 60,
             backgroundColor: Colors.grey[300],
             backgroundImage: _profileImage != null && _profileImage!.isNotEmpty
-                ? NetworkImage(_profileImage!)
+              ? MediaCacheService.instance.imageProvider(_profileImage!)
                 : null,
             child: _profileImage == null || _profileImage!.isEmpty
                 ? const Icon(Icons.person, size: 60, color: Colors.grey)
@@ -321,7 +321,9 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
     return CircleAvatar(
       backgroundColor: Colors.blue,
       radius: radius,
-      backgroundImage: imageUrl != null ? NetworkImage(imageUrl) : null,
+      backgroundImage: imageUrl != null
+          ? MediaCacheService.instance.imageProvider(imageUrl)
+          : null,
       child: imageUrl == null
           ? Text(
               fullName[0].toUpperCase(),

@@ -1037,6 +1037,44 @@ async fn make_teacher(
         }));
     }
 
+    // Create teacher feed if missing
+    let has_feed = sqlx::query_scalar::<_, bool>(
+        "SELECT EXISTS(SELECT 1 FROM feeds WHERE owner_type = 'teacher' AND owner_user_id = $1)"
+    )
+    .bind(user_id)
+    .fetch_one(&mut *tx)
+    .await
+    .unwrap_or(false);
+
+    if !has_feed {
+        let name = sqlx::query_scalar::<_, Option<String>>(
+            "SELECT full_name FROM users WHERE id = $1"
+        )
+        .bind(user_id)
+        .fetch_one(&mut *tx)
+        .await
+        .ok()
+        .flatten()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| "Teacher".to_string());
+
+        let feed_title = format!("{} Feed", name);
+        if let Err(e) = sqlx::query(
+            "INSERT INTO feeds (owner_type, owner_user_id, title) VALUES ('teacher', $1, $2)"
+        )
+        .bind(user_id)
+        .bind(&feed_title)
+        .execute(&mut *tx)
+        .await
+        {
+            error!("Failed to create teacher feed: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to create teacher feed"
+            }));
+        }
+    }
+
     // Commit transaction
     if let Err(e) = tx.commit().await {
         error!("Failed to commit transaction: {}", e);

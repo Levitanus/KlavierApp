@@ -1,4 +1,4 @@
-package com.example.klavierapp_frontend
+package app.music.school
 
 import io.flutter.embedding.android.FlutterActivity
 

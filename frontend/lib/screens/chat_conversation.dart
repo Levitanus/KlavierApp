@@ -10,6 +10,7 @@ import '../auth.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
 import '../services/audio_player_service.dart';
+import '../services/media_cache_service.dart';
 import '../utils/media_download.dart';
 import '../widgets/quill_embed_builders.dart';
 import '../widgets/quill_editor_composer.dart';
@@ -826,7 +827,10 @@ class _MessageBubble extends StatelessWidget {
       case 'image':
         content = ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 240),
-          child: Image.network(url, fit: BoxFit.contain),
+          child: MediaCacheService.instance.cachedImage(
+            url: url,
+            fit: BoxFit.contain,
+          ),
         );
         break;
       case 'video':
@@ -898,7 +902,7 @@ class _MessageBubble extends StatelessWidget {
     final result = await downloadMedia(
       url: url,
       filename: filename,
-      appFolderName: 'klavierapp',
+      appFolderName: 'music_school_app',
     );
 
     if (!context.mounted) return;

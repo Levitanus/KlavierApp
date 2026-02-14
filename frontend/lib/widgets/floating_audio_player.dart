@@ -178,7 +178,7 @@ class _FloatingAudioPlayerState extends State<FloatingAudioPlayer> {
     final result = await downloadMedia(
       url: url,
       filename: filename,
-      appFolderName: 'klavierapp',
+      appFolderName: 'music_school_app',
     );
 
     if (!context.mounted) return;
