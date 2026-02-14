@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'auth.dart';
 import 'models/chat.dart';
 import 'services/chat_service.dart';
+import 'services/media_cache_service.dart';
 import 'screens/chat_conversation.dart';
 import 'config/app_config.dart';
 
@@ -264,10 +265,13 @@ class _ThreadListTile extends StatelessWidget {
       ),
       trailing: thread.unreadCount > 0
           ? CircleAvatar(
-              backgroundColor: Colors.blue,
+              backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
               child: Text(
                 thread.unreadCount.toString(),
-                style: const TextStyle(color: Colors.white, fontSize: 12),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  fontSize: 12,
+                ),
               ),
             )
           : null,
@@ -292,11 +296,13 @@ class _BottomChatToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: Colors.grey[300]!)),
-        color: Colors.white,
+        border: Border(top: BorderSide(color: colorScheme.outlineVariant)),
+        color: isDark ? colorScheme.outline : colorScheme.surface,
       ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
@@ -483,12 +489,17 @@ class _NewChatDialogState extends State<_NewChatDialog> {
   ImageProvider? _avatarImage(ChatUserOption user) {
     final profileImage = user.profileImage;
     if (profileImage == null || profileImage.isEmpty) return null;
-    return NetworkImage('$_baseUrl/uploads/profile_images/$profileImage');
+    return MediaCacheService.instance
+        .imageProvider('$_baseUrl/uploads/profile_images/$profileImage');
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+      contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+      actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
       title: const Text('Start New Chat'),
       content: SizedBox(
         width: double.maxFinite,

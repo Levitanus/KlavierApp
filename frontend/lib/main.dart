@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'l10n/app_localizations.dart';
 import 'config/app_config.dart';
 import 'auth.dart';
 import 'services/notification_service.dart';
@@ -14,6 +15,62 @@ import 'login_screen.dart';
 import 'home_screen.dart';
 import 'reset_password_screen.dart';
 import 'register_screen.dart';
+
+final ColorScheme _lightColorScheme = ColorScheme.fromSeed(
+  brightness: Brightness.light,
+  seedColor: const Color(0xFF2F9C94),
+).copyWith(
+  primary: const Color(0xFF2F9C94),
+  onPrimary: const Color(0xFFFFFFFF),
+  primaryContainer: const Color(0xFFBEE8E3),
+  onPrimaryContainer: const Color(0xFF0B3532),
+  secondary: const Color(0xFF4FB3A6),
+  onSecondary: const Color(0xFF0A2A25),
+  secondaryContainer: const Color(0xFFD6F1ED),
+  onSecondaryContainer: const Color(0xFF0F3E38),
+  tertiary: const Color(0xFFF2C94C),
+  onTertiary: const Color(0xFF3A2A00),
+  tertiaryContainer: const Color(0xFFFFE8A3),
+  onTertiaryContainer: const Color(0xFF2D1C00),
+  error: const Color(0xFFC82128),
+  onError: const Color(0xFFFFFFFF),
+  errorContainer: const Color(0xFFF6C7C9),
+  onErrorContainer: const Color(0xFF3A0B0D),
+  background: const Color(0xFFFFF6E8),
+  onBackground: const Color(0xFF231F20),
+  surface: const Color(0xFFFFFFFF),
+  onSurface: const Color(0xFF231F20),
+  outline: const Color(0xFFE8DCC7),
+  surfaceTint: const Color(0xFF2F9C94),
+);
+
+final ColorScheme _darkColorScheme = ColorScheme.fromSeed(
+  brightness: Brightness.dark,
+  seedColor: const Color(0xFF2F9C94),
+).copyWith(
+  primary: const Color(0xFF3BA79D),
+  onPrimary: const Color(0xFFFFFFFF),
+  primaryContainer: const Color(0xFF1D3F3B),
+  onPrimaryContainer: const Color(0xFFC5EEE9),
+  secondary: const Color(0xFF4FB3A6),
+  onSecondary: const Color(0xFF0B2320),
+  secondaryContainer: const Color(0xFF22514B),
+  onSecondaryContainer: const Color(0xFFD3F1ED),
+  tertiary: const Color(0xFFF07C76),
+  onTertiary: const Color(0xFF2B0D0B),
+  tertiaryContainer: const Color(0xFF3A1C1A),
+  onTertiaryContainer: const Color(0xFFFFD5D2),
+  error: const Color(0xFFED1C24),
+  onError: const Color(0xFFFFFFFF),
+  errorContainer: const Color(0xFF7A0D12),
+  onErrorContainer: const Color(0xFFF7E3E4),
+  background: const Color(0xFF141211),
+  onBackground: const Color(0xFFF7F0E8),
+  surface: const Color(0xFF1F1B1A),
+  onSurface: const Color(0xFFF7F0E8),
+  outline: const Color(0xFF3A3130),
+  surfaceTint: const Color(0xFF3BA79D),
+);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -105,20 +162,39 @@ class MyApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'Klavier',
+        onGenerateTitle: (context) =>
+            AppLocalizations.of(context)?.appTitle ?? 'Music School App',
         theme: ThemeData(
-          primarySwatch: Colors.blue,
           useMaterial3: true,
+          colorScheme: _lightColorScheme,
+          scaffoldBackgroundColor: _lightColorScheme.background,
+          dividerColor: _lightColorScheme.outline,
+          appBarTheme: AppBarTheme(
+            backgroundColor: _lightColorScheme.surface,
+            foregroundColor: _lightColorScheme.onSurface,
+            elevation: 0,
+          ),
         ),
-        localizationsDelegates: const [
+        darkTheme: ThemeData(
+          useMaterial3: true,
+          colorScheme: _darkColorScheme,
+          scaffoldBackgroundColor: _darkColorScheme.background,
+          dividerColor: _darkColorScheme.outline,
+          appBarTheme: AppBarTheme(
+            backgroundColor: _darkColorScheme.surface,
+            foregroundColor: _darkColorScheme.onSurface,
+            elevation: 0,
+          ),
+        ),
+        themeMode: ThemeMode.system,
+        localizationsDelegates: [
+          AppLocalizations.delegate,
           GlobalMaterialLocalizations.delegate,
           GlobalWidgetsLocalizations.delegate,
           GlobalCupertinoLocalizations.delegate,
           quill.FlutterQuillLocalizations.delegate,
         ],
-        supportedLocales: const [
-          Locale('en'),
-        ],
+        supportedLocales: AppLocalizations.supportedLocales,
         onGenerateRoute: (settings) {
           final name = settings.name ?? '/';
           final uri = Uri.parse(name);

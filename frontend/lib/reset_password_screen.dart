@@ -93,6 +93,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
             context: context,
             barrierDismissible: false,
             builder: (context) => AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+              contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               title: const Text('Success'),
               content: const Text('Your password has been reset successfully. You can now log in with your new password.'),
               actions: [

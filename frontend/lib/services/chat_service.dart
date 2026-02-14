@@ -5,13 +5,17 @@ import 'dart:convert';
 import '../models/chat.dart';
 import 'websocket_service.dart';
 import '../config/app_config.dart';
+import 'app_data_cache_service.dart';
 
 String get _baseUrl => '${AppConfig.instance.baseUrl}/chat';
+
+const Duration _chatNetworkTimeout = Duration(seconds: 12);
 
 class ChatService extends ChangeNotifier {
   String _token;
   int? _currentUserId;
   final WebSocketService wsService;
+  final AppDataCacheService _cache = AppDataCacheService.instance;
   
   List<ChatThread> threads = [];
   List<ChatThread> personalThreads = [];
@@ -48,6 +52,9 @@ class ChatService extends ChangeNotifier {
   String get token => _token;
   bool get isAdminUser => _isAdminUser;
   int get totalUnreadCount => personalUnreadCount + adminUnreadCount;
+
+  String _threadsCacheKey(String mode) => 'chat_threads:$mode';
+  String _messagesCacheKey(int threadId) => 'chat_messages:$threadId';
 
   void updateToken(String token) {
     if (token == _token) return;
@@ -99,6 +106,30 @@ class ChatService extends ChangeNotifier {
       notifyListeners();
     }
 
+    if (setCurrent) {
+      final cached = await _cache.readJsonList(
+        _threadsCacheKey(mode),
+        _currentUserId,
+      );
+      if (cached != null && cached.isNotEmpty) {
+        final cachedThreads = cached
+            .whereType<Map<String, dynamic>>()
+            .map(ChatThread.fromJson)
+            .toList();
+
+        if (mode == 'admin') {
+          adminThreads = cachedThreads;
+          adminUnreadCount = _calculateUnreadCount(cachedThreads);
+        } else {
+          personalThreads = cachedThreads;
+          personalUnreadCount = _calculateUnreadCount(cachedThreads);
+        }
+
+        threads = cachedThreads;
+        notifyListeners();
+      }
+    }
+
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/threads?mode=$mode'),
@@ -110,6 +141,12 @@ class ChatService extends ChangeNotifier {
         final loadedThreads = data
             .map((t) => ChatThread.fromJson(t as Map<String, dynamic>))
             .toList();
+
+        await _cache.writeJson(
+          _threadsCacheKey(mode),
+          _currentUserId,
+          loadedThreads.map((t) => t.toJson()).toList(),
+        );
 
         if (mode == 'admin') {
           adminThreads = loadedThreads;
@@ -157,11 +194,25 @@ class ChatService extends ChangeNotifier {
     errorMessage = null;
     notifyListeners();
 
+    if (!messagesByThread.containsKey(threadId)) {
+      final cached = await _cache.readJsonList(
+        _messagesCacheKey(threadId),
+        _currentUserId,
+      );
+      if (cached != null && cached.isNotEmpty) {
+        messagesByThread[threadId] = cached
+            .whereType<Map<String, dynamic>>()
+            .map(ChatMessage.fromJson)
+            .toList();
+        notifyListeners();
+      }
+    }
+
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/threads/$threadId/messages?limit=$limit&offset=$offset'),
         headers: {'Authorization': 'Bearer $_token'},
-      );
+      ).timeout(_chatNetworkTimeout);
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
@@ -204,6 +255,13 @@ class ChatService extends ChangeNotifier {
         } else {
           messagesByThread[threadId] = newMessages;
         }
+
+        final updated = messagesByThread[threadId] ?? newMessages;
+        await _cache.writeJson(
+          _messagesCacheKey(threadId),
+          _currentUserId,
+          updated.map((m) => m.toJson()).toList(),
+        );
         errorMessage = null;
 
         // Subscribe to thread for real-time updates
@@ -221,6 +279,25 @@ class ChatService extends ChangeNotifier {
     isLoading = false;
     notifyListeners();
     return 0;
+  }
+
+  void clearLocalCache() {
+    threads = [];
+    personalThreads = [];
+    adminThreads = [];
+    messagesByThread.clear();
+    relatedTeachers = [];
+    availableUsers = [];
+    isLoading = false;
+    isLoadingRelatedTeachers = false;
+    isLoadingAvailableUsers = false;
+    errorMessage = null;
+    personalUnreadCount = 0;
+    adminUnreadCount = 0;
+    subscribedThreads.clear();
+    _threadsLoaded = false;
+    _adminCountsLoaded = false;
+    notifyListeners();
   }
 
   void _subscribeToThread(int threadId) {
@@ -501,7 +578,7 @@ class ChatService extends ChangeNotifier {
           
           final index = messagesByThread[threadId]!.indexOf(message);
           messagesByThread[threadId]![index] = updated;
-          notifyListeners();
+          // Don't notify listeners for receipt updates to avoid disrupting input
           break;
         }
       }
@@ -595,11 +672,11 @@ class ChatService extends ChangeNotifier {
           'Content-Type': 'application/json',
         },
         body: json.encode({'body': quillJson}),
-      );
+      ).timeout(_chatNetworkTimeout);
 
       if (response.statusCode == 201) {
         if (!messagesByThread.containsKey(threadId)) {
-          await loadThreadMessages(threadId);
+          unawaited(loadThreadMessages(threadId));
         }
         return true;
       } else {
@@ -680,12 +757,12 @@ class ChatService extends ChangeNotifier {
           'body': quillJson,
           'attachments': attachments.map((a) => a.toJson()).toList(),
         }),
-      );
+      ).timeout(_chatNetworkTimeout);
 
       if (response.statusCode == 201) {
-        if (!messagesByThread.containsKey(threadId)) {
-          await loadThreadMessages(threadId);
-        }
+        // Reload thread messages to ensure the new message appears
+        // This is a fallback in case websocket doesn't update immediately
+        unawaited(loadThreadMessages(threadId, limit: 50, offset: 0, append: false));
         return true;
       } else {
         errorMessage = 'Failed to send message: ${response.statusCode}';
@@ -759,14 +836,14 @@ class ChatService extends ChangeNotifier {
           'body': quillJson,
           'attachments': attachments.map((a) => a.toJson()).toList(),
         }),
-      );
+      ).timeout(_chatNetworkTimeout);
 
       if (response.statusCode == 201) {
         final data = json.decode(response.body);
         final threadId = data['thread_id'] as int?;
         
         // Reload personal threads to get the new/updated thread
-        await loadThreads(mode: 'personal', setCurrent: false);
+        unawaited(loadThreads(mode: 'personal', setCurrent: false));
         
         return threadId;
       } else {

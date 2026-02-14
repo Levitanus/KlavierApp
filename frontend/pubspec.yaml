@@ -1,5 +1,5 @@
-name: klavierapp_frontend
-description: Klavier Flutter frontend (scaffold)
+name: music_school_app_frontend
+description: Music school app Flutter frontend
 publish_to: 'none'
 version: 0.1.0
 environment:
@@ -8,6 +8,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
   shared_preferences: ^2.2.2
   http: ^1.1.2
   provider: ^6.1.1
@@ -15,12 +19,15 @@ dependencies:
   file_picker: ^8.0.0
   intl: ^0.20.2
   flutter_quill: ^11.5.0
+  flutter_svg: ^2.0.10
   web_socket_channel: ^3.0.0
   just_audio: ^0.9.38
   audio_session: ^0.1.21
   video_player: ^2.9.1
   record: ^6.2.0
   path_provider: ^2.1.4
+  cached_network_image: ^3.3.1
+  flutter_cache_manager: ^3.3.1
 
 dev_dependencies:
   flutter_lints: ^2.0.0
@@ -28,5 +35,7 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true
   assets:
     - assets/config.json
+    - assets/branding/

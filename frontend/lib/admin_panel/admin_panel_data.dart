@@ -9,17 +9,39 @@ mixin _AdminPanelData on _AdminPanelStateBase {
 
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
+      final queryParameters = <String, String>{
+        'page': _currentPage.toString(),
+        'page_size': _pageSize.toString(),
+        if (_searchQuery.isNotEmpty) 'search': _searchQuery,
+      };
+      final uri = Uri.parse('${AppConfig.instance.baseUrl}/api/admin/users')
+          .replace(queryParameters: queryParameters);
       final response = await http.get(
-        Uri.parse('${AppConfig.instance.baseUrl}/api/admin/users'),
+        uri,
         headers: {
           'Authorization': 'Bearer ${authService.token}',
         },
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+        final decoded = jsonDecode(response.body);
+        final UsersPageResponse pageData;
+        if (decoded is List) {
+          final users = decoded.map((json) => User.fromJson(json)).toList();
+          pageData = UsersPageResponse(
+            users: users,
+            total: users.length,
+            page: 1,
+            pageSize: users.length,
+          );
+        } else {
+          pageData = UsersPageResponse.fromJson(decoded);
+        }
         setState(() {
-          _users = data.map((json) => User.fromJson(json)).toList();
+          _users = pageData.users;
+          _totalUsers = pageData.total;
+          _currentPage = pageData.page;
+          _pageSize = pageData.pageSize;
           _isLoading = false;
         });
 

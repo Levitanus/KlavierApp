@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_svg/flutter_svg.dart';
 import 'dart:convert';
 import 'auth.dart';
 import 'home_screen.dart';
@@ -36,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       final authService = Provider.of<AuthService>(context, listen: false);
-      final success = await authService.login(
+      final result = await authService.login(
         _usernameController.text.trim(),
         _passwordController.text,
       );
@@ -47,14 +49,15 @@ class _LoginScreenState extends State<LoginScreen> {
         _isLoading = false;
       });
 
-      if (success) {
+      if (result.success) {
+        TextInput.finishAutofillContext();
         // Navigate to home screen
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
       } else {
         setState(() {
-          _errorMessage = 'Invalid username or password';
+          _errorMessage = result.errorMessage ?? 'Login failed';
         });
       }
     }
@@ -67,6 +70,10 @@ class _LoginScreenState extends State<LoginScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: const Text('Forgot Password'),
         content: Form(
           key: formKey,
@@ -81,10 +88,12 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: usernameController,
+                autofillHints: const [AutofillHints.username],
                 decoration: const InputDecoration(
                   labelText: 'Username',
                   border: OutlineInputBorder(),
                 ),
+                textInputAction: TextInputAction.done,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return 'Please enter your username';
@@ -129,6 +138,10 @@ class _LoginScreenState extends State<LoginScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: const Text('Request Sent'),
             content: Text(data['message'] ?? 'Password reset request sent successfully.'),
             actions: [
@@ -143,6 +156,10 @@ class _LoginScreenState extends State<LoginScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: const Text('Error'),
             content: const Text('Failed to send password reset request. Please try again.'),
             actions: [
@@ -160,6 +177,10 @@ class _LoginScreenState extends State<LoginScreen> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+          contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
           title: const Text('Error'),
           content: Text('An error occurred: $e'),
           actions: [
@@ -175,6 +196,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final logoAsset = isDark
+      ? 'assets/branding/logo bright.svg'
+      : 'assets/branding/logo dark.svg';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Login'),
@@ -186,114 +212,117 @@ class _LoginScreenState extends State<LoginScreen> {
             padding: const EdgeInsets.all(24.0),
             child: Form(
               key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // Logo or App Title
-                  const Icon(
-                    Icons.piano,
-                    size: 80,
-                    color: Colors.blue,
-                  ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Klavier',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
+              child: AutofillGroup(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Logo or App Title
+                    SvgPicture.asset(
+                      'assets/branding/icon.svg',
+                      height: 72,
+                      width: 72,
                     ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 48),
-
-                  // Username Field
-                  TextFormField(
-                    controller: _usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      prefixIcon: Icon(Icons.person),
-                      border: OutlineInputBorder(),
+                    const SizedBox(height: 12),
+                    SvgPicture.asset(
+                      logoAsset,
+                      height: 32,
                     ),
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Please enter your username';
-                      }
-                      return null;
-                    },
-                    enabled: !_isLoading,
-                  ),
-                  const SizedBox(height: 16),
+                    const SizedBox(height: 48),
 
-                  // Password Field
-                  TextFormField(
-                    controller: _passwordController,
-                    decoration: InputDecoration(
-                      labelText: 'Password',
-                      prefixIcon: const Icon(Icons.lock),
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(
-                          _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                        ),
-                        onPressed: () {
-                          setState(() {
-                            _obscurePassword = !_obscurePassword;
-                          });
-                        },
+                    // Username Field
+                    TextFormField(
+                      controller: _usernameController,
+                      autofillHints: const [AutofillHints.username],
+                      decoration: const InputDecoration(
+                        labelText: 'Username',
+                        prefixIcon: Icon(Icons.person),
+                        border: OutlineInputBorder(),
                       ),
+                      textInputAction: TextInputAction.next,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Please enter your username';
+                        }
+                        return null;
+                      },
+                      enabled: !_isLoading,
                     ),
-                    obscureText: _obscurePassword,
-                    validator: (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter your password';
-                      }
-                      return null;
-                    },
-                    enabled: !_isLoading,
-                    onFieldSubmitted: (_) => _handleLogin(),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 16),
 
-                  // Error Message
-                  if (_errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(
-                        _errorMessage!,
-                        style: const TextStyle(
-                          color: Colors.red,
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-
-                  // Login Button
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _handleLogin,
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text(
-                            'Login',
-                            style: TextStyle(fontSize: 16),
+                    // Password Field
+                    TextFormField(
+                      controller: _passwordController,
+                      autofillHints: const [AutofillHints.password],
+                      decoration: InputDecoration(
+                        labelText: 'Password',
+                        prefixIcon: const Icon(Icons.lock),
+                        border: const OutlineInputBorder(),
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
                           ),
-                  ),
-                  const SizedBox(height: 16),
+                          onPressed: () {
+                            setState(() {
+                              _obscurePassword = !_obscurePassword;
+                            });
+                          },
+                        ),
+                      ),
+                      obscureText: _obscurePassword,
+                      autocorrect: false,
+                      enableSuggestions: false,
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Please enter your password';
+                        }
+                        return null;
+                      },
+                      enabled: !_isLoading,
+                      onFieldSubmitted: (_) => _handleLogin(),
+                    ),
+                    const SizedBox(height: 24),
 
-                  // Forgot Password Button
-                  TextButton(
-                    onPressed: _isLoading ? null : _handleForgotPassword,
-                    child: const Text('Forgot Password?'),
-                  ),
+                    // Error Message
+                    if (_errorMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 16),
+                        child: Text(
+                          _errorMessage!,
+                          style: const TextStyle(
+                            color: Colors.red,
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+
+                    // Login Button
+                    ElevatedButton(
+                      onPressed: _isLoading ? null : _handleLogin,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text(
+                              'Login',
+                              style: TextStyle(fontSize: 16),
+                            ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Forgot Password Button
+                    TextButton(
+                      onPressed: _isLoading ? null : _handleForgotPassword,
+                      child: const Text('Forgot Password?'),
+                    ),
                 ],
+                ),
               ),
             ),
           ),

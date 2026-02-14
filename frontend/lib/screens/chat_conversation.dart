@@ -9,8 +9,12 @@ import 'package:provider/provider.dart';
 import '../auth.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
+import '../services/audio_player_service.dart';
+import '../services/media_cache_service.dart';
+import '../utils/media_download.dart';
 import '../widgets/quill_embed_builders.dart';
-import '../utils/voice_recorder.dart';
+import '../widgets/quill_editor_composer.dart';
+import '../widgets/floating_audio_player.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   final ChatThread thread;
@@ -34,7 +38,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final Set<int> _readMarkedMessageIds = {};
   static const int _pageSize = 50;
   final List<_PendingAttachment> _pendingAttachments = [];
-  final VoiceRecorder _voiceRecorder = VoiceRecorder();
   bool _isUploadingAttachment = false;
 
   @override
@@ -308,68 +311,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  Future<void> _toggleVoiceRecording() async {
-    if (_voiceRecorder.isRecording) {
-      final audio = await _voiceRecorder.stop();
-      if (audio == null) return;
-
-      setState(() {
-        _isUploadingAttachment = true;
-      });
-
-      final chatService = context.read<ChatService>();
-      final uploaded = await chatService.uploadMedia(
-        mediaType: 'audio',
-        bytes: audio.bytes,
-        filename: 'voice.${audio.extension}',
-      );
-
-      if (!mounted) return;
-
-      if (uploaded == null) {
-        setState(() {
-          _isUploadingAttachment = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(chatService.errorMessage ?? 'Failed to upload voice message')),
-        );
-        return;
-      }
-
-      final attachment = _PendingAttachment(
-        input: ChatAttachmentInput(
-          mediaId: uploaded.mediaId,
-          attachmentType: 'voice',
-        ),
-        url: uploaded.url,
-        attachmentType: 'voice',
-        inline: true,
-      );
-
-      setState(() {
-        _pendingAttachments.add(attachment);
-        _isUploadingAttachment = false;
-      });
-
-      _insertEmbed('voice', uploaded.url);
-      return;
-    }
-
-    final available = await _voiceRecorder.isAvailable();
-    if (!available) {
-      _pickAttachment(attachmentType: 'voice', inline: true);
-      return;
-    }
-
-    await _voiceRecorder.start();
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
   Future<void> _sendMessage() async {
     final chatService = context.read<ChatService>();
-    
+
     if (_editorController.document.isEmpty()) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Message cannot be empty')),
@@ -381,129 +325,90 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       _isSending = true;
     });
 
-    // Get Quill JSON
-    final quillJson = _editorController.document.toDelta().toJson();
-    final attachments = _pendingAttachments.map((a) => a.input).toList();
-
     bool success = false;
-    
-    // Only use admin message endpoint for virtual threads (user creating first message to admin)
-    if (widget.thread.isAdminChat && widget.thread.id == -1) {
-      // Non-admin user sending first message to admin
-      final threadId = await chatService.sendAdminMessage(
-        {'ops': quillJson},
-        attachments: attachments,
-      );
-      success = threadId != null;
-      
-      if (success) {
-        // Thread was just created, navigate to the real thread
-        final realThread = chatService.personalThreads.firstWhere(
-          (t) => t.id == threadId,
-          orElse: () => widget.thread,
+    try {
+      // Get Quill JSON
+      final quillJson = _editorController.document.toDelta().toJson();
+      final attachments = _pendingAttachments.map((a) => a.input).toList();
+
+      // Only use admin message endpoint for virtual threads (user creating first message to admin)
+      if (widget.thread.isAdminChat && widget.thread.id == -1) {
+        // Non-admin user sending first message to admin
+        final threadId = await chatService.sendAdminMessage(
+          {'ops': quillJson},
+          attachments: attachments,
         );
-        if (mounted && realThread.id != -1) {
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => ChatConversationScreen(thread: realThread),
-            ),
+        success = threadId != null;
+
+        if (success) {
+          // Thread was just created, navigate to the real thread
+          final realThread = chatService.personalThreads.firstWhere(
+            (t) => t.id == threadId,
+            orElse: () => widget.thread,
           );
-          return;
+          if (mounted && realThread.id != -1) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => ChatConversationScreen(thread: realThread),
+              ),
+            );
+            return;
+          }
         }
-      }
-    } else {
-      // All other cases: regular peer chat, admin replying in admin chat
-      success = await chatService.sendMessageWithAttachments(
-        widget.thread.id,
-        {'ops': quillJson},
-        attachments: attachments,
-      );
-    }
-
-    if (mounted) {
-      setState(() {
-        _isSending = false;
-      });
-
-      if (success) {
-        _editorController.clear();
-        setState(() {
-          _pendingAttachments.clear();
-        });
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(chatService.errorMessage ?? 'Failed to send message')),
+        // All other cases: regular peer chat, admin replying in admin chat
+        success = await chatService.sendMessageWithAttachments(
+          widget.thread.id,
+          {'ops': quillJson},
+          attachments: attachments,
         );
       }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
     }
-  }
 
-  void _insertNewline() {
-    final selection = _editorController.selection;
-    final offset = selection.baseOffset;
-    if (offset < 0) return;
-    _editorController.replaceText(
-      offset,
-      0,
-      '\n',
-      TextSelection.collapsed(offset: offset + 1),
-    );
-  }
+    if (!mounted) return;
 
-  Future<void> _promptForLink() async {
-    final selection = _editorController.selection;
-    if (selection.isCollapsed) return;
-
-    final controller = TextEditingController();
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Insert link'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'URL',
-            border: OutlineInputBorder(),
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Apply'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-    final url = controller.text.trim();
-    if (url.isEmpty) return;
-
-    _editorController.formatSelection(
-      quill.LinkAttribute(url),
-    );
+    if (success) {
+      _editorController.clear();
+      setState(() {
+        _pendingAttachments.clear();
+      });
+      // Scroll to bottom to show the new message
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _scrollToBottom();
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to send message')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final displayName = widget.thread.peerName ?? 'Unknown';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(displayName),
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: _buildMessageList(),
-          ),
-          _buildMessageComposer(),
-        ],
+    return ChangeNotifierProvider(
+      create: (_) => AudioPlayerService(),
+      child: Scaffold(
+        resizeToAvoidBottomInset: true,
+        appBar: AppBar(
+          title: Text(displayName),
+        ),
+        body: Column(
+          children: [
+            const FloatingAudioPlayer(),
+            Expanded(
+              child: _buildMessageList(),
+            ),
+            _buildMessageComposer(),
+          ],
+        ),
       ),
     );
   }
@@ -575,12 +480,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   Widget _buildMessageComposer() {
     return Container(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 8,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 8,
-      ),
+      padding: const EdgeInsets.fromLTRB(3, 4, 3, 4),
       decoration: BoxDecoration(
         border: Border(top: BorderSide(color: Colors.grey[300]!)),
       ),
@@ -608,214 +508,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 },
               ),
             ),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey[300]!),
-              borderRadius: BorderRadius.circular(8),
+          QuillEditorComposer(
+            controller: _editorController,
+            config: const QuillEditorComposerConfig(
+              minHeight: 40,
+              maxHeight: 120,
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: Shortcuts(
-                    shortcuts: {
-                      LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyB):
-                          const _FormatIntent(_FormatType.bold),
-                      LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyI):
-                          const _FormatIntent(_FormatType.italic),
-                      LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyU):
-                          const _FormatIntent(_FormatType.underline),
-                      LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyK):
-                          const _FormatIntent(_FormatType.link),
-                      LogicalKeySet(LogicalKeyboardKey.enter):
-                          const _SendIntent(),
-                      LogicalKeySet(LogicalKeyboardKey.shift, LogicalKeyboardKey.enter):
-                          const _NewlineIntent(),
-                    },
-                    child: Actions(
-                      actions: {
-                        _FormatIntent: CallbackAction<_FormatIntent>(
-                          onInvoke: (intent) {
-                            switch (intent.type) {
-                              case _FormatType.bold:
-                                _editorController.formatSelection(quill.Attribute.bold);
-                                break;
-                              case _FormatType.italic:
-                                _editorController.formatSelection(quill.Attribute.italic);
-                                break;
-                              case _FormatType.underline:
-                                _editorController.formatSelection(quill.Attribute.underline);
-                                break;
-                              case _FormatType.link:
-                                _promptForLink();
-                                break;
-                            }
-                            return null;
-                          },
-                        ),
-                        _SendIntent: CallbackAction<_SendIntent>(
-                          onInvoke: (intent) {
-                            if (!_isSending) {
-                              _sendMessage();
-                            }
-                            return null;
-                          },
-                        ),
-                        _NewlineIntent: CallbackAction<_NewlineIntent>(
-                          onInvoke: (intent) {
-                            _insertNewline();
-                            return null;
-                          },
-                        ),
-                      },
-                      child: Focus(
-                        focusNode: _editorFocusNode,
-                        onKeyEvent: (node, event) {
-                          if (event is KeyDownEvent) {
-                            final isShiftPressed = event.logicalKey == LogicalKeyboardKey.shiftLeft ||
-                                event.logicalKey == LogicalKeyboardKey.shiftRight ||
-                                HardwareKeyboard.instance.isShiftPressed;
-                            if (event.logicalKey == LogicalKeyboardKey.enter &&
-                                isShiftPressed) {
-                              _insertNewline();
-                              return KeyEventResult.handled;
-                            }
-                            if (event.logicalKey == LogicalKeyboardKey.enter &&
-                                !isShiftPressed) {
-                              if (!_isSending) {
-                                _sendMessage();
-                              }
-                              return KeyEventResult.handled;
-                            }
-                          }
-                          return KeyEventResult.ignored;
-                        },
-                        child: SizedBox(
-                          height: 100,
-                          child: GestureDetector(
-                            onTap: () {
-                              if (!_editorFocusNode.hasFocus) {
-                                _editorFocusNode.requestFocus();
-                              }
-                            },
-                            child: quill.QuillEditor.basic(
-                              controller: _editorController,
-                              config: quill.QuillEditorConfig(
-                                embedBuilders: [
-                                  ImageEmbedBuilder(),
-                                  VideoEmbedBuilder(),
-                                  AudioEmbedBuilder(),
-                                  VoiceEmbedBuilder(),
-                                  FileEmbedBuilder(),
-                                ],
-                                unknownEmbedBuilder: UnknownEmbedBuilder(),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                if (_isTouchPlatform()) ...[
-                  const SizedBox(width: 8),
-                  IconButton(
-                    tooltip: 'Format',
-                    icon: const Icon(Icons.text_format),
-                    onPressed: _showFormatMenu,
-                  ),
-                ],
-                const SizedBox(width: 4),
-                IconButton(
-                  tooltip: 'Attach',
-                  icon: Icon(_isUploadingAttachment ? Icons.hourglass_top : Icons.attach_file),
-                  onPressed: _isUploadingAttachment ? null : _showAttachmentMenu,
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  tooltip: _voiceRecorder.isRecording ? 'Stop recording' : 'Record voice',
-                  icon: Icon(
-                    _voiceRecorder.isRecording ? Icons.stop_circle : Icons.mic,
-                    color: _voiceRecorder.isRecording ? Colors.red : null,
-                  ),
-                  onPressed: _toggleVoiceRecording,
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  onPressed: _isSending ? null : _sendMessage,
-                  icon: _isSending
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.send),
-                ),
-              ],
-            ),
+            onSendPressed: _isSending ? null : _sendMessage,
+            onAttachmentSelected: _showAttachmentMenu,
+            onVoiceRecorded: _onVoiceRecorded,
           ),
         ],
       ),
     );
   }
 
-  bool _isTouchPlatform() {
-    if (kIsWeb) return false;
-    final platform = Theme.of(context).platform;
-    return platform == TargetPlatform.android || platform == TargetPlatform.iOS;
-  }
-
-  void _showFormatMenu() {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (context) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Wrap(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.format_bold),
-                title: const Text('Bold'),
-                onTap: () {
-                  _editorController.formatSelection(quill.Attribute.bold);
-                  Navigator.of(context).pop();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.format_italic),
-                title: const Text('Italic'),
-                onTap: () {
-                  _editorController.formatSelection(quill.Attribute.italic);
-                  Navigator.of(context).pop();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.format_underline),
-                title: const Text('Underline'),
-                onTap: () {
-                  _editorController.formatSelection(quill.Attribute.underline);
-                  Navigator.of(context).pop();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.link),
-                title: const Text('Insert link'),
-                onTap: () {
-                  Navigator.of(context).pop();
-                  _promptForLink();
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showAttachmentMenu() {
-    showModalBottomSheet<void>(
+  Future<void> _showAttachmentMenu() async {
+    await showModalBottomSheet<void>(
       context: context,
       builder: (context) => SafeArea(
         child: Padding(
@@ -861,6 +570,50 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     );
   }
 
+  Future<void> _onVoiceRecorded(List<int> bytes, String filename) async {
+    if (bytes.isEmpty) return;
+
+    setState(() {
+      _isUploadingAttachment = true;
+    });
+
+    final chatService = context.read<ChatService>();
+    final uploaded = await chatService.uploadMedia(
+      mediaType: 'voice',
+      bytes: bytes,
+      filename: filename,
+    );
+
+    if (!mounted) return;
+
+    if (uploaded == null) {
+      setState(() {
+        _isUploadingAttachment = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to upload voice message')),
+      );
+      return;
+    }
+
+    final attachment = _PendingAttachment(
+      input: ChatAttachmentInput(
+        mediaId: uploaded.mediaId,
+        attachmentType: 'voice',
+      ),
+      url: uploaded.url,
+      attachmentType: 'voice',
+      inline: true,
+    );
+
+    setState(() {
+      _pendingAttachments.add(attachment);
+      _isUploadingAttachment = false;
+    });
+
+    _insertEmbed('voice', uploaded.url);
+  }
+
   Future<void> _editMessage(ChatMessage message) async {
     final controller = quill.QuillController(
       document: message.quillController.document,
@@ -870,34 +623,24 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final updated = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: const Text('Edit message'),
         content: SizedBox(
           width: 600,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              quill.QuillSimpleToolbar(
+              QuillEditorComposer(
                 controller: controller,
-                config: const quill.QuillSimpleToolbarConfig(
-                  showAlignmentButtons: true,
-                  showCodeBlock: false,
-                  showQuote: false,
-                ),
-              ),
-              SizedBox(
-                height: 180,
-                child: quill.QuillEditor.basic(
-                  controller: controller,
-                  config: quill.QuillEditorConfig(
-                    embedBuilders: [
-                      ImageEmbedBuilder(),
-                      VideoEmbedBuilder(),
-                      AudioEmbedBuilder(),
-                      VoiceEmbedBuilder(),
-                      FileEmbedBuilder(),
-                    ],
-                    unknownEmbedBuilder: UnknownEmbedBuilder(),
-                  ),
+                config: const QuillEditorComposerConfig(
+                  minHeight: 80,
+                  maxHeight: 180,
+                  showAttachButton: false,
+                  showVoiceButton: false,
+                  showSendButton: false,
                 ),
               ),
             ],
@@ -931,21 +674,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 }
 
-enum _FormatType { bold, italic, underline, link }
-
-class _FormatIntent extends Intent {
-  final _FormatType type;
-  const _FormatIntent(this.type);
-}
-
-class _SendIntent extends Intent {
-  const _SendIntent();
-}
-
-class _NewlineIntent extends Intent {
-  const _NewlineIntent();
-}
-
 class _PendingAttachment {
   final ChatAttachmentInput input;
   final String url;
@@ -977,7 +705,10 @@ class _MessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bubbleColor = isOwn ? Colors.blue.shade100 : Colors.grey.shade100;
+    final colorScheme = Theme.of(context).colorScheme;
+    final bubbleColor = isOwn
+        ? colorScheme.secondaryContainer
+        : colorScheme.surfaceContainerHigh;
     final align = isOwn ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final name = message.senderName;
     final controller = _buildReadOnlyController();
@@ -1016,22 +747,21 @@ class _MessageBubble extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
-                          child: IgnorePointer(
-                            child: quill.QuillEditor.basic(
-                              controller: controller,
-                              config: quill.QuillEditorConfig(
-                                scrollable: false,
-                                autoFocus: false,
-                                padding: EdgeInsets.zero,
-                                embedBuilders: [
-                                  ImageEmbedBuilder(),
-                                  VideoEmbedBuilder(),
-                                  AudioEmbedBuilder(),
-                                  VoiceEmbedBuilder(),
-                                  FileEmbedBuilder(),
-                                ],
-                                unknownEmbedBuilder: UnknownEmbedBuilder(),
-                              ),
+                          child: quill.QuillEditor.basic(
+                            controller: controller,
+                            config: quill.QuillEditorConfig(
+                              scrollable: false,
+                              autoFocus: false,
+                              showCursor: false,
+                              padding: EdgeInsets.zero,
+                              embedBuilders: [
+                                ImageEmbedBuilder(),
+                                VideoEmbedBuilder(),
+                                AudioEmbedBuilder(),
+                                VoiceEmbedBuilder(),
+                                FileEmbedBuilder(),
+                              ],
+                              unknownEmbedBuilder: UnknownEmbedBuilder(),
                             ),
                           ),
                         ),
@@ -1048,7 +778,7 @@ class _MessageBubble extends StatelessWidget {
                       for (final attachment in attachments)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 6),
-                          child: _buildAttachmentWidget(attachment),
+                          child: _buildAttachmentWidget(context, attachment),
                         ),
                     ],
                     const SizedBox(height: 4),
@@ -1090,22 +820,30 @@ class _MessageBubble extends StatelessWidget {
         .toList();
   }
 
-  Widget _buildAttachmentWidget(ChatAttachment attachment) {
+  Widget _buildAttachmentWidget(BuildContext context, ChatAttachment attachment) {
     final url = normalizeMediaUrl(attachment.url);
+    Widget content;
     switch (attachment.attachmentType) {
       case 'image':
-        return ConstrainedBox(
+        content = ConstrainedBox(
           constraints: const BoxConstraints(maxHeight: 240),
-          child: Image.network(url, fit: BoxFit.contain),
+          child: MediaCacheService.instance.cachedImage(
+            url: url,
+            fit: BoxFit.contain,
+          ),
         );
+        break;
       case 'video':
-        return ChatVideoPlayer(url: url);
+        content = ChatVideoPlayer(url: url);
+        break;
       case 'audio':
-        return ChatAudioPlayer(url: url, label: 'Audio');
+        content = ChatAudioPlayer(url: url, label: 'Audio');
+        break;
       case 'voice':
-        return ChatAudioPlayer(url: url, label: 'Voice message');
+        content = ChatAudioPlayer(url: url, label: 'Voice message');
+        break;
       case 'file':
-        return Row(
+        content = Row(
           children: [
             const Icon(Icons.insert_drive_file),
             const SizedBox(width: 8),
@@ -1118,9 +856,73 @@ class _MessageBubble extends StatelessWidget {
             ),
           ],
         );
+        break;
       default:
-        return Text('Unsupported attachment: ${attachment.attachmentType}');
+        content = Text('Unsupported attachment: ${attachment.attachmentType}');
     }
+
+    return _buildAttachmentWithMenu(
+      child: content,
+      onDownload: () => _downloadAttachment(context, url),
+    );
+  }
+
+  Widget _buildAttachmentWithMenu({
+    required Widget child,
+    required VoidCallback onDownload,
+  }) {
+    return Stack(
+      alignment: Alignment.topRight,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(right: 32),
+          child: child,
+        ),
+        PopupMenuButton<String>(
+          tooltip: 'Attachment actions',
+          onSelected: (value) {
+            if (value == 'download') {
+              onDownload();
+            }
+          },
+          itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: 'download',
+              child: Text('Download source file'),
+            ),
+          ],
+          icon: const Icon(Icons.more_horiz, size: 20),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _downloadAttachment(BuildContext context, String url) async {
+    final filename = _fileNameFromUrl(url);
+    final result = await downloadMedia(
+      url: url,
+      filename: filename,
+      appFolderName: 'music_school_app',
+    );
+
+    if (!context.mounted) return;
+
+    final message = result.success
+        ? (result.filePath != null
+            ? 'Saved to ${result.filePath}'
+            : 'Download started')
+        : (result.errorMessage ?? 'Download failed');
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  String? _fileNameFromUrl(String url) {
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.pathSegments.isEmpty) return null;
+    final name = uri.pathSegments.last.trim();
+    return name.isEmpty ? null : name;
   }
 
   Widget _buildReceiptStatus(List<MessageReceipt> receipts) {

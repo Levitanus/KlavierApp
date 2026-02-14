@@ -89,3 +89,30 @@ class StudentInfo {
     required this.fullName,
   });
 }
+
+class UsersPageResponse {
+  final List<User> users;
+  final int total;
+  final int page;
+  final int pageSize;
+
+  UsersPageResponse({
+    required this.users,
+    required this.total,
+    required this.page,
+    required this.pageSize,
+  });
+
+  factory UsersPageResponse.fromJson(Map<String, dynamic> json) {
+    final usersJson = (json['users'] as List<dynamic>? ?? <dynamic>[])
+        .map((item) => User.fromJson(item as Map<String, dynamic>))
+        .toList();
+
+    return UsersPageResponse(
+      users: usersJson,
+      total: (json['total'] as num?)?.toInt() ?? usersJson.length,
+      page: (json['page'] as num?)?.toInt() ?? 1,
+      pageSize: (json['page_size'] as num?)?.toInt() ?? usersJson.length,
+    );
+  }
+}

@@ -9,6 +9,8 @@ import 'package:file_picker/file_picker.dart';
 import 'auth.dart';
 import 'services/hometask_service.dart';
 import 'services/chat_service.dart';
+import 'services/app_data_cache_service.dart';
+import 'services/media_cache_service.dart';
 import 'models/hometask.dart';
 import 'screens/chat_conversation.dart';
 import 'config/app_config.dart';
@@ -620,20 +622,20 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                   const SizedBox(height: 4),
                                   Text('@${student['username'] ?? ''}'),
                                   const SizedBox(height: 12),
-                                  Row(
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
                                     children: [
                                       OutlinedButton.icon(
                                         icon: const Icon(Icons.visibility),
                                         label: const Text('View Profile'),
                                         onPressed: () => _showStudentProfileDialog(student),
                                       ),
-                                      const SizedBox(width: 8),
                                       ElevatedButton.icon(
                                         icon: const Icon(Icons.assignment_add),
                                         label: const Text('Assign Hometask'),
                                         onPressed: () => _showAssignHometaskDialog(student),
                                       ),
-                                      const SizedBox(width: 8),
                                       ElevatedButton.icon(
                                         icon: const Icon(Icons.message),
                                         label: const Text('Message'),
@@ -642,7 +644,6 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                           student['full_name'] as String,
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
                                       TextButton.icon(
                                         icon: const Icon(Icons.person_remove, color: Colors.red),
                                         label: const Text(
@@ -715,14 +716,15 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                   const SizedBox(height: 4),
                                   Text('@${teacher['username'] ?? ''}'),
                                   const SizedBox(height: 12),
-                                  Row(
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
                                     children: [
                                       OutlinedButton.icon(
                                         icon: const Icon(Icons.visibility),
                                         label: const Text('View Profile'),
                                         onPressed: () => _showTeacherProfileDialog(teacher),
                                       ),
-                                      const SizedBox(width: 8),
                                       ElevatedButton.icon(
                                         icon: const Icon(Icons.message),
                                         label: const Text('Message'),
@@ -731,7 +733,6 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                           teacher['full_name'] as String,
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
                                       TextButton.icon(
                                         icon: const Icon(Icons.logout, color: Colors.red),
                                         label: const Text(

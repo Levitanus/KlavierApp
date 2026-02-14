@@ -867,7 +867,7 @@ async fn update_hometask_status(
         }
     };
 
-    let (teacher_id, student_id, task_title, due_date, current_status, repeat_every_days, next_reset_at) = hometask;
+    let (teacher_id, student_id, task_title, _due_date, current_status, repeat_every_days, next_reset_at) = hometask;
 
     match payload.status {
         HometaskStatus::CompletedByStudent => {
@@ -1045,7 +1045,6 @@ async fn update_hometask_status(
                         insert_notification(&app_state.db, parent_id, &reopened_body, "normal").await;
                     }
                 }
-                _ => {}
             }
 
             HttpResponse::Ok().json(json!({ "status": "updated" }))

@@ -6,12 +6,14 @@ import '../models/feed.dart';
 import '../models/chat.dart';
 import 'websocket_service.dart';
 import '../config/app_config.dart';
+import 'app_data_cache_service.dart';
 
 class FeedService extends ChangeNotifier {
   final AuthService authService;
   final WebSocketService wsService;
   final String baseUrl;
   String? _lastToken;
+  final AppDataCacheService _cache = AppDataCacheService.instance;
 
   FeedService({
     required this.authService,
@@ -34,6 +36,19 @@ class FeedService extends ChangeNotifier {
   bool get isLoadingFeeds => _isLoadingFeeds;
   List<FeedComment> commentsForPost(int postId) => _commentsByPost[postId] ?? [];
 
+  String _feedsCacheKey() => 'feeds';
+  String _postsCacheKey(int feedId, bool importantOnly, int limit, int offset) {
+    return 'feed_posts:$feedId:$importantOnly:$limit:$offset';
+  }
+
+  String _postCacheKey(int postId) => 'feed_post:$postId';
+  String _commentsCacheKey(int postId) => 'feed_comments:$postId';
+
+  void _cacheComments(int postId, List<FeedComment> comments) {
+    final payload = comments.map((comment) => comment.toJson()).toList();
+    _cache.writeJson(_commentsCacheKey(postId), authService.userId, payload);
+  }
+
   void syncAuth() {
     final token = authService.token;
     if (token != _lastToken) {
@@ -50,6 +65,17 @@ class FeedService extends ChangeNotifier {
   Future<void> fetchFeeds() async {
     if (authService.token == null) return;
 
+    if (_feeds.isEmpty) {
+      final cached = await _cache.readJsonList(_feedsCacheKey(), authService.userId);
+      if (cached != null && cached.isNotEmpty) {
+        _feeds = cached
+            .whereType<Map<String, dynamic>>()
+            .map((json) => Feed.fromJson(json))
+            .toList();
+        notifyListeners();
+      }
+    }
+
     _isLoadingFeeds = true;
     notifyListeners();
 
@@ -65,6 +91,7 @@ class FeedService extends ChangeNotifier {
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
         _feeds = data.map((json) => Feed.fromJson(json)).toList();
+        await _cache.writeJson(_feedsCacheKey(), authService.userId, data);
       } else {
         debugPrint('Failed to fetch feeds: ${response.statusCode}');
       }
@@ -183,6 +210,8 @@ class FeedService extends ChangeNotifier {
   }) async {
     if (authService.token == null) return [];
 
+    final cacheKey = _postsCacheKey(feedId, importantOnly, limit, offset);
+
     try {
       final uri = Uri.parse('$baseUrl/api/feeds/$feedId/posts').replace(
         queryParameters: {
@@ -202,10 +231,19 @@ class FeedService extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
+        await _cache.writeJson(cacheKey, authService.userId, data);
         return data.map((json) => FeedPost.fromJson(json)).toList();
       }
     } catch (e) {
       debugPrint('Error fetching feed posts: $e');
+    }
+
+    final cached = await _cache.readJsonList(cacheKey, authService.userId);
+    if (cached != null) {
+      return cached
+          .whereType<Map<String, dynamic>>()
+          .map((json) => FeedPost.fromJson(json))
+          .toList();
     }
 
     return [];
@@ -213,6 +251,8 @@ class FeedService extends ChangeNotifier {
 
   Future<FeedPost?> fetchPost(int postId) async {
     if (authService.token == null) return null;
+
+    final cacheKey = _postCacheKey(postId);
 
     try {
       final response = await http.get(
@@ -224,13 +264,28 @@ class FeedService extends ChangeNotifier {
       );
 
       if (response.statusCode == 200) {
-        return FeedPost.fromJson(json.decode(response.body));
+        final data = json.decode(response.body);
+        await _cache.writeJson(cacheKey, authService.userId, data);
+        return FeedPost.fromJson(data);
       }
     } catch (e) {
       debugPrint('Error fetching post: $e');
     }
 
+    final cached = await _cache.readJsonMap(cacheKey, authService.userId);
+    if (cached != null) {
+      return FeedPost.fromJson(cached);
+    }
+
     return null;
+  }
+
+  void clearLocalCache() {
+    _feeds = [];
+    _commentsByPost.clear();
+    _subscribedPosts.clear();
+    _isLoadingFeeds = false;
+    notifyListeners();
   }
 
   Future<bool> markPostRead(int postId) async {
@@ -348,6 +403,19 @@ class FeedService extends ChangeNotifier {
   Future<List<FeedComment>> fetchComments(int postId) async {
     if (authService.token == null) return [];
 
+    final cacheKey = _commentsCacheKey(postId);
+    if (!_commentsByPost.containsKey(postId)) {
+      final cached = await _cache.readJsonList(cacheKey, authService.userId);
+      if (cached != null && cached.isNotEmpty) {
+        final comments = cached
+            .whereType<Map<String, dynamic>>()
+            .map((json) => FeedComment.fromJson(json))
+            .toList();
+        _commentsByPost[postId] = comments;
+        notifyListeners();
+      }
+    }
+
     try {
       final response = await http.get(
         Uri.parse('$baseUrl/api/feeds/posts/$postId/comments'),
@@ -361,11 +429,20 @@ class FeedService extends ChangeNotifier {
         final List<dynamic> data = json.decode(response.body);
         final comments = data.map((json) => FeedComment.fromJson(json)).toList();
         _commentsByPost[postId] = comments;
+        await _cache.writeJson(cacheKey, authService.userId, data);
         notifyListeners();
         return comments;
       }
     } catch (e) {
       debugPrint('Error fetching comments: $e');
+    }
+
+    final cached = await _cache.readJsonList(cacheKey, authService.userId);
+    if (cached != null) {
+      return cached
+          .whereType<Map<String, dynamic>>()
+          .map((json) => FeedComment.fromJson(json))
+          .toList();
     }
 
     return [];
@@ -411,6 +488,7 @@ class FeedService extends ChangeNotifier {
       }
       updated.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       _commentsByPost[postId] = updated;
+      _cacheComments(postId, updated);
       notifyListeners();
     } catch (e) {
       debugPrint('Error handling comment update: $e');
@@ -445,6 +523,7 @@ class FeedService extends ChangeNotifier {
         if (!existing.any((item) => item.id == comment.id)) {
           _commentsByPost[postId] = [...existing, comment]
             ..sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          _cacheComments(postId, _commentsByPost[postId] ?? []);
           notifyListeners();
         }
         return comment;
@@ -487,6 +566,7 @@ class FeedService extends ChangeNotifier {
         }
         updated.sort((a, b) => a.createdAt.compareTo(b.createdAt));
         _commentsByPost[postId] = updated;
+        _cacheComments(postId, updated);
         notifyListeners();
         return comment;
       }
@@ -592,7 +672,17 @@ class FeedService extends ChangeNotifier {
         },
       );
 
-      return response.statusCode == 200;
+      if (response.statusCode == 200) {
+        final existing = _commentsByPost[postId];
+        if (existing != null) {
+          final updated = existing.where((item) => item.id != commentId).toList();
+          _commentsByPost[postId] = updated;
+          _cacheComments(postId, updated);
+          notifyListeners();
+        }
+        return true;
+      }
+      return false;
     } catch (e) {
       debugPrint('Error deleting comment: $e');
       return false;

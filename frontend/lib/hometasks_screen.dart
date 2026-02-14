@@ -154,104 +154,133 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final showStudentSelector = isParent || isTeacher;
     final canComplete = (isStudent || isParent) && !_showArchive;
     final canToggleItems = (isStudent || isParent || isTeacher) && !_showArchive;
+    final listBottomPadding = isTeacher ? 96.0 : 16.0;
+    StudentSummary? selectedStudent;
+    final selectedStudentId = _selectedStudentId;
+    if (selectedStudentId != null) {
+      for (final student in _students) {
+        if (student.userId == selectedStudentId) {
+          selectedStudent = student;
+          break;
+        }
+      }
+    }
 
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Stack(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Hometasks',
-                style: Theme.of(context).textTheme.headlineSmall,
-              ),
-              const Spacer(),
-              IconButton(
-                tooltip: 'Refresh',
-                onPressed: _loadHometasks,
-                icon: const Icon(Icons.refresh),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          if (showStudentSelector) ...[
-            if (_isLoadingStudents)
-              const LinearProgressIndicator()
-            else if (_studentsError != null)
-              Text(
-                _studentsError!,
-                style: const TextStyle(color: Colors.redAccent),
-              )
-            else
               Row(
                 children: [
-                  const Text('Student:'),
-                  const SizedBox(width: 12),
-                  DropdownButton<int>(
-                    value: _selectedStudentId,
-                    items: _students
-                        .map(
-                          (student) => DropdownMenuItem(
-                            value: student.userId,
-                            child: Text(student.fullName),
-                          ),
-                        )
-                        .toList(),
-                    onChanged: (value) async {
-                      if (value == null) return;
-                      setState(() {
-                        _selectedStudentId = value;
-                      });
-                      await _loadHometasks();
+                  Expanded(
+                    child: Text(
+                      'Hometasks',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Refresh',
+                    onPressed: _loadHometasks,
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (showStudentSelector) ...[
+                if (_isLoadingStudents)
+                  const LinearProgressIndicator()
+                else if (_studentsError != null)
+                  Text(
+                    _studentsError!,
+                    style: const TextStyle(color: Colors.redAccent),
+                  )
+                else
+                  Row(
+                    children: [
+                      const Text('Student:'),
+                      const SizedBox(width: 12),
+                      DropdownButton<int>(
+                        value: _selectedStudentId,
+                        items: _students
+                            .map(
+                              (student) => DropdownMenuItem(
+                                value: student.userId,
+                                child: Text(student.fullName),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) async {
+                          if (value == null) return;
+                          setState(() {
+                            _selectedStudentId = value;
+                          });
+                          await _loadHometasks();
+                        },
+                      ),
+                    ],
+                  ),
+                const SizedBox(height: 8),
+              ],
+              Row(
+                children: [
+                  ChoiceChip(
+                    label: const Text('Active'),
+                    selected: !_showArchive,
+                    onSelected: (selected) async {
+                      if (selected) {
+                        setState(() {
+                          _showArchive = false;
+                        });
+                        await _loadHometasks();
+                      }
+                    },
+                  ),
+                  const SizedBox(width: 8),
+                  ChoiceChip(
+                    label: const Text('Archive'),
+                    selected: _showArchive,
+                    onSelected: (selected) async {
+                      if (selected) {
+                        setState(() {
+                          _showArchive = true;
+                        });
+                        await _loadHometasks();
+                      }
                     },
                   ),
                 ],
               ),
-            const SizedBox(height: 12),
-          ],
-          Row(
-            children: [
-              ChoiceChip(
-                label: const Text('Active'),
-                selected: !_showArchive,
-                onSelected: (selected) async {
-                  if (selected) {
-                    setState(() {
-                      _showArchive = false;
-                    });
-                    await _loadHometasks();
-                  }
-                },
-              ),
-              const SizedBox(width: 8),
-              ChoiceChip(
-                label: const Text('Archive'),
-                selected: _showArchive,
-                onSelected: (selected) async {
-                  if (selected) {
-                    setState(() {
-                      _showArchive = true;
-                    });
-                    await _loadHometasks();
-                  }
-                },
+              const SizedBox(height: 8),
+              Expanded(
+                child: _buildHometaskBody(
+                  hometaskService: hometaskService,
+                  canComplete: canComplete,
+                  canReorder: isTeacher && !_showArchive,
+                  canToggleItems: canToggleItems,
+                  canAccomplish: isTeacher && !_showArchive,
+                  canReopen: isTeacher,
+                  bottomPadding: listBottomPadding,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: _buildHometaskBody(
-              hometaskService: hometaskService,
-              canComplete: canComplete,
-              canReorder: isTeacher && !_showArchive,
-              canToggleItems: canToggleItems,
-              canAccomplish: isTeacher && !_showArchive,
-              canReopen: isTeacher,
+        ),
+        if (isTeacher)
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: FloatingActionButton.extended(
+              onPressed: selectedStudent == null
+                  ? null
+                  : () => _showAssignHometaskDialog(selectedStudent!),
+              icon: const Icon(Icons.assignment_add),
+              label: const Text('Assign Hometask'),
             ),
           ),
-        ],
-      ),
+      ],
     );
   }
 
@@ -262,6 +291,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
     required bool canToggleItems,
     required bool canAccomplish,
     required bool canReopen,
+    required double bottomPadding,
   }) {
     if (hometaskService.isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -300,6 +330,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
     if (canReorder) {
       return ReorderableListView.builder(
         buildDefaultDragHandles: false,
+        padding: EdgeInsets.only(bottom: bottomPadding),
         itemCount: hometasks.length,
         onReorder: (oldIndex, newIndex) async {
           if (newIndex > oldIndex) {
@@ -327,15 +358,14 @@ class _HometasksScreenState extends State<HometasksScreen> {
         },
         itemBuilder: (context, index) {
           final hometask = hometasks[index];
-          return ReorderableDragStartListener(
+          return Padding(
             key: ValueKey('hometask-${hometask.id}'),
-            index: index,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: HometaskWidget(
-                hometask: hometask,
-                showDragHandle: true,
-                canEditItems: _isTeacher(context.read<AuthService>()),
+            padding: const EdgeInsets.only(bottom: 8),
+            child: HometaskWidget(
+              hometask: hometask,
+              showDragHandle: true,
+              dragHandleIndex: index,
+              canEditItems: _isTeacher(context.read<AuthService>()),
               onMarkCompleted: canComplete
                   ? () async => _markCompleted(hometask.id)
                   : null,
@@ -367,7 +397,6 @@ class _HometasksScreenState extends State<HometasksScreen> {
               onMarkReopened: canReopen
                   ? () async => _markReopened(hometask.id)
                   : null,
-              ),
             ),
           );
         },
@@ -384,6 +413,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final teacherNames = grouped.keys.toList()..sort();
 
     return ListView(
+      padding: EdgeInsets.only(bottom: bottomPadding),
       children: teacherNames
           .map(
             (teacherName) => Card(
@@ -439,6 +469,331 @@ class _HometasksScreenState extends State<HometasksScreen> {
             ),
           )
           .toList(),
+    );
+  }
+
+  void _showAssignHometaskDialog(StudentSummary student) {
+    final titleController = TextEditingController();
+    final descriptionController = TextEditingController();
+    final itemControllers = [TextEditingController()];
+    final repeatDaysController = TextEditingController();
+    DateTime? dueDate;
+    bool isSubmitting = false;
+    HometaskType selectedType = HometaskType.checklist;
+    String repeatSelection = 'none';
+    final formKey = GlobalKey<FormState>();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text('Assign Hometask to ${student.fullName}'),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            content: SizedBox(
+              width: 520,
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: titleController,
+                        decoration: const InputDecoration(
+                          labelText: 'Title',
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                                ? 'Title is required'
+                                : null,
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        controller: descriptionController,
+                        decoration: const InputDecoration(
+                          labelText: 'Description (optional)',
+                          border: OutlineInputBorder(),
+                        ),
+                        minLines: 2,
+                        maxLines: 4,
+                      ),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Due date'),
+                        subtitle: Text(
+                          dueDate != null
+                              ? '${dueDate!.year}-${dueDate!.month.toString().padLeft(2, '0')}-${dueDate!.day.toString().padLeft(2, '0')}'
+                              : 'No due date',
+                        ),
+                        trailing: const Icon(Icons.calendar_today),
+                        onTap: () async {
+                          final picked = await showDatePicker(
+                            context: context,
+                            initialDate: dueDate ?? DateTime.now(),
+                            firstDate: DateTime.now().subtract(
+                              const Duration(days: 1),
+                            ),
+                            lastDate: DateTime.now().add(
+                              const Duration(days: 3650),
+                            ),
+                          );
+                          if (picked != null) {
+                            setDialogState(() {
+                              dueDate = picked;
+                            });
+                          }
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<String>(
+                        initialValue: repeatSelection,
+                        decoration: const InputDecoration(
+                          labelText: 'Repeat',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: 'none',
+                            child: Text('No repeat'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'daily',
+                            child: Text('Each day'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'weekly',
+                            child: Text('Each week'),
+                          ),
+                          DropdownMenuItem(
+                            value: 'custom',
+                            child: Text('Custom interval'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setDialogState(() {
+                            repeatSelection = value;
+                          });
+                        },
+                      ),
+                      if (repeatSelection == 'custom') ...[
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: repeatDaysController,
+                          decoration: const InputDecoration(
+                            labelText: 'Repeat every (days)',
+                            border: OutlineInputBorder(),
+                          ),
+                          keyboardType: TextInputType.number,
+                          validator: (value) {
+                            if (repeatSelection != 'custom') {
+                              return null;
+                            }
+                            final parsed = int.tryParse(value ?? '');
+                            if (parsed == null || parsed <= 0) {
+                              return 'Enter a positive number of days';
+                            }
+                            return null;
+                          },
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<HometaskType>(
+                        initialValue: selectedType,
+                        decoration: const InputDecoration(
+                          labelText: 'Hometask type',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: const [
+                          DropdownMenuItem(
+                            value: HometaskType.simple,
+                            child: Text('Simple'),
+                          ),
+                          DropdownMenuItem(
+                            value: HometaskType.checklist,
+                            child: Text('Checklist'),
+                          ),
+                          DropdownMenuItem(
+                            value: HometaskType.progress,
+                            child: Text('Progress'),
+                          ),
+                        ],
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setDialogState(() {
+                            selectedType = value;
+                          });
+                        },
+                      ),
+                      const Divider(),
+                      if (selectedType == HometaskType.checklist ||
+                          selectedType == HometaskType.progress) ...[
+                        Text(
+                          selectedType == HometaskType.checklist
+                              ? 'Checklist items'
+                              : 'Progress items',
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        ...List.generate(itemControllers.length, (index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: itemControllers[index],
+                                    decoration: InputDecoration(
+                                      labelText: 'Item ${index + 1}',
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                    validator: (value) =>
+                                        value == null || value.trim().isEmpty
+                                            ? 'Required'
+                                            : null,
+                                  ),
+                                ),
+                                if (itemControllers.length > 1)
+                                  IconButton(
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        itemControllers.removeAt(index);
+                                      });
+                                    },
+                                    icon: const Icon(Icons.remove_circle_outline),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              setDialogState(() {
+                                itemControllers.add(TextEditingController());
+                              });
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add item'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        if (!formKey.currentState!.validate()) {
+                          return;
+                        }
+
+                        final items = selectedType == HometaskType.checklist ||
+                                selectedType == HometaskType.progress
+                            ? itemControllers
+                                .map((controller) => controller.text.trim())
+                                .where((text) => text.isNotEmpty)
+                                .toList()
+                            : <String>[];
+
+                        if ((selectedType == HometaskType.checklist ||
+                                selectedType == HometaskType.progress) &&
+                            items.isEmpty) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                'Add at least one ${selectedType == HometaskType.checklist ? 'checklist' : 'progress'} item.',
+                              ),
+                            ),
+                          );
+                          return;
+                        }
+
+                        int? repeatEveryDays;
+                        switch (repeatSelection) {
+                          case 'daily':
+                            repeatEveryDays = 1;
+                            break;
+                          case 'weekly':
+                            repeatEveryDays = 7;
+                            break;
+                          case 'custom':
+                            repeatEveryDays =
+                                int.tryParse(repeatDaysController.text.trim());
+                            if (repeatEveryDays == null || repeatEveryDays <= 0) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Enter a valid repeat interval.'),
+                                ),
+                              );
+                              return;
+                            }
+                            break;
+                          case 'none':
+                          default:
+                            repeatEveryDays = null;
+                        }
+
+                        setDialogState(() {
+                          isSubmitting = true;
+                        });
+
+                        final hometaskService = context.read<HometaskService>();
+                        final success = await hometaskService.createHometask(
+                          studentId: student.userId,
+                          title: titleController.text.trim(),
+                          description: descriptionController.text.trim().isEmpty
+                              ? null
+                              : descriptionController.text.trim(),
+                          dueDate: dueDate,
+                          hometaskType: selectedType,
+                          items: items.isEmpty ? null : items,
+                          repeatEveryDays: repeatEveryDays,
+                        );
+
+                        if (success && context.mounted) {
+                          Navigator.of(context).pop();
+                          await _loadHometasks();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Hometask assigned.'),
+                            ),
+                          );
+                        } else if (context.mounted) {
+                          setDialogState(() {
+                            isSubmitting = false;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Failed to assign hometask.'),
+                            ),
+                          );
+                        }
+                      },
+                child: const Text('Assign'),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 

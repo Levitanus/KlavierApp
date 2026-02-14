@@ -1,6 +1,6 @@
 # Frontend
 
-This folder contains a minimal Flutter scaffold for the Klavier app.
+This folder contains a minimal Flutter scaffold for the music school app.
 
 To fully initialize the Flutter project locally (if Flutter is installed), run:
 

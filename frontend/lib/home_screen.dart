@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_svg/flutter_svg.dart';
 import 'auth.dart';
 import 'login_screen.dart';
 import 'admin_panel.dart';
@@ -10,6 +11,10 @@ import 'hometasks_screen.dart';
 import 'dashboard_screen.dart';
 import 'services/notification_service.dart';
 import 'services/chat_service.dart';
+import 'services/feed_service.dart';
+import 'services/hometask_service.dart';
+import 'services/app_data_cache_service.dart';
+import 'services/media_cache_service.dart';
 import 'feeds_screen.dart';
 import 'chat_screen.dart';
 import 'notifications_screen.dart';
@@ -80,6 +85,15 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
+    final cached = await AppDataCacheService.instance
+        .readJsonMap('profile', authService.userId);
+    if (cached != null && mounted) {
+      setState(() {
+        _applyDrawerProfile(cached);
+        _profileLoading = false;
+      });
+    }
+
     setState(() {
       _profileLoading = true;
     });
@@ -99,29 +113,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        final profileImage = data['profile_image'] != null &&
-                data['profile_image'].toString().isNotEmpty
-            ? '$_baseUrl/uploads/profile_images/${data['profile_image']}'
-            : null;
-        final studentData = data['student_data'] as Map<String, dynamic>?;
-        final parentData = data['parent_data'] as Map<String, dynamic>?;
-        final teacherData = data['teacher_data'] as Map<String, dynamic>?;
-        String? fullName;
-
-        if (data['full_name'] != null) {
-          fullName = data['full_name']?.toString();
-        } else if (studentData != null) {
-          fullName = studentData['full_name']?.toString();
-        } else if (parentData != null) {
-          fullName = parentData['full_name']?.toString();
-        } else if (teacherData != null) {
-          fullName = teacherData['full_name']?.toString();
-        }
+        await AppDataCacheService.instance
+            .writeJson('profile', authService.userId, data);
 
         setState(() {
-          _drawerUsername = data['username']?.toString();
-          _drawerFullName = fullName;
-          _drawerProfileImage = profileImage;
+          _applyDrawerProfile(data);
           _profileLoading = false;
         });
       } else {
@@ -137,6 +133,109 @@ class _HomeScreenState extends State<HomeScreen> {
       setState(() {
         _profileLoading = false;
       });
+    }
+  }
+
+  void _applyDrawerProfile(Map<String, dynamic> data) {
+    final profileImage = data['profile_image'] != null &&
+            data['profile_image'].toString().isNotEmpty
+        ? '$_baseUrl/uploads/profile_images/${data['profile_image']}'
+        : null;
+    final studentData = data['student_data'] as Map<String, dynamic>?;
+    final parentData = data['parent_data'] as Map<String, dynamic>?;
+    final teacherData = data['teacher_data'] as Map<String, dynamic>?;
+    String? fullName;
+
+    if (data['full_name'] != null) {
+      fullName = data['full_name']?.toString();
+    } else if (studentData != null) {
+      fullName = studentData['full_name']?.toString();
+    } else if (parentData != null) {
+      fullName = parentData['full_name']?.toString();
+    } else if (teacherData != null) {
+      fullName = teacherData['full_name']?.toString();
+    }
+
+    _drawerUsername = data['username']?.toString();
+    _drawerFullName = fullName;
+    _drawerProfileImage = profileImage;
+  }
+
+  Future<void> _confirmClearAppCache() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        title: const Text('Clear app data cache'),
+        content: const Text('This will remove cached messages, feeds, hometasks, and profile data.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final authService = context.read<AuthService>();
+    await AppDataCacheService.instance.clearUserData(authService.userId);
+    context.read<FeedService>().clearLocalCache();
+    context.read<HometaskService>().clearLocalCache();
+    context.read<ChatService>().clearLocalCache();
+
+    setState(() {
+      _drawerUsername = null;
+      _drawerFullName = null;
+      _drawerProfileImage = null;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('App data cache cleared.')),
+      );
+    }
+  }
+
+  Future<void> _confirmClearMediaCache() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        title: const Text('Clear media cache'),
+        content: const Text('This will remove cached images and media files.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    await MediaCacheService.instance.clear();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Media cache cleared.')),
+      );
     }
   }
 
@@ -167,16 +266,27 @@ class _HomeScreenState extends State<HomeScreen> {
       case 3:
         return const ChatScreen();
       case 4:
-        return const NotificationsScreen();
+        return const ProfileScreen();
       default:
         return const DashboardScreen();
     }
+  }
+
+  void _navigateToPage(Widget page) {
+    setState(() {
+      _currentPage = page;
+      _selectedDrawerIndex = null;
+    });
   }
 
   Future<void> _handleLogout() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: const Text('Logout'),
         content: const Text('Are you sure you want to logout?'),
         actions: [
@@ -207,12 +317,25 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final logoAsset = isDark
+        ? 'assets/branding/logo bright.svg'
+        : 'assets/branding/logo dark.svg';
+    final isNotificationsPage = _currentPage is NotificationsScreen;
     
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Klavier'),
+        title: SvgPicture.asset(
+          logoAsset,
+          height: 28,
+        ),
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: _NotificationNavIcon(active: isNotificationsPage),
+            tooltip: 'Notifications',
+            onPressed: () => _navigateToPage(const NotificationsScreen()),
+          ),
           Builder(
             builder: (context) => IconButton(
               icon: const Icon(Icons.menu),
@@ -234,14 +357,20 @@ class _HomeScreenState extends State<HomeScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
+                  SvgPicture.asset(
+                    logoAsset,
+                    height: 22,
+                  ),
+                  const SizedBox(height: 12),
                   Row(
                     children: [
                       CircleAvatar(
                         radius: 28,
                         backgroundColor: Colors.white.withValues(alpha: 25),
                         backgroundImage: _drawerProfileImage != null
-                            ? NetworkImage(_drawerProfileImage!)
-                            : null,
+                          ? MediaCacheService.instance
+                            .imageProvider(_drawerProfileImage!)
+                          : null,
                         child: _drawerProfileImage == null
                             ? const Icon(
                                 Icons.person,
@@ -311,20 +440,25 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const Divider(),
             if (authService.isAdmin) ...[
-              ExpansionTile(
-                leading: const Icon(Icons.admin_panel_settings),
-                title: const Text('Admin'),
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.people),
-                    title: const Text('User Management'),
-                    selected: _selectedDrawerIndex == 100,
-                    onTap: () => _navigateTo(const AdminPanel(), 100),
-                  ),
-                ],
+              ListTile(
+                leading: const Icon(Icons.people),
+                title: const Text('User Management'),
+                selected: _selectedDrawerIndex == 100,
+                onTap: () => _navigateTo(const AdminPanel(), 100),
               ),
               const Divider(),
             ],
+            ListTile(
+              leading: const Icon(Icons.cached),
+              title: const Text('Clear app data cache'),
+              onTap: _confirmClearAppCache,
+            ),
+            ListTile(
+              leading: const Icon(Icons.image_not_supported),
+              title: const Text('Clear media cache'),
+              onTap: _confirmClearMediaCache,
+            ),
+            const Divider(),
             ListTile(
               leading: const Icon(Icons.logout),
               title: const Text('Logout'),
@@ -360,9 +494,9 @@ class _HomeScreenState extends State<HomeScreen> {
             label: 'Chats',
           ),
           BottomNavigationBarItem(
-            icon: _NotificationNavIcon(active: false),
-            activeIcon: _NotificationNavIcon(active: true),
-            label: 'Notifications',
+            icon: Icon(Icons.person_outline),
+            activeIcon: Icon(Icons.person),
+            label: 'Profile',
           ),
         ],
       ),
@@ -398,7 +532,7 @@ class _NotificationNavIcon extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red,
+                  color: Theme.of(context).colorScheme.secondaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 constraints: const BoxConstraints(
@@ -407,8 +541,8 @@ class _NotificationNavIcon extends StatelessWidget {
                 ),
                 child: Text(
                   unreadCount > 99 ? '99+' : unreadCount.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
                   ),
@@ -453,7 +587,7 @@ class _ChatNavIcon extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red,
+                  color: Theme.of(context).colorScheme.secondaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 constraints: const BoxConstraints(
@@ -462,8 +596,8 @@ class _ChatNavIcon extends StatelessWidget {
                 ),
                 child: Text(
                   unreadCount > 99 ? '99+' : unreadCount.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
                     fontSize: 9,
                     fontWeight: FontWeight.bold,
                   ),

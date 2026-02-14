@@ -9,6 +9,34 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         .join();
   }
 
+  void _confirmDeleteUser(User user) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete User'),
+        content: Text('Delete ${user.username}? This cannot be undone.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _deleteUser(user);
+            },
+            icon: const Icon(Icons.delete),
+            label: const Text('Delete'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showEditUserDialog(User? user) {
     final usernameController =
         TextEditingController(text: user?.username ?? '');
@@ -24,6 +52,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: Text(isNewUser ? 'Add User' : 'Edit User'),
         content: StatefulBuilder(
           builder: (context, setDialogState) => SingleChildScrollView(
@@ -242,6 +274,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: Text('Make ${user.username} a Student'),
         content: Form(
           key: formKey,
@@ -340,6 +376,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: Text('Make ${user.username} a Parent'),
         content: StatefulBuilder(
           builder: (context, setDialogState) {
@@ -454,6 +494,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: Text('Make ${user.username} a Teacher'),
         content: const Text('This will grant teacher privileges to the user.'),
         actions: [
@@ -486,6 +530,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: const Text('Add Student'),
         content: StatefulBuilder(
           builder: (context, setDialogState) => SingleChildScrollView(
@@ -680,6 +728,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: const Text('Add Parent'),
         content: StatefulBuilder(
           builder: (context, setDialogState) {
@@ -892,6 +944,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: const Text('Add Teacher'),
         content: StatefulBuilder(
           builder: (context, setDialogState) => SingleChildScrollView(

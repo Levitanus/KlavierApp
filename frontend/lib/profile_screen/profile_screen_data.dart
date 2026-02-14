@@ -1,6 +1,41 @@
 part of '../profile_screen.dart';
 
 mixin _ProfileScreenData on _ProfileScreenStateBase {
+  void _applyProfileData(Map<String, dynamic> data) {
+    _userId = data['id'];
+    _username = data['username'] ?? '';
+    _email = data['email'];
+    _phone = data['phone'];
+    _profileImage = data['profile_image'] != null &&
+            data['profile_image'].toString().isNotEmpty
+        ? '${_ProfileScreenStateBase._baseUrl}/uploads/profile_images/${data['profile_image']}'
+        : null;
+    _createdAt = data['created_at'] != null
+        ? DateTime.fromMillisecondsSinceEpoch(data['created_at'] * 1000)
+        : null;
+
+    _roles = data['roles'] != null ? List<String>.from(data['roles']) : [];
+    _adminRoleSelected = _roles.contains('admin');
+    _studentData = data['student_data'];
+    _parentData = data['parent_data'];
+    _teacherData = data['teacher_data'];
+
+    _emailController.text = _email ?? '';
+    _phoneController.text = _phone ?? '';
+
+    if (_studentData != null) {
+      _fullNameController.text = _studentData!['full_name'] ?? '';
+      _addressController.text = _studentData!['address'] ?? '';
+      _birthdayController.text = _studentData!['birthday'] ?? '';
+    } else if (_parentData != null) {
+      _fullNameController.text = _parentData!['full_name'] ?? '';
+    } else if (_teacherData != null) {
+      _fullNameController.text = _teacherData!['full_name'] ?? '';
+    } else {
+      _fullNameController.text = data['full_name'] ?? '';
+    }
+  }
+
   Future<void> _loadProfile() async {
     setState(() {
       _isLoading = true;
@@ -23,6 +58,17 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       return;
     }
 
+    final cachedProfile = await AppDataCacheService.instance
+        .readJsonMap('profile', authService.userId);
+    final hasCached = cachedProfile != null;
+
+    if (cachedProfile != null && mounted) {
+      setState(() {
+        _applyProfileData(cachedProfile);
+        _isLoading = false;
+      });
+    }
+
     try {
       final response = await http.get(
         Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/profile'),
@@ -34,41 +80,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Profile data received: $data');
+        await AppDataCacheService.instance
+            .writeJson('profile', authService.userId, data);
         setState(() {
-          _userId = data['id'];
-          _username = data['username'];
-          _email = data['email'];
-          _phone = data['phone'];
-          _profileImage = data['profile_image'] != null &&
-                  data['profile_image'].toString().isNotEmpty
-              ? '${_ProfileScreenStateBase._baseUrl}/uploads/profile_images/${data['profile_image']}'
-              : null;
-          print('Profile image URL: $_profileImage');
-          _createdAt =
-              DateTime.fromMillisecondsSinceEpoch(data['created_at'] * 1000);
-
-          _roles = data['roles'] != null ? List<String>.from(data['roles']) : [];
-          _adminRoleSelected = _roles.contains('admin');
-          _studentData = data['student_data'];
-          _parentData = data['parent_data'];
-          _teacherData = data['teacher_data'];
-
-          _emailController.text = _email ?? '';
-          _phoneController.text = _phone ?? '';
-
-          if (_studentData != null) {
-            _fullNameController.text = _studentData!['full_name'] ?? '';
-            _addressController.text = _studentData!['address'] ?? '';
-            _birthdayController.text = _studentData!['birthday'] ?? '';
-          } else if (_parentData != null) {
-            _fullNameController.text = _parentData!['full_name'] ?? '';
-          } else if (_teacherData != null) {
-            _fullNameController.text = _teacherData!['full_name'] ?? '';
-          } else {
-            _fullNameController.text = data['full_name'] ?? '';
-          }
-
+          _applyProfileData(data);
           _isLoading = false;
         });
 
@@ -80,16 +95,28 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           await _loadStudentTeachers();
         }
       } else {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'Failed to load profile: ${response.statusCode}';
-        });
+        if (!hasCached) {
+          setState(() {
+            _isLoading = false;
+            _errorMessage = 'Failed to load profile: ${response.statusCode}';
+          });
+        } else if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = 'Error loading profile: $e';
-      });
+      if (!hasCached) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Error loading profile: $e';
+        });
+      } else if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -683,6 +710,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+              contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               title: const Text('Parent Registration Link'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1073,6 +1104,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+              contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               title: const Text('Student Registration Link'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1256,6 +1291,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: Text(title),
         content: Text(content),
         actions: [

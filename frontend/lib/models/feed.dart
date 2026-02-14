@@ -181,6 +181,19 @@ class FeedComment {
     );
   }
 
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'post_id': postId,
+      'author_user_id': authorUserId,
+      'parent_comment_id': parentCommentId,
+      'content': content,
+      'attachments': attachments.map((a) => a.toJson()).toList(),
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
+    };
+  }
+
   quill.Document toDocument() {
     try {
       return quill.Document.fromJson(content);

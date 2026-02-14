@@ -60,6 +60,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           });
 
           return AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: Text(title),
             content: Text(content),
             actions: [
@@ -128,6 +132,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                   .toList();
 
           return AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: const Text('Add Students'),
             content: SizedBox(
               width: 500,
@@ -241,6 +249,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           }
 
           return AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: Text(student['full_name'] ?? 'Student Profile'),
             content: SizedBox(
               width: 500,
@@ -352,6 +364,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: Text('Assign Hometask to ${student['full_name'] ?? 'Student'}'),
             content: SizedBox(
               width: 520,
@@ -683,6 +699,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           final canAssign = authService.roles.contains('teacher');
 
           return AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: Text(teacher['full_name'] ?? 'Teacher Profile'),
             content: SizedBox(
               width: 500,
@@ -789,6 +809,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: Text(parent['full_name'] ?? 'Parent Profile'),
         content: SizedBox(
           width: 500,
@@ -857,6 +881,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: Text('Make $_username a Student'),
         content: Form(
           key: formKey,
@@ -928,6 +956,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: Text('Make $_username a Parent'),
         content: StatefulBuilder(
           builder: (context, setDialogState) {
@@ -1048,6 +1080,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: Text('Make $_username a Teacher'),
         content: const Text('This will grant teacher privileges to the user.'),
         actions: [
@@ -1110,6 +1146,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                   .toList();
 
           return AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: const Text('Add Children'),
             content: SizedBox(
               width: 500,
@@ -1229,6 +1269,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           }
 
           return AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: Row(
               children: [
                 _buildChildAvatar(
