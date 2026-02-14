@@ -1,0 +1,22 @@
+{
+  email {$ACME_EMAIL}
+}
+
+{$APP_HOST} {
+  root * /srv/app
+  file_server
+  encode zstd gzip
+  header {
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+}
+
+{$API_HOST} {
+  reverse_proxy backend:8080
+  encode zstd gzip
+  header {
+    X-Content-Type-Options "nosniff"
+  }
+}
