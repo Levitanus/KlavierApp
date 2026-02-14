@@ -88,6 +88,10 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: const Text('Reset Link Generated'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -133,6 +137,39 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Failed to generate reset link')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteUser(User user) async {
+    try {
+      final authService = Provider.of<AuthService>(context, listen: false);
+      final response = await http.delete(
+        Uri.parse('${AppConfig.instance.baseUrl}/api/admin/users/${user.id}'),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+        },
+      );
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        await _loadUsers();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('User ${user.username} deleted')),
+          );
+        }
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to delete user')),
         );
       }
     } catch (e) {

@@ -494,6 +494,10 @@ class _NewChatDialogState extends State<_NewChatDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+      contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+      actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
       title: const Text('Start New Chat'),
       content: SizedBox(
         width: double.maxFinite,

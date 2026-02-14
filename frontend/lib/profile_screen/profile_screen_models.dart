@@ -103,6 +103,10 @@ class _ChangePasswordDialogState extends State<ChangePasswordDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+      titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+      contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+      actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
       title: const Text('Change Password'),
       content: Form(
         key: _formKey,

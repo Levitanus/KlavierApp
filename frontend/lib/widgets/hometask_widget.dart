@@ -10,6 +10,7 @@ class HometaskWidget extends StatefulWidget {
   final VoidCallback? onMarkAccomplished;
   final VoidCallback? onMarkReopened;
   final bool showDragHandle;
+  final int? dragHandleIndex;
   final bool canEditItems;
 
   const HometaskWidget({
@@ -22,6 +23,7 @@ class HometaskWidget extends StatefulWidget {
     this.onMarkAccomplished,
     this.onMarkReopened,
     this.showDragHandle = false,
+    this.dragHandleIndex,
     this.canEditItems = false,
   });
 
@@ -151,11 +153,20 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                 if (widget.showDragHandle)
                   Padding(
                     padding: const EdgeInsets.only(right: 12, top: 2),
-                    child: Icon(
-                      Icons.drag_handle,
-                      size: 20,
-                      color: Colors.grey.shade400,
-                    ),
+                    child: widget.dragHandleIndex == null
+                        ? Icon(
+                            Icons.drag_handle,
+                            size: 20,
+                            color: Colors.grey.shade400,
+                          )
+                        : ReorderableDragStartListener(
+                            index: widget.dragHandleIndex!,
+                            child: Icon(
+                              Icons.drag_handle,
+                              size: 20,
+                              color: Colors.grey.shade400,
+                            ),
+                          ),
                   ),
                 Expanded(
                   child: Text(
@@ -201,7 +212,7 @@ class _HometaskWidgetState extends State<HometaskWidget> {
               Align(
                 alignment: Alignment.centerRight,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: 6),
                   child: ElevatedButton.icon(
                     onPressed: widget.onMarkCompleted,
                     icon: const Icon(Icons.check),
@@ -214,7 +225,7 @@ class _HometaskWidgetState extends State<HometaskWidget> {
               Align(
                 alignment: Alignment.centerRight,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: 6),
                   child: OutlinedButton.icon(
                     onPressed: widget.onMarkAccomplished,
                     icon: const Icon(Icons.verified),
@@ -227,7 +238,7 @@ class _HometaskWidgetState extends State<HometaskWidget> {
               Align(
                 alignment: Alignment.centerRight,
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: 6),
                   child: TextButton.icon(
                     onPressed: widget.onMarkReopened,
                     icon: const Icon(Icons.restore),

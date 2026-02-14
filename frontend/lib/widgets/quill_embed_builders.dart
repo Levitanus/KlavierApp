@@ -189,6 +189,10 @@ Widget _buildVideoPreviewEmbed(
         showDialog(
           context: context,
           builder: (_) => AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: const Text('Video'),
             content: const Text('Web video player is limited. You can download the file or open it separately.'),
             actions: [
@@ -342,6 +346,10 @@ class __VideoPlayerDialogState extends State<_VideoPlayerDialog> {
   Widget build(BuildContext context) {
     if (_failed) {
       return AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: const Text('Video Error'),
         content: const Text('Failed to load video'),
         actions: [
@@ -355,6 +363,10 @@ class __VideoPlayerDialogState extends State<_VideoPlayerDialog> {
 
     if (!_ready || _controller == null) {
       return AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: const Text('Loading'),
         content: const SizedBox(
           height: 100,

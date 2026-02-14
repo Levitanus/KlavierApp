@@ -47,6 +47,21 @@ pub struct UpdateUserRequest {
     pub roles: Option<Vec<String>>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct UsersQuery {
+    pub search: Option<String>,
+    pub page: Option<i64>,
+    pub page_size: Option<i64>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct UsersPageResponse {
+    pub users: Vec<UserResponse>,
+    pub total: i64,
+    pub page: i64,
+    pub page_size: i64,
+}
+
 // Helper to verify admin role from claims
 fn verify_admin_role(req: &HttpRequest, app_state: &AppState) -> Result<(), HttpResponse> {
     let claims = verify_token(req, app_state)?;
@@ -71,17 +86,68 @@ async fn test_route() -> impl Responder {
 async fn get_users(
     req: HttpRequest,
     app_state: web::Data<AppState>,
+    query: web::Query<UsersQuery>,
 ) -> impl Responder {
     if let Err(response) = verify_admin_role(&req, &app_state) {
         return response;
     }
 
-    // Get all users
-    let users_result = sqlx::query_as::<_, UserResponse>(
-        "SELECT id, username, full_name, email, phone FROM users ORDER BY username"
-    )
-    .fetch_all(&app_state.db)
-    .await;
+    let page = query.page.unwrap_or(1).max(1);
+    let page_size = query.page_size.unwrap_or(20).clamp(1, 100);
+    let offset = (page - 1) * page_size;
+    let search = query
+        .search
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string());
+
+    let total_result: Result<i64, sqlx::Error> = if let Some(search) = &search {
+        let pattern = format!("%{}%", search);
+        sqlx::query_scalar(
+            "SELECT COUNT(*) FROM users WHERE username ILIKE $1 OR full_name ILIKE $1",
+        )
+        .bind(pattern)
+        .fetch_one(&app_state.db)
+        .await
+    } else {
+        sqlx::query_scalar("SELECT COUNT(*) FROM users")
+            .fetch_one(&app_state.db)
+            .await
+    };
+
+    let total = match total_result {
+        Ok(total) => total,
+        Err(e) => {
+            error!("Database error: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to fetch users"
+            }));
+        }
+    };
+
+    let users_result = if let Some(search) = &search {
+        let pattern = format!("%{}%", search);
+        sqlx::query_as::<_, UserResponse>(
+            "SELECT id, username, full_name, email, phone FROM users \
+             WHERE username ILIKE $1 OR full_name ILIKE $1 \
+             ORDER BY username LIMIT $2 OFFSET $3",
+        )
+        .bind(pattern)
+        .bind(page_size)
+        .bind(offset)
+        .fetch_all(&app_state.db)
+        .await
+    } else {
+        sqlx::query_as::<_, UserResponse>(
+            "SELECT id, username, full_name, email, phone FROM users \
+             ORDER BY username LIMIT $1 OFFSET $2",
+        )
+        .bind(page_size)
+        .bind(offset)
+        .fetch_all(&app_state.db)
+        .await
+    };
 
     let mut users = match users_result {
         Ok(users) => users,
@@ -143,7 +209,12 @@ async fn get_users(
         }
     }
 
-    HttpResponse::Ok().json(users)
+    HttpResponse::Ok().json(UsersPageResponse {
+        users,
+        total,
+        page,
+        page_size,
+    })
 }
 
 #[post("/api/admin/users")]

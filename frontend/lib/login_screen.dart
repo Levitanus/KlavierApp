@@ -70,6 +70,10 @@ class _LoginScreenState extends State<LoginScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: const Text('Forgot Password'),
         content: Form(
           key: formKey,
@@ -134,6 +138,10 @@ class _LoginScreenState extends State<LoginScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: const Text('Request Sent'),
             content: Text(data['message'] ?? 'Password reset request sent successfully.'),
             actions: [
@@ -148,6 +156,10 @@ class _LoginScreenState extends State<LoginScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
             title: const Text('Error'),
             content: const Text('Failed to send password reset request. Please try again.'),
             actions: [
@@ -165,6 +177,10 @@ class _LoginScreenState extends State<LoginScreen> {
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+          contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
           title: const Text('Error'),
           content: Text('An error occurred: $e'),
           actions: [

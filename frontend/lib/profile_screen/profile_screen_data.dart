@@ -683,6 +683,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+              contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               title: const Text('Parent Registration Link'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1073,6 +1077,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
+              insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+              contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
               title: const Text('Student Registration Link'),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1256,6 +1264,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
         title: Text(title),
         content: Text(content),
         actions: [
