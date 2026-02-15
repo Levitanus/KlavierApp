@@ -1,88 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart';
+import 'package:intl/intl.dart';
 import '../services/notification_service.dart';
 import '../models/notification.dart';
-import '../home_screen.dart';
-import 'package:intl/intl.dart';
+import '../services/push_notification_service.dart';
 import '../l10n/app_localizations.dart';
+import '../utils/notification_navigation.dart';
 
-void _navigateToRoute(BuildContext context, String route, Map<String, dynamic>? metadata) {
-  // Parse the route and navigate accordingly
-  final uri = Uri.parse(route);
-  final navigator = Navigator.of(context, rootNavigator: true);
-  
-  if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'admin') {
-    if (uri.pathSegments.length >= 2 && uri.pathSegments[1] == 'users') {
-      // Route: /admin/users/{username}
-      final username = uri.pathSegments.length > 2 ? uri.pathSegments[2] : null;
-      
-      // Navigate to HomeScreen with admin panel opened for specific user
-      final page = HomeScreen(adminUsername: username);
-      if (navigator.canPop()) {
-        navigator.pushReplacement(
-          MaterialPageRoute(builder: (context) => page),
-        );
-      } else {
-        navigator.push(
-          MaterialPageRoute(builder: (context) => page),
-        );
-      }
-    } else {
-      // Generic admin route - go back to home
-      if (navigator.canPop()) {
-        navigator.pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
-      } else {
-        navigator.push(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
-      }
-    }
-  } else if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'hometasks') {
-    final rawStudentId = metadata?['student_id'];
-    final studentId = rawStudentId is int ? rawStudentId : null;
-    final page = HomeScreen(initialStudentId: studentId);
-    if (navigator.canPop()) {
-      navigator.pushReplacement(
-        MaterialPageRoute(builder: (context) => page),
-      );
-    } else {
-      navigator.push(
-        MaterialPageRoute(builder: (context) => page),
-      );
-    }
-  } else if (uri.pathSegments.isNotEmpty && uri.pathSegments[0] == 'feeds') {
-    final rawFeedId = metadata?['feed_id'];
-    final rawPostId = metadata?['post_id'];
-    final feedId = rawFeedId is int ? rawFeedId : null;
-    final postId = rawPostId is int ? rawPostId : null;
-    final page = HomeScreen(
-      initialFeedId: feedId,
-      initialPostId: postId,
-    );
-    if (navigator.canPop()) {
-      navigator.pushReplacement(
-        MaterialPageRoute(builder: (context) => page),
-      );
-    } else {
-      navigator.push(
-        MaterialPageRoute(builder: (context) => page),
-      );
-    }
-  } else {
-    // Handle other routes - just go back to home
-    if (navigator.canPop()) {
-      navigator.pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
-    } else {
-      navigator.push(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
-    }
-  }
-}
 
 class NotificationBellWidget extends StatelessWidget {
   const NotificationBellWidget({super.key});
@@ -97,7 +22,10 @@ class NotificationBellWidget extends StatelessWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.notifications),
-              onPressed: () {
+              onPressed: () async {
+                await context
+                    .read<PushNotificationService>()
+                    .requestPermissionAndRegister();
                 _showNotificationsDropdown(context, notificationService);
               },
             ),
@@ -215,6 +143,22 @@ class _NotificationDropdownContentState
                   },
                 ),
                 IconButton(
+                  icon: const Icon(Icons.notifications_active),
+                  onPressed: () async {
+                    final ok = await context
+                        .read<PushNotificationService>()
+                        .requestPermissionAndRegister();
+                    if (context.mounted && !ok) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Notifications are disabled.'),
+                        ),
+                      );
+                    }
+                  },
+                  tooltip: 'Enable notifications',
+                ),
+                IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: () {
                     widget.notificationService.fetchNotifications(
@@ -262,14 +206,18 @@ class _NotificationDropdownContentState
                   final notification = service.notifications[index];
                   return NotificationTile(
                     notification: notification,
-                    onTap: () {
+                    onTap: () async {
                       if (notification.isUnread) {
                         service.markAsRead([notification.id]);
                       }
                       Navigator.of(context).pop();
                       // Navigate to route if specified
                       if (notification.body.route != null) {
-                        _navigateToRoute(context, notification.body.route!, notification.body.metadata);
+                        await navigateToNotificationRoute(
+                          context,
+                          notification.body.route!,
+                          notification.body.metadata,
+                        );
                       }
                     },
                     onDelete: () {

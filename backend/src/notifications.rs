@@ -6,6 +6,7 @@ use serde_json::Value as JsonValue;
 use log::{error};
 
 use crate::AppState;
+use crate::push;
 use crate::users::verify_token;
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
@@ -117,7 +118,7 @@ pub async fn get_notifications(
     let offset = query.offset.unwrap_or(0);
     
     let mut query_builder = sqlx::QueryBuilder::new(
-        "SELECT id, user_id, type as notification_type, title, body, created_at, read_at, priority 
+        "SELECT id, user_id, type as notification_type, title, body, created_at, read_at, priority \
          FROM notifications WHERE user_id = "
     );
     query_builder.push_bind(user_id);
@@ -130,6 +131,7 @@ pub async fn get_notifications(
         query_builder.push(" AND type = ");
         query_builder.push_bind(notification_type);
     }
+    query_builder.push(" AND type <> 'chat_message'");
     
     query_builder.push(" ORDER BY created_at DESC LIMIT ");
     query_builder.push_bind(limit);
@@ -185,7 +187,7 @@ pub async fn get_unread_count(
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     
     let count = sqlx::query_scalar::<_, i64>(
-        "SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read_at IS NULL"
+        "SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read_at IS NULL AND type <> 'chat_message'"
     )
     .bind(user_id)
     .fetch_one(&app_state.db)
@@ -262,6 +264,8 @@ pub async fn create_notification(
         error!("Database error creating notification: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to create notification")
     })?;
+
+    push::send_notification_to_user(db.get_ref(), notification.user_id, &payload.body, Some(notification.id)).await;
     
     Ok(HttpResponse::Created().json(notification))
 }

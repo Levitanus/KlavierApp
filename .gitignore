@@ -23,3 +23,7 @@ musikschule
 musikschule.pub
 
 deploy/upload_certificate.pem
+deploy/google-services.json
+deploy/firebase-service-account.json
+frontend/android/app/google-services.json
+**/google-services.json

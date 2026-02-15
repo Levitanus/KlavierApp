@@ -13,6 +13,7 @@ import 'hometasks_screen.dart';
 import 'dashboard_screen.dart';
 import 'services/notification_service.dart';
 import 'services/chat_service.dart';
+import 'models/chat.dart';
 import 'services/feed_service.dart';
 import 'services/hometask_service.dart';
 import 'services/app_data_cache_service.dart';
@@ -21,6 +22,7 @@ import 'services/theme_service.dart';
 import 'feeds_screen.dart';
 import 'chat_screen.dart';
 import 'notifications_screen.dart';
+import 'screens/chat_conversation.dart';
 import 'config/app_config.dart';
 import 'l10n/app_localizations.dart';
 
@@ -29,6 +31,7 @@ class HomeScreen extends StatefulWidget {
   final int? initialStudentId;
   final int? initialFeedId;
   final int? initialPostId;
+  final int? initialChatThreadId;
   
   const HomeScreen({
     super.key,
@@ -36,6 +39,7 @@ class HomeScreen extends StatefulWidget {
     this.initialStudentId,
     this.initialFeedId,
     this.initialPostId,
+    this.initialChatThreadId,
   });
 
   @override
@@ -50,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget? _currentPage;
   bool _profileLoading = false;
   bool _consentDialogShown = false;
+  bool _chatRouteHandled = false;
   String? _drawerUsername;
   String? _drawerFullName;
   String? _drawerProfileImage;
@@ -71,6 +76,9 @@ class _HomeScreenState extends State<HomeScreen> {
     } else if (widget.initialStudentId != null) {
       _currentPage = HometasksScreen(initialStudentId: widget.initialStudentId);
       _selectedTabIndex = 1;
+    } else if (widget.initialChatThreadId != null) {
+      _currentPage = const ChatScreen();
+      _selectedTabIndex = 3;
     } else {
       _currentPage = const DashboardScreen();
     }
@@ -78,7 +86,40 @@ class _HomeScreenState extends State<HomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadDrawerProfile();
       _maybeShowConsentDialog();
+      _openChatThreadFromRoute();
     });
+  }
+
+  Future<void> _openChatThreadFromRoute() async {
+    if (_chatRouteHandled || widget.initialChatThreadId == null || !mounted) {
+      return;
+    }
+    _chatRouteHandled = true;
+    final threadId = widget.initialChatThreadId!;
+    final authService = context.read<AuthService>();
+    final chatService = context.read<ChatService>();
+    await chatService.loadThreads(mode: 'personal');
+    if (authService.isAdmin) {
+      await chatService.loadThreads(mode: 'admin', setCurrent: false);
+    }
+    final threads = authService.isAdmin
+        ? [...chatService.personalThreads, ...chatService.adminThreads]
+        : chatService.threads;
+    ChatThread? match;
+    for (final thread in threads) {
+      if (thread.id == threadId) {
+        match = thread;
+        break;
+      }
+    }
+    if (!mounted || match == null) {
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => ChatConversationScreen(thread: match!),
+      ),
+    );
   }
 
   Future<void> _maybeShowConsentDialog() async {

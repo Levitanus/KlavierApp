@@ -10,6 +10,7 @@ import 'models/chat.dart';
 import 'models/feed.dart';
 import 'services/feed_service.dart';
 import 'services/audio_player_service.dart';
+import 'services/active_view_tracker.dart';
 import 'services/media_cache_service.dart';
 import 'utils/media_download.dart';
 import 'widgets/quill_embed_builders.dart';
@@ -593,6 +594,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   @override
   void initState() {
     super.initState();
+    ActiveViewTracker.setActiveFeedPost(widget.post.id);
     _post = widget.post;
     _feedService = context.read<FeedService>();
     _feedService.addListener(_handleFeedUpdate);
@@ -668,6 +670,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
 
   @override
   void dispose() {
+    ActiveViewTracker.clearActiveFeedPost(widget.post.id);
     _feedService.removeListener(_handleFeedUpdate);
     super.dispose();
   }
@@ -1073,8 +1076,8 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
 
     final listBottomPadding = _post.allowComments ? 96.0 : 16.0;
 
-    return ChangeNotifierProvider(
-      create: (_) => AudioPlayerService(),
+    return ChangeNotifierProvider.value(
+      value: AudioPlayerService(),
       child: Scaffold(
         appBar: AppBar(
           title: Text(AppLocalizations.of(context)?.feedsPostTitle ?? 'Post'),

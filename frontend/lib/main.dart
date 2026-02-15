@@ -1,22 +1,32 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'l10n/app_localizations.dart';
 import 'config/app_config.dart';
 import 'auth.dart';
 import 'services/notification_service.dart';
+import 'services/push_notification_service.dart';
 import 'services/hometask_service.dart';
 import 'services/feed_service.dart';
 import 'services/chat_service.dart';
 import 'services/websocket_service.dart';
 import 'services/theme_service.dart';
 import 'services/locale_service.dart';
+import 'services/active_view_tracker.dart';
+import 'firebase_options.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 import 'reset_password_screen.dart';
 import 'register_screen.dart';
+import 'utils/notification_navigation.dart';
 
 final ColorScheme _lightColorScheme = ColorScheme.fromSeed(
   brightness: Brightness.light,
@@ -74,12 +84,184 @@ final ColorScheme _darkColorScheme = ColorScheme.fromSeed(
   surfaceTint: const Color(0xFF3BA79D),
 );
 
+final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
+final FlutterLocalNotificationsPlugin _localNotifications =
+    FlutterLocalNotificationsPlugin();
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  if (!kIsWeb) {
+    const AndroidInitializationSettings androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    const InitializationSettings initSettings =
+        InitializationSettings(android: androidSettings);
+    await _localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: _handleLocalNotificationResponse,
+    );
+  }
+
+  if (kIsWeb || defaultTargetPlatform == TargetPlatform.android) {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      _handleForegroundMessage(message);
+    });
+
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      _handleNotificationNavigation(message.data);
+    });
+
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      _handleNotificationNavigation(initialMessage.data);
+    }
+  }
   await AppConfig.load();
   // Use path-based URL strategy instead of hash-based
   usePathUrlStrategy();
   runApp(const MyApp());
+}
+
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+}
+
+void _handleLocalNotificationResponse(NotificationResponse response) {
+  final payload = response.payload;
+  if (payload == null || payload.isEmpty) {
+    return;
+  }
+
+  final params = Uri.splitQueryString(payload);
+  _handleNotificationNavigation(Map<String, dynamic>.from(params));
+}
+
+Future<void> _handleForegroundMessage(RemoteMessage message) async {
+  if (kDebugMode) {
+    print('[PUSH] Foreground message received: ${message.data}');
+  }
+
+  final data = message.data;
+  if (_shouldSuppressForegroundNotification(data)) {
+    if (kDebugMode) {
+      print('[PUSH] Suppressed foreground notification for active screen');
+    }
+    return;
+  }
+
+  await _showLocalNotification(
+    title: message.notification?.title ?? 'Notification',
+    body: message.notification?.body ?? '',
+    payload: data,
+  );
+}
+
+bool _shouldSuppressForegroundNotification(Map<String, dynamic> data) {
+  final route = data['route'] as String?;
+  if (route == null || route.isEmpty) {
+    return false;
+  }
+
+  if (route.startsWith('/chat/')) {
+    final match = RegExp(r'/chat/(\d+)').firstMatch(route);
+    final threadId = match != null ? int.tryParse(match.group(1) ?? '') : null;
+    if (threadId != null && ActiveViewTracker.activeChatThreadId == threadId) {
+      return true;
+    }
+  }
+
+  if (route.startsWith('/feeds')) {
+    final metadata = _parseMetadata(data);
+    final rawPostId = metadata?['post_id'];
+    final postId = rawPostId is int
+        ? rawPostId
+        : (rawPostId is String ? int.tryParse(rawPostId) : null);
+    if (postId != null && ActiveViewTracker.activeFeedPostId == postId) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+Map<String, dynamic>? _parseMetadata(Map<String, dynamic> data) {
+  final raw = data['metadata'];
+  if (raw == null) {
+    return null;
+  }
+  if (raw is Map<String, dynamic>) {
+    return raw;
+  }
+  if (raw is String && raw.isNotEmpty) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map<String, dynamic>) {
+        return decoded;
+      }
+    } catch (_) {
+      return null;
+    }
+  }
+  return null;
+}
+
+void _handleNotificationNavigation(Map<String, dynamic> data) {
+  final route = data['route'] as String?;
+  if (route == null || route.isEmpty) {
+    return;
+  }
+
+  final metadata = _parseMetadata(data);
+  final context = _navigatorKey.currentContext;
+  if (context == null) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _handleNotificationNavigation(data);
+    });
+    return;
+  }
+
+  navigateToNotificationRoute(context, route, metadata);
+}
+
+Future<void> _showLocalNotification({
+  required String title,
+  required String body,
+  required Map<String, dynamic> payload,
+}) async {
+  if (kIsWeb) return; // Local notifications not needed on web
+  
+  const AndroidNotificationDetails androidDetails =
+      AndroidNotificationDetails(
+    'default',
+    'Default Notifications',
+    channelDescription: 'Default notification channel',
+    importance: Importance.max,
+    priority: Priority.high,
+  );
+  
+  const NotificationDetails details = NotificationDetails(
+    android: androidDetails,
+  );
+  
+  await _localNotifications.show(
+    UniqueKey().hashCode,
+    title,
+    body,
+    details,
+    payload: Uri(
+      queryParameters: payload.map(
+        (k, v) => MapEntry(k, v.toString()),
+      ),
+    ).query,
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -98,6 +280,17 @@ class MyApp extends StatelessWidget {
           ),
           update: (context, authService, previous) =>
               previous ?? NotificationService(authService: authService),
+        ),
+        ChangeNotifierProxyProvider<AuthService, PushNotificationService>(
+          create: (context) => PushNotificationService(
+            authService: context.read<AuthService>(),
+          ),
+          update: (context, authService, previous) {
+            final service =
+                previous ?? PushNotificationService(authService: authService);
+            service.syncAuth();
+            return service;
+          },
         ),
         ChangeNotifierProxyProvider<AuthService, HometaskService>(
           create: (context) => HometaskService(
@@ -167,6 +360,7 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer2<ThemeService, LocaleService>(
         builder: (context, themeService, localeService, child) => MaterialApp(
+          navigatorKey: _navigatorKey,
           onGenerateTitle: (context) =>
               AppLocalizations.of(context)?.appTitle ?? 'Music School App',
           locale: localeService.locale ?? const Locale('de'),
@@ -221,6 +415,35 @@ class MyApp extends StatelessWidget {
               return MaterialPageRoute(
                 builder: (context) => RegisterScreen(token: token),
               );
+            }
+
+            if (uri.path == '/feeds') {
+              final feedId = int.tryParse(uri.queryParameters['feed_id'] ?? '');
+              final postId = int.tryParse(uri.queryParameters['post_id'] ?? '');
+              return MaterialPageRoute(
+                builder: (context) => HomeScreen(
+                  initialFeedId: feedId,
+                  initialPostId: postId,
+                ),
+              );
+            }
+
+            if (uri.path == '/hometasks') {
+              final studentId =
+                  int.tryParse(uri.queryParameters['student_id'] ?? '');
+              return MaterialPageRoute(
+                builder: (context) => HomeScreen(initialStudentId: studentId),
+              );
+            }
+
+            // Handle /chat/{threadId}
+            if (uri.pathSegments.length == 2 && uri.pathSegments.first == 'chat') {
+              final threadId = int.tryParse(uri.pathSegments[1]);
+              if (threadId != null) {
+                return MaterialPageRoute(
+                  builder: (context) => HomeScreen(initialChatThreadId: threadId),
+                );
+              }
             }
 
             return MaterialPageRoute(

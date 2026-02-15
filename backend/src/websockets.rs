@@ -84,6 +84,14 @@ impl WsServerActor {
         debug!("[ws] user {} subscribed to thread {}", user_id, thread_id);
     }
 
+    pub async fn is_user_watching_thread(&self, user_id: i32, thread_id: i32) -> bool {
+        let thread_watchers = self.thread_watchers.read().await;
+        thread_watchers
+            .get(&thread_id)
+            .map(|watchers| watchers.contains(&user_id))
+            .unwrap_or(false)
+    }
+
     pub async fn subscribe_to_post(&self, user_id: i32, post_id: i32) {
         let mut post_watchers = self.post_watchers.write().await;
         post_watchers

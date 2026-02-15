@@ -158,6 +158,7 @@ class WebSocketService extends ChangeNotifier {
     
     _subscription?.cancel();
     await _channel?.sink.close(status.goingAway);
+    _channel = null;
     
     _isConnected = false;
     _isConnecting = false;
@@ -167,7 +168,10 @@ class WebSocketService extends ChangeNotifier {
 
   /// Send a message via WebSocket
   void send(WsMessage message) {
-    if (!_isConnected) {
+    if (_isDisposed) {
+      return;
+    }
+    if (!_isConnected || _channel == null) {
       if (kDebugMode) {
         print('WebSocket not connected, message not sent: ${message.msgType}');
       }
@@ -185,6 +189,7 @@ class WebSocketService extends ChangeNotifier {
       if (kDebugMode) {
         print('Error sending WebSocket message: $e');
       }
+      _handleDisconnection();
       _enqueueMessage(message);
     }
   }
@@ -280,6 +285,7 @@ class WebSocketService extends ChangeNotifier {
     if (_isDisposed) return;
     _isConnected = false;
     _isConnecting = false;
+    _channel = null;
     _safeNotifyListeners();
     _notifyConnectionListeners(false);
     if (kDebugMode) {

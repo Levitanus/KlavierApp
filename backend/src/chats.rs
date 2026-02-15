@@ -8,6 +8,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::users::verify_token;
 use crate::websockets;
+use crate::notifications::{ContentBlock, NotificationBody, NotificationContent};
+use crate::push;
 use crate::AppState;
 
 // ============================================================================
@@ -46,6 +48,50 @@ async fn fetch_user_display_name(db: &PgPool, user_id: i32) -> String {
     .await
     .unwrap_or(None)
     .unwrap_or_else(|| "Unknown".to_string())
+}
+
+fn build_chat_notification(sender_name: &str, message: &str, thread_id: i32, sender_id: i32) -> NotificationBody {
+    NotificationBody {
+        body_type: "chat_message".to_string(),
+        title: format!("New message from {}", sender_name),
+        route: Some(format!("/chat/{}", thread_id)),
+        content: NotificationContent {
+            blocks: vec![ContentBlock::Text {
+                text: message.to_string(),
+                style: Some("body".to_string()),
+            }],
+            actions: None,
+        },
+        metadata: Some(json!({
+            "thread_id": thread_id,
+            "sender_id": sender_id,
+        })),
+    }
+}
+
+fn chat_message_preview(body: &serde_json::Value) -> String {
+    let mut text = String::new();
+    if let Some(ops) = body.get("ops").and_then(|value| value.as_array()) {
+        for op in ops {
+            if let Some(insert) = op.get("insert").and_then(|value| value.as_str()) {
+                text.push_str(insert);
+            }
+        }
+    }
+
+    let trimmed = text.trim().to_string();
+    if trimmed.is_empty() {
+        return "New message".to_string();
+    }
+
+    let limit = 180;
+    if trimmed.len() <= limit {
+        return trimmed;
+    }
+
+    let mut cut = trimmed.chars().take(limit).collect::<String>();
+    cut.push_str("...");
+    cut
 }
 
 fn is_valid_attachment_type(value: &str) -> bool {
@@ -1098,12 +1144,13 @@ async fn send_message(
 
     // Broadcast message via WebSocket
     let sender_name = fetch_user_display_name(&app_state.db, user_id).await;
+    let preview = chat_message_preview(&payload.body);
     let message_data = serde_json::json!({
         "message_id": message_id,
         "thread_id": thread_id,
         "sender_id": user_id,
         "sender_name": sender_name,
-        "body": payload.body,
+        "body": payload.body.clone(),
         "attachments": attachments,
         "created_at": created_at.to_rfc3339(),
         "updated_at": updated_at.to_rfc3339(),
@@ -1118,6 +1165,34 @@ async fn send_message(
     };
     
     app_state.ws_server.broadcast_to_thread(thread_id, ws_message).await;
+
+    let notification_body = build_chat_notification(&sender_name, &preview, thread_id, user_id);
+    for recipient_id in &recipients {
+        let notification_id = sqlx::query_scalar::<_, i32>(
+            "INSERT INTO notifications (user_id, type, title, body, priority)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id",
+        )
+        .bind(recipient_id)
+        .bind(&notification_body.body_type)
+        .bind(&notification_body.title)
+        .bind(serde_json::to_value(&notification_body).unwrap_or_default())
+        .bind("normal")
+        .fetch_optional(&app_state.db)
+        .await
+        .unwrap_or(None);
+
+        if let Some(notification_id) = notification_id {
+            debug!("[CHAT] Sending push to user {} for thread {}", recipient_id, thread_id);
+            push::send_notification_to_user(
+                &app_state.db,
+                *recipient_id,
+                &notification_body,
+                Some(notification_id),
+            )
+            .await;
+        }
+    }
 
     Ok(HttpResponse::Created().json(json!({
         "message_id": message_id,
@@ -1214,12 +1289,13 @@ async fn send_admin_message(
 
     // Broadcast message via WebSocket
     let sender_name = fetch_user_display_name(&app_state.db, user_id).await;
+    let preview = chat_message_preview(&payload.body);
     let message_data = serde_json::json!({
         "message_id": message_id,
         "thread_id": thread_id,
         "sender_id": user_id,
         "sender_name": sender_name,
-        "body": payload.body,
+        "body": payload.body.clone(),
         "attachments": attachments,
         "created_at": created_at.to_rfc3339(),
         "updated_at": updated_at.to_rfc3339(),
@@ -1234,6 +1310,34 @@ async fn send_admin_message(
     };
 
     app_state.ws_server.broadcast_to_thread(thread_id, ws_message).await;
+
+    let notification_body = build_chat_notification(&sender_name, &preview, thread_id, user_id);
+    for admin_id in &admin_recipients {
+        let notification_id = sqlx::query_scalar::<_, i32>(
+            "INSERT INTO notifications (user_id, type, title, body, priority)
+             VALUES ($1, $2, $3, $4, $5)
+             RETURNING id",
+        )
+        .bind(admin_id)
+        .bind(&notification_body.body_type)
+        .bind(&notification_body.title)
+        .bind(serde_json::to_value(&notification_body).unwrap_or_default())
+        .bind("normal")
+        .fetch_optional(&app_state.db)
+        .await
+        .unwrap_or(None);
+
+        if let Some(notification_id) = notification_id {
+            debug!("[CHAT] Sending push to admin {} for thread {}", admin_id, thread_id);
+            push::send_notification_to_user(
+                &app_state.db,
+                *admin_id,
+                &notification_body,
+                Some(notification_id),
+            )
+            .await;
+        }
+    }
 
     Ok(HttpResponse::Created().json(json!({
         "message_id": message_id,

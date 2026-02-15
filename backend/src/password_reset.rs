@@ -12,6 +12,7 @@ use log::error;
 
 use crate::email::{EmailError, EmailService};
 use crate::notification_builders::build_password_reset_request_notification;
+use crate::push;
 
 #[derive(Debug)]
 pub enum PasswordResetError {
@@ -165,17 +166,23 @@ pub async fn request_password_reset(
         let notification_body = build_password_reset_request_notification(username, request_id);
         
         for admin_id in admin_ids {
-            let _ = sqlx::query(
+            let notification_id = sqlx::query_scalar::<_, i32>(
                 "INSERT INTO notifications (user_id, type, title, body, priority)
-                 VALUES ($1, $2, $3, $4, $5)"
+                 VALUES ($1, $2, $3, $4, $5)
+                 RETURNING id"
             )
             .bind(admin_id)
             .bind(&notification_body.body_type)
             .bind(&notification_body.title)
             .bind(serde_json::to_value(&notification_body).unwrap_or_default())
             .bind("high") // High priority for admin action items
-            .execute(pool)
-            .await;
+            .fetch_optional(pool)
+            .await
+            .unwrap_or(None);
+
+            if let Some(notification_id) = notification_id {
+                push::send_notification_to_user(pool, admin_id, &notification_body, Some(notification_id)).await;
+            }
         }
     }
 

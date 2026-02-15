@@ -14,6 +14,7 @@ pub mod feeds;
 pub mod media;
 pub mod chats;
 pub mod websockets;
+pub mod push;
 
 use actix_web::{middleware, web, App};
 use actix_files as fs;
@@ -138,6 +139,7 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
         .configure(feeds::configure)
         .configure(media::configure)
         .configure(chats::configure)
+        .configure(push::configure)
         .route("/ws", web::get().to(ws_endpoint))
         .service(fs::Files::new("/uploads/profile_images", profile_images_dir).show_files_listing())
         .service(fs::Files::new("/uploads/media", media_dir).show_files_listing())

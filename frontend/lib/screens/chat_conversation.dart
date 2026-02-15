@@ -10,6 +10,7 @@ import '../auth.dart';
 import '../models/chat.dart';
 import '../services/chat_service.dart';
 import '../services/audio_player_service.dart';
+import '../services/active_view_tracker.dart';
 import '../services/media_cache_service.dart';
 import '../utils/media_download.dart';
 import '../widgets/quill_embed_builders.dart';
@@ -43,6 +44,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   @override
   void initState() {
     super.initState();
+    ActiveViewTracker.setActiveChatThread(widget.thread.id);
     _editorController = quill.QuillController.basic();
     _scrollController = ScrollController();
     _editorFocusNode = FocusNode();
@@ -56,6 +58,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   @override
   void dispose() {
+    ActiveViewTracker.clearActiveChatThread(widget.thread.id);
     _editorController.dispose();
     _scrollController.removeListener(_handleScroll);
     _scrollController.dispose();
@@ -393,8 +396,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   Widget build(BuildContext context) {
     final displayName = widget.thread.peerName ?? 'Unknown';
 
-    return ChangeNotifierProvider(
-      create: (_) => AudioPlayerService(),
+    return ChangeNotifierProvider.value(
+      value: AudioPlayerService(),
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         appBar: AppBar(

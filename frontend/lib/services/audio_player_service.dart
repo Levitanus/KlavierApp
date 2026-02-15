@@ -70,7 +70,6 @@ class AudioPlayerService extends ChangeNotifier {
 
   @override
   void dispose() {
-    _player.dispose();
-    super.dispose();
+    // Intentionally left empty to avoid disposing the singleton.
   }
 }

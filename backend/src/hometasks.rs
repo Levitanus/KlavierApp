@@ -14,6 +14,7 @@ use crate::notification_builders::{
     build_hometask_reopened_notification,
 };
 use crate::notifications::NotificationBody;
+use crate::push;
 use crate::roles::helpers::verify_can_access_student;
 use crate::users::{verify_token, Claims};
 use crate::AppState;
@@ -97,17 +98,23 @@ async fn insert_notification(
     body: &NotificationBody,
     priority: &str,
 ) {
-    let _ = sqlx::query(
+    let notification_id = sqlx::query_scalar::<_, i32>(
         "INSERT INTO notifications (user_id, type, title, body, priority)
-         VALUES ($1, $2, $3, $4, $5)",
+         VALUES ($1, $2, $3, $4, $5)
+         RETURNING id",
     )
     .bind(user_id)
     .bind(&body.body_type)
     .bind(&body.title)
     .bind(serde_json::to_value(body).unwrap_or_default())
     .bind(priority)
-    .execute(db)
-    .await;
+    .fetch_optional(db)
+    .await
+    .unwrap_or(None);
+
+    if let Some(notification_id) = notification_id {
+        push::send_notification_to_user(db, user_id, body, Some(notification_id)).await;
+    }
 }
 
 async fn fetch_teacher_name(db: &PgPool, teacher_id: i32) -> String {
