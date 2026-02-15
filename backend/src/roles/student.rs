@@ -291,11 +291,10 @@ pub(crate) async fn create_student(
 
     // Create student entry
     if let Err(e) = sqlx::query(
-        "INSERT INTO students (user_id, address, birthday) 
-           VALUES ($1, $2, $3)"
+        "INSERT INTO students (user_id, birthday) 
+           VALUES ($1, $2)"
     )
     .bind(user_id)
-    .bind(&student_req.address)
     .bind(birthday)
     .execute(&mut *tx)
     .await
@@ -335,8 +334,8 @@ pub(crate) async fn get_student(
     }
 
     // Get student with user info
-    let student = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.address, s.birthday, s.status::text
+    let student = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, NaiveDate, String)>(
+        "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.birthday, s.status::text
         FROM users u
         INNER JOIN students s ON u.id = s.user_id
         WHERE u.id = $1"
@@ -346,14 +345,13 @@ pub(crate) async fn get_student(
     .await;
 
     match student {
-        Ok(Some((user_id, username, email, phone, full_name, address, birthday, status))) => {
+        Ok(Some((user_id, username, email, phone, full_name, birthday, status))) => {
             HttpResponse::Ok().json(StudentWithUserInfo {
                 user_id,
                 username,
                 email,
                 phone,
                 full_name,
-                address,
                 birthday,
                 status,
             })
@@ -388,8 +386,8 @@ pub(crate) async fn list_students(
         }));
     }
 
-    let students: Vec<StudentWithUserInfo> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.address, s.birthday, s.status::text
+    let students: Vec<StudentWithUserInfo> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, NaiveDate, String)>(
+        "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.birthday, s.status::text
            FROM users u
            INNER JOIN students s ON u.id = s.user_id"
     )
@@ -397,14 +395,13 @@ pub(crate) async fn list_students(
     .await
     .unwrap_or_default()
     .into_iter()
-    .map(|(user_id, username, email, phone, full_name, address, birthday, status)| {
+    .map(|(user_id, username, email, phone, full_name, birthday, status)| {
         StudentWithUserInfo {
             user_id,
             username,
             email,
             phone,
             full_name,
-            address,
             birthday,
             status,
         }
@@ -489,7 +486,7 @@ pub(crate) async fn update_student(
     }
 
     // Update student table
-    if update_req.address.is_some() || update_req.birthday.is_some() {
+    if update_req.birthday.is_some() {
         let mut query = String::from("UPDATE students SET ");
         let mut updates = Vec::new();
         let mut bind_count = 1;
@@ -508,11 +505,6 @@ pub(crate) async fn update_student(
             None
         };
 
-        if update_req.address.is_some() {
-            updates.push(format!("address = ${}", bind_count));
-            bind_count += 1;
-        }
-
         if birthday_date.is_some() {
             updates.push(format!("birthday = ${}", bind_count));
             bind_count += 1;
@@ -522,10 +514,6 @@ pub(crate) async fn update_student(
         query.push_str(&format!(" WHERE user_id = ${}", bind_count));
 
         let mut q = sqlx::query(&query);
-
-        if let Some(ref address) = update_req.address {
-            q = q.bind(address);
-        }
 
         if let Some(date) = birthday_date {
             q = q.bind(date);

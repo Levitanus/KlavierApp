@@ -21,3 +21,5 @@ musikschule_app.pub
 musikschule
 
 musikschule.pub
+
+deploy/upload_certificate.pem

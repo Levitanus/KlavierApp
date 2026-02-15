@@ -52,3 +52,4 @@ flutter:
   assets:
     - assets/config.json
     - assets/branding/
+    - assets/consent.txt

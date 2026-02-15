@@ -6,7 +6,6 @@ use sqlx::FromRow;
 pub struct Student {
     pub user_id: i32,
     pub full_name: String,
-    pub address: String,
     pub birthday: NaiveDate,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
@@ -35,7 +34,6 @@ pub struct StudentWithUserInfo {
     pub email: Option<String>,
     pub phone: Option<String>,
     pub full_name: String,
-    pub address: String,
     pub birthday: NaiveDate,
     pub status: String,
 }
@@ -79,7 +77,6 @@ pub struct CreateStudentRequest {
     pub email: Option<String>,
     pub phone: Option<String>,
     pub full_name: String,
-    pub address: String,
     pub birthday: String,
 }
 
@@ -105,7 +102,6 @@ pub struct CreateTeacherRequest {
 #[derive(Debug, Deserialize)]
 pub struct UpdateStudentRequest {
     pub full_name: Option<String>,
-    pub address: Option<String>,
     pub birthday: Option<String>,
     pub email: Option<String>,
     pub phone: Option<String>,

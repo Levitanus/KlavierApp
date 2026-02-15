@@ -25,7 +25,6 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
     if (_studentData != null) {
       _fullNameController.text = _studentData!['full_name'] ?? '';
-      _addressController.text = _studentData!['address'] ?? '';
       _birthdayController.text = _studentData!['birthday'] ?? '';
     } else if (_parentData != null) {
       _fullNameController.text = _parentData!['full_name'] ?? '';
@@ -214,7 +213,6 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       _fullNameController.text = unifiedFullName.toString();
 
       if (_studentData != null) {
-        _addressController.text = _studentData!['address'] ?? '';
         _birthdayController.text = _studentData!['birthday'] ?? '';
       }
 
@@ -317,9 +315,6 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       if (_fullNameController.text.isNotEmpty) {
         updateData['full_name'] = _fullNameController.text;
       }
-      if (_studentData != null && _addressController.text.isNotEmpty) {
-        updateData['address'] = _addressController.text;
-      }
       if (_studentData != null && _birthdayController.text.isNotEmpty) {
         updateData['birthday'] = _birthdayController.text;
       }
@@ -380,8 +375,6 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           if (_phoneController.text.isNotEmpty) 'phone': _phoneController.text,
           if (_fullNameController.text.isNotEmpty)
             'full_name': _fullNameController.text,
-          if (_addressController.text.isNotEmpty)
-            'address': _addressController.text,
           if (_birthdayController.text.isNotEmpty)
             'birthday': _birthdayController.text,
         };
@@ -479,7 +472,6 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
       if (_studentData != null) {
         _fullNameController.text = _studentData!['full_name'] ?? '';
-        _addressController.text = _studentData!['address'] ?? '';
         _birthdayController.text = _studentData!['birthday'] ?? '';
       } else if (_parentData != null) {
         _fullNameController.text = _parentData!['full_name'] ?? '';
@@ -1373,7 +1365,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
   }
 
     Future<void> _makeUserStudent(
-      String address, String birthday) async {
+      String birthday) async {
     if (_userId == null) return;
     final authService = Provider.of<AuthService>(context, listen: false);
 
@@ -1385,7 +1377,6 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'address': address,
           'birthday': birthday,
         }),
       );
@@ -1629,7 +1620,6 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
   Future<void> _updateChildData(
     int childUserId,
     String fullName,
-    String address,
     String birthday,
   ) async {
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -1656,7 +1646,6 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         },
         body: jsonEncode({
           'full_name': fullName,
-          'address': address,
           'birthday': birthday,
         }),
       );

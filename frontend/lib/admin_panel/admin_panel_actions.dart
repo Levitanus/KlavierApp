@@ -181,8 +181,8 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     }
   }
 
-  Future<void> _makeUserStudent(
-      int userId, String address, String birthday) async {
+    Future<void> _makeUserStudent(
+      int userId, String birthday) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
@@ -192,7 +192,6 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'address': address,
           'birthday': birthday,
         }),
       );
@@ -296,8 +295,8 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     }
   }
 
-  Future<void> _createStudent(String username, String password, String? email,
-      String? phone, String fullName, String address, String birthday) async {
+    Future<void> _createStudent(String username, String password, String? email,
+      String? phone, String fullName, String birthday) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
       final response = await http.post(
@@ -312,7 +311,6 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
           if (email != null) 'email': email,
           if (phone != null) 'phone': phone,
           'full_name': fullName,
-          'address': address,
           'birthday': birthday,
         }),
       );

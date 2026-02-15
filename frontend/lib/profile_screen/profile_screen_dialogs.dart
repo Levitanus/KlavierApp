@@ -268,12 +268,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                       'Birthday',
                       student['birthday']?.toString() ?? 'Not set',
                     ),
-                    const SizedBox(height: 8),
-                    _buildInfoRow(
-                      Icons.home_outlined,
-                      'Address',
-                      student['address']?.toString() ?? 'Not set',
-                    ),
                     const Divider(),
                     const SizedBox(height: 8),
                     Text(
@@ -874,7 +868,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
   }
 
   void _showMakeStudentDialog() {
-    final addressController = TextEditingController();
     final birthdayController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
@@ -892,16 +885,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Address',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: birthdayController,
                   decoration: const InputDecoration(
@@ -932,7 +915,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
               if (formKey.currentState!.validate()) {
                 Navigator.of(context).pop();
                 await _makeUserStudent(
-                  addressController.text,
                   birthdayController.text,
                 );
               }
@@ -1243,7 +1225,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
 
   void _showChildDetailsDialog(Map<String, dynamic> child) {
     final fullNameController = TextEditingController(text: child['full_name']);
-    final addressController = TextEditingController(text: child['address']);
     final birthdayController = TextEditingController(text: child['birthday']);
     bool isEditing = false;
     bool isSaving = false;
@@ -1319,17 +1300,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                         ),
                         enabled: !isSaving,
                       ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: addressController,
-                        decoration: const InputDecoration(
-                          labelText: 'Address',
-                          prefixIcon: Icon(Icons.home),
-                          border: OutlineInputBorder(),
-                        ),
-                        enabled: !isSaving,
-                      ),
-                      const SizedBox(height: 16),
                       TextField(
                         controller: birthdayController,
                         decoration: const InputDecoration(
@@ -1345,13 +1315,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                         leading: const Icon(Icons.badge),
                         title: const Text('Full Name'),
                         subtitle: Text(child['full_name']),
-                        contentPadding: EdgeInsets.zero,
-                      ),
-                      const Divider(),
-                      ListTile(
-                        leading: const Icon(Icons.home),
-                        title: const Text('Address'),
-                        subtitle: Text(child['address']),
                         contentPadding: EdgeInsets.zero,
                       ),
                       const Divider(),
@@ -1465,7 +1428,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                           setState(() {
                             isEditing = false;
                             fullNameController.text = child['full_name'];
-                            addressController.text = child['address'];
                             birthdayController.text = child['birthday'];
                           });
                         },
@@ -1482,7 +1444,6 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                           await _updateChildData(
                             child['user_id'],
                             fullNameController.text,
-                            addressController.text,
                             birthdayController.text,
                           );
 

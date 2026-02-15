@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'auth.dart';
 import 'login_screen.dart';
 import 'admin_panel.dart';
@@ -41,10 +43,12 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   static String get _baseUrl => AppConfig.instance.baseUrl;
+  static const String _consentKey = 'consent_accepted_v1';
   int _selectedTabIndex = 0;
   int? _selectedDrawerIndex;
   Widget? _currentPage;
   bool _profileLoading = false;
+  bool _consentDialogShown = false;
   String? _drawerUsername;
   String? _drawerFullName;
   String? _drawerProfileImage;
@@ -72,7 +76,84 @@ class _HomeScreenState extends State<HomeScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadDrawerProfile();
+      _maybeShowConsentDialog();
     });
+  }
+
+  Future<void> _maybeShowConsentDialog() async {
+    if (_consentDialogShown || !mounted) return;
+    _consentDialogShown = true;
+
+    final prefs = await SharedPreferences.getInstance();
+    final hasAccepted = prefs.getBool(_consentKey) ?? false;
+    if (hasAccepted || !mounted) return;
+
+    final consentText = await _loadConsentText();
+    bool consentAccepted = false;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+          contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+          actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+          title: const Text('Consent (short)'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(consentText),
+              const SizedBox(height: 8),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: consentAccepted,
+                onChanged: (value) {
+                  setDialogState(() {
+                    consentAccepted = value ?? false;
+                  });
+                },
+                title: const Text(
+                  'I agree and (if the account is for a child) I am a parent/guardian or authorized.',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: consentAccepted
+                  ? () async {
+                      await prefs.setBool(_consentKey, true);
+                      if (context.mounted) {
+                        Navigator.of(context).pop();
+                      }
+                    }
+                  : null,
+              child: const Text('Agree'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<String> _loadConsentText() async {
+    try {
+      final text = await rootBundle.loadString('assets/consent.txt');
+      final trimmed = text.trim();
+      if (trimmed.isNotEmpty) {
+        return trimmed;
+      }
+    } catch (_) {}
+
+    return 'Consent (short)\n'
+        '- Music learning content only.\n'
+        '- You can edit or delete your profile.\n'
+        '- Data is protected with TLS.\n'
+        '- No sharing except email delivery (SendGrid).\n'
+        'If the account is for a child, you confirm you are a parent/guardian or authorized.';
   }
 
   Future<void> _loadDrawerProfile() async {

@@ -77,7 +77,6 @@ abstract class _ProfileScreenStateBase extends State<ProfileScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _fullNameController = TextEditingController();
-  final TextEditingController _addressController = TextEditingController();
   final TextEditingController _birthdayController = TextEditingController();
 
   bool get _isAdminView => widget.userId != null;
@@ -89,14 +88,13 @@ abstract class _ProfileScreenStateBase extends State<ProfileScreen> {
   Future<void> _removeTeacherFromStudent(int studentId, int teacherId);
   Future<void> _updateAdminRole();
   Future<void> _toggleRoleArchive(String role);
-  Future<void> _makeUserStudent(String address, String birthday);
+  Future<void> _makeUserStudent(String birthday);
   Future<void> _makeUserParent(List<int> studentIds);
   Future<void> _makeUserTeacher();
   Future<void> _addChildrenToParent(List<int> studentIds);
   Future<void> _updateChildData(
     int childUserId,
     String fullName,
-    String address,
     String birthday,
   );
   Future<List<StudentInfo>> _loadStudentsForSelection();
@@ -131,7 +129,6 @@ class _ProfileScreenState extends _ProfileScreenStateBase
     _emailController.dispose();
     _phoneController.dispose();
     _fullNameController.dispose();
-    _addressController.dispose();
     _birthdayController.dispose();
     super.dispose();
   }
@@ -420,22 +417,6 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                     
                     // Student-specific fields
                     if (_studentData != null) ...[
-                      // Address
-                      if (_isEditing)
-                        _buildEditableField(
-                          label: 'Address',
-                          controller: _addressController,
-                          icon: Icons.home_outlined,
-                        )
-                      else
-                        _buildProfileField(
-                          label: 'Address',
-                          value: _studentData!['address'] ?? 'Not set',
-                          icon: Icons.home_outlined,
-                          isEditable: true,
-                        ),
-                      const SizedBox(height: 16),
-                      
                       // Birthday
                       if (_isEditing)
                         _buildEditableField(
@@ -546,12 +527,6 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                     Icons.cake_outlined,
                                     'Birthday',
                                     child['birthday'],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  _buildInfoRow(
-                                    Icons.home_outlined,
-                                    'Address',
-                                    child['address'],
                                   ),
                                   const SizedBox(height: 12),
                                   Row(

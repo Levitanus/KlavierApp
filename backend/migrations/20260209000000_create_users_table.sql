@@ -100,7 +100,6 @@ CREATE INDEX IF NOT EXISTS idx_notifications_body_gin ON notifications USING gin
 -- Create students table with additional details
 CREATE TABLE IF NOT EXISTS students (
     user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    address TEXT NOT NULL,
     birthday DATE NOT NULL,
     status role_status NOT NULL DEFAULT 'active',
     archived_at TIMESTAMPTZ,

@@ -267,7 +267,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
   }
 
   void _showMakeStudentDialog(User user) {
-    final addressController = TextEditingController();
     final birthdayController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
@@ -285,16 +284,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                TextFormField(
-                  controller: addressController,
-                  decoration: const InputDecoration(
-                    labelText: 'Address',
-                    border: OutlineInputBorder(),
-                  ),
-                  validator: (value) =>
-                      value?.isEmpty ?? true ? 'Required' : null,
-                ),
-                const SizedBox(height: 16),
                 TextFormField(
                   controller: birthdayController,
                   decoration: const InputDecoration(
@@ -326,7 +315,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 Navigator.of(context).pop();
                 await _makeUserStudent(
                   user.id,
-                  addressController.text,
                   birthdayController.text,
                 );
               }
@@ -523,7 +511,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
     final emailController = TextEditingController();
     final phoneController = TextEditingController();
     final fullNameController = TextEditingController();
-    final addressController = TextEditingController();
     final birthdayController = TextEditingController();
     final formKey = GlobalKey<FormState>();
 
@@ -606,16 +593,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
-                    controller: addressController,
-                    decoration: const InputDecoration(
-                      labelText: 'Address',
-                      border: OutlineInputBorder(),
-                    ),
-                    validator: (value) =>
-                        value?.isEmpty ?? true ? 'Required' : null,
-                  ),
-                  const SizedBox(height: 16),
-                  TextFormField(
                     controller: birthdayController,
                     decoration: const InputDecoration(
                       labelText: 'Birthday (YYYY-MM-DD)',
@@ -673,7 +650,6 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                   emailController.text.isEmpty ? null : emailController.text,
                   phoneController.text.isEmpty ? null : phoneController.text,
                   fullNameController.text,
-                  addressController.text,
                   birthdayController.text,
                 );
               }

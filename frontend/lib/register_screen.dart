@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'auth.dart';
 import 'config/app_config.dart';
@@ -16,6 +18,7 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   static String get _baseUrl => AppConfig.instance.baseUrl;
+  static const String _consentKey = 'consent_accepted_v1';
 
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
@@ -24,13 +27,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _fullNameController = TextEditingController();
-  final _addressController = TextEditingController();
   final _birthdayController = TextEditingController();
 
   bool _isLoading = true;
   bool _isSubmitting = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
+  bool _consentAccepted = false;
+  String _consentText = '';
   String? _errorMessage;
   
   // Token info
@@ -42,6 +46,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void initState() {
     super.initState();
     _validateToken();
+    _loadConsentText();
   }
 
   @override
@@ -52,9 +57,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _fullNameController.dispose();
-    _addressController.dispose();
     _birthdayController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadConsentText() async {
+    try {
+      final text = await rootBundle.loadString('assets/consent.txt');
+      if (mounted) {
+        setState(() {
+          _consentText = text.trim();
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _consentText = '';
+        });
+      }
+    }
+  }
+
+  String get _consentTextFallback {
+    return 'Consent (short)\n'
+        '- Music learning content only.\n'
+        '- You can edit or delete your profile.\n'
+        '- Data is protected with TLS.\n'
+        '- No sharing except email delivery (SendGrid).\n'
+        'If registering a child, you confirm you are a parent/guardian or authorized.';
   }
 
   Future<void> _validateToken() async {
@@ -109,6 +139,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
       return;
     }
 
+    if (!_consentAccepted) {
+      setState(() {
+        _errorMessage = 'Please accept the consent to continue';
+      });
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
       _errorMessage = null;
@@ -126,7 +163,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       // Add role-specific fields
       if (_role == 'student') {
-        requestBody['address'] = _addressController.text;
         requestBody['birthday'] = _birthdayController.text;
       }
 
@@ -139,6 +175,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (response.statusCode == 201) {
         // Registration successful
         final authService = Provider.of<AuthService>(context, listen: false);
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_consentKey, true);
         
         // Auto-login after registration
         final loginResult = await authService.login(
@@ -373,26 +412,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Address field (required for students)
+                      // Birthday field (required for students)
                       if (_role == 'student') ...[
-                        TextFormField(
-                          controller: _addressController,
-                          decoration: const InputDecoration(
-                            labelText: 'Address',
-                            prefixIcon: Icon(Icons.home),
-                            border: OutlineInputBorder(),
-                          ),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return 'Please enter your address';
-                            }
-                            return null;
-                          },
-                          enabled: !_isSubmitting,
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // Birthday field (required for students)
                         TextFormField(
                           controller: _birthdayController,
                           decoration: const InputDecoration(
@@ -507,6 +528,40 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         enabled: !_isSubmitting,
                       ),
                       const SizedBox(height: 24),
+
+                      Card(
+                        elevation: 0,
+                        color: Theme.of(context).colorScheme.surface,
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _consentText.isNotEmpty
+                                    ? _consentText
+                                    : _consentTextFallback,
+                              ),
+                              const SizedBox(height: 12),
+                              CheckboxListTile(
+                                contentPadding: EdgeInsets.zero,
+                                value: _consentAccepted,
+                                onChanged: _isSubmitting
+                                    ? null
+                                    : (value) {
+                                        setState(() {
+                                          _consentAccepted = value ?? false;
+                                        });
+                                      },
+                                title: const Text(
+                                  'I agree and (if registering a child) I am a parent/guardian or authorized.',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
 
                       // Register button
                       ElevatedButton(

@@ -598,7 +598,6 @@ async fn resolve_password_reset_request(
 
 #[derive(Debug, Deserialize)]
 pub struct MakeStudentRequest {
-    pub address: String,
     pub birthday: String, // YYYY-MM-DD format
 }
 
@@ -721,11 +720,10 @@ async fn make_student(
 
     // Create student entry
     if let Err(e) = sqlx::query(
-        "INSERT INTO students (user_id, address, birthday) 
-         VALUES ($1, $2, $3)"
+        "INSERT INTO students (user_id, birthday) 
+         VALUES ($1, $2)"
     )
     .bind(user_id)
-    .bind(&student_data.address)
     .bind(birthday)
     .execute(&mut *tx)
     .await

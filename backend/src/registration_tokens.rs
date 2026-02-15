@@ -47,7 +47,6 @@ pub struct RegisterWithTokenRequest {
     pub phone: Option<String>,
     pub full_name: String,
     // Student-specific fields
-    pub address: Option<String>,
     pub birthday: Option<String>,
 }
 
@@ -518,9 +517,9 @@ async fn register_with_token(
     
     // Validate required fields based on role
     if token.role == "student" {
-        if register_req.address.is_none() || register_req.birthday.is_none() {
+        if register_req.birthday.is_none() {
             return HttpResponse::BadRequest().json(serde_json::json!({
-                "error": "Address and birthday are required for student registration"
+                "error": "Birthday is required for student registration"
             }));
         }
     }
@@ -621,11 +620,10 @@ async fn register_with_token(
             };
             
             if let Err(e) = sqlx::query(
-                "INSERT INTO students (user_id, address, birthday) 
-                 VALUES ($1, $2, $3)"
+                "INSERT INTO students (user_id, birthday) 
+                 VALUES ($1, $2)"
             )
             .bind(user_id)
-            .bind(register_req.address.as_ref().unwrap())
             .bind(birthday)
             .execute(&mut *tx)
             .await

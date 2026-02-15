@@ -373,8 +373,8 @@ pub(crate) async fn list_teacher_students(
         }
     }
 
-    let students: Vec<StudentWithUserInfo> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.address, s.birthday, s.status::text
+    let students: Vec<StudentWithUserInfo> = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, NaiveDate, String)>(
+        "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.birthday, s.status::text
          FROM users u
          INNER JOIN students s ON u.id = s.user_id
          INNER JOIN teacher_student_relations tsr ON s.user_id = tsr.student_user_id
@@ -385,14 +385,13 @@ pub(crate) async fn list_teacher_students(
     .await
     .unwrap_or_default()
     .into_iter()
-    .map(|(user_id, username, email, phone, full_name, address, birthday, status)| {
+    .map(|(user_id, username, email, phone, full_name, birthday, status)| {
         StudentWithUserInfo {
             user_id,
             username,
             email,
             phone,
             full_name,
-            address,
             birthday,
             status,
         }

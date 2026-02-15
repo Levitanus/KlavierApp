@@ -50,7 +50,6 @@ abstract class _AdminPanelStateBase extends State<AdminPanel> {
   Future<void> _deleteUser(User user);
   Future<void> _makeUserStudent(
     int userId,
-    String address,
     String birthday,
   );
   Future<void> _makeUserParent(
@@ -64,7 +63,6 @@ abstract class _AdminPanelStateBase extends State<AdminPanel> {
     String? email,
     String? phone,
     String fullName,
-    String address,
     String birthday,
   );
   Future<void> _createParent(

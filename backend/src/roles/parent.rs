@@ -202,8 +202,8 @@ pub(crate) async fn get_parent(
     match parent {
         Ok(Some((user_id, username, email, phone, full_name, status))) => {
             // Get children
-            let children = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String, NaiveDate, String)>(
-                "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.address, s.birthday, s.status::text
+            let children = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, NaiveDate, String)>(
+                "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.birthday, s.status::text
                  FROM users u
                  INNER JOIN students s ON u.id = s.user_id
                  INNER JOIN parent_student_relations psr ON s.user_id = psr.student_user_id
@@ -214,14 +214,13 @@ pub(crate) async fn get_parent(
             .await
             .unwrap_or_default()
             .into_iter()
-            .map(|(user_id, username, email, phone, full_name, address, birthday, status)| {
+            .map(|(user_id, username, email, phone, full_name, birthday, status)| {
                 StudentWithUserInfo {
                     user_id,
                     username,
                     email,
                     phone,
                     full_name,
-                    address,
                     birthday,
                     status,
                 }

@@ -376,7 +376,6 @@ async fn reset_password(
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StudentData {
     pub full_name: String,
-    pub address: String,
     pub birthday: NaiveDate,
     pub status: String,
 }
@@ -394,7 +393,6 @@ pub struct StudentInfo {
     pub user_id: i32,
     pub username: String,
     pub full_name: String,
-    pub address: String,
     pub birthday: NaiveDate,
     pub profile_image: Option<String>,
     pub status: String,
@@ -436,7 +434,6 @@ pub struct UpdateProfileRequest {
     pub phone: Option<String>,
     // Role-specific fields
     pub full_name: Option<String>,
-    pub address: Option<String>,
     pub birthday: Option<String>, // YYYY-MM-DD format
 }
 
@@ -491,8 +488,8 @@ async fn get_profile(
 
     // Get student data if user is a student
     if profile.roles.contains(&"student".to_string()) {
-        if let Ok(Some((full_name, address, birthday, status))) = sqlx::query_as::<_, (String, String, NaiveDate, String)>(
-            "SELECT u.full_name, s.address, s.birthday, s.status::text
+        if let Ok(Some((full_name, birthday, status))) = sqlx::query_as::<_, (String, NaiveDate, String)>(
+            "SELECT u.full_name, s.birthday, s.status::text
              FROM students s
              INNER JOIN users u ON u.id = s.user_id
              WHERE s.user_id = $1"
@@ -503,7 +500,6 @@ async fn get_profile(
         {
             profile.student_data = Some(StudentData {
                 full_name,
-                address,
                 birthday,
                 status,
             });
@@ -523,8 +519,8 @@ async fn get_profile(
         .await
         {
             // Get children
-            let children: Vec<_> = sqlx::query_as::<_, (i32, String, String, String, NaiveDate, Option<String>, String)>(
-                 "SELECT u.id, u.username, u.full_name, s.address, s.birthday, u.profile_image, s.status::text
+              let children: Vec<_> = sqlx::query_as::<_, (i32, String, String, NaiveDate, Option<String>, String)>(
+                  "SELECT u.id, u.username, u.full_name, s.birthday, u.profile_image, s.status::text
                   FROM users u
                   INNER JOIN students s ON u.id = s.user_id
                  INNER JOIN parent_student_relations psr ON s.user_id = psr.student_user_id
@@ -535,11 +531,10 @@ async fn get_profile(
             .await
             .unwrap_or_default()
             .into_iter()
-            .map(|(user_id, username, full_name, address, birthday, profile_image, status)| StudentInfo {
+              .map(|(user_id, username, full_name, birthday, profile_image, status)| StudentInfo {
                 user_id,
                 username,
                 full_name,
-                address,
                 birthday,
                 profile_image,
                 status,
@@ -645,7 +640,7 @@ async fn update_profile(
     }
 
     // Update role-specific data if provided
-    if update_req.address.is_some() || update_req.birthday.is_some() {
+    if update_req.birthday.is_some() {
         // Check if user is a student
         let is_student = sqlx::query_scalar::<_, bool>(
             "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
@@ -673,10 +668,6 @@ async fn update_profile(
                 None
             };
 
-            if update_req.address.is_some() {
-                updates.push(format!("address = ${}", bind_count));
-                bind_count += 1;
-            }
             if birthday_date.is_some() {
                 updates.push(format!("birthday = ${}", bind_count));
                 bind_count += 1;
@@ -691,9 +682,6 @@ async fn update_profile(
 
                 let mut q = sqlx::query(&query);
                 
-                if let Some(ref address) = update_req.address {
-                    q = q.bind(address);
-                }
                 if let Some(date) = birthday_date {
                     q = q.bind(date);
                 }
