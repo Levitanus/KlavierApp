@@ -19,6 +19,7 @@ import 'services/hometask_service.dart';
 import 'services/app_data_cache_service.dart';
 import 'services/media_cache_service.dart';
 import 'services/theme_service.dart';
+import 'utils/favicon_updater.dart';
 import 'feeds_screen.dart';
 import 'chat_screen.dart';
 import 'notifications_screen.dart';
@@ -653,7 +654,12 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      body: _currentPage ?? const DashboardScreen(),
+      body: Stack(
+        children: [
+          _currentPage ?? const DashboardScreen(),
+          const _WebFaviconSync(),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedTabIndex,
         type: BottomNavigationBarType.fixed,
@@ -738,6 +744,23 @@ class _NotificationNavIcon extends StatelessWidget {
             ),
           ],
         );
+      },
+    );
+  }
+}
+
+class _WebFaviconSync extends StatelessWidget {
+  const _WebFaviconSync();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer2<NotificationService, ChatService>(
+      builder: (context, notificationService, chatService, child) {
+        FaviconUpdater.update(
+          chatCount: chatService.totalUnreadCount,
+          notificationCount: notificationService.unreadCount,
+        );
+        return const SizedBox.shrink();
       },
     );
   }

@@ -33,8 +33,29 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close();
 
   const route = event.notification?.data?.route;
+  const metadata = event.notification?.data?.metadata;
   const origin = self.location.origin;
-  const targetUrl = route && route.startsWith('/') ? origin + route : origin;
+  let targetUrl = origin;
+  if (route && route.startsWith('/')) {
+    const url = new URL(route, origin);
+    if (metadata) {
+      try {
+        const parsed = JSON.parse(metadata);
+        if (parsed.feed_id) {
+          url.searchParams.set('feed_id', parsed.feed_id);
+        }
+        if (parsed.post_id) {
+          url.searchParams.set('post_id', parsed.post_id);
+        }
+        if (parsed.student_id) {
+          url.searchParams.set('student_id', parsed.student_id);
+        }
+      } catch (e) {
+        // Ignore invalid metadata
+      }
+    }
+    targetUrl = url.toString();
+  }
 
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {

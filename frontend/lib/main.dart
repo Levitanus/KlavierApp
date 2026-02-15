@@ -192,6 +192,14 @@ bool _shouldSuppressForegroundNotification(Map<String, dynamic> data) {
   return false;
 }
 
+String _resolveNotificationIcon(Map<String, dynamic> data) {
+  final type = data['type'] as String?;
+  if (type == 'chat_message' || type == 'feed_comment') {
+    return 'ic_notif_message';
+  }
+  return 'ic_notif_bell';
+}
+
 Map<String, dynamic>? _parseMetadata(Map<String, dynamic> data) {
   final raw = data['metadata'];
   if (raw == null) {
@@ -237,25 +245,26 @@ Future<void> _showLocalNotification({
   required Map<String, dynamic> payload,
 }) async {
   if (kIsWeb) return; // Local notifications not needed on web
+
+  final smallIcon = _resolveNotificationIcon(payload);
   
-  const AndroidNotificationDetails androidDetails =
-      AndroidNotificationDetails(
+  final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
     'default',
     'Default Notifications',
     channelDescription: 'Default notification channel',
     importance: Importance.max,
     priority: Priority.high,
-  );
-  
-  const NotificationDetails details = NotificationDetails(
-    android: androidDetails,
+    icon: smallIcon,
+    largeIcon: const DrawableResourceAndroidBitmap('ic_notif_large'),
   );
   
   await _localNotifications.show(
     UniqueKey().hashCode,
     title,
     body,
-    details,
+    NotificationDetails(
+      android: androidDetails,
+    ),
     payload: Uri(
       queryParameters: payload.map(
         (k, v) => MapEntry(k, v.toString()),

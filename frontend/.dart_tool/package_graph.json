@@ -28,6 +28,7 @@
         "record",
         "shared_preferences",
         "video_player",
+        "web",
         "web_socket_channel"
       ],
       "devDependencies": [
@@ -54,6 +55,11 @@
       "dependencies": [
         "lints"
       ]
+    },
+    {
+      "name": "web",
+      "version": "1.1.1",
+      "dependencies": []
     },
     {
       "name": "flutter_local_notifications",
@@ -706,11 +712,6 @@
       "dependencies": [
         "web"
       ]
-    },
-    {
-      "name": "web",
-      "version": "1.1.1",
-      "dependencies": []
     },
     {
       "name": "stream_channel",

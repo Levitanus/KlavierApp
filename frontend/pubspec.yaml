@@ -31,6 +31,7 @@ dependencies:
   firebase_core: ^3.8.0
   firebase_messaging: ^15.1.2
   flutter_local_notifications: ^17.2.3
+  web: ^1.1.1
 
 dev_dependencies:
   flutter_lints: ^2.0.0
@@ -45,7 +46,7 @@ flutter_launcher_icons:
     image_path: assets/branding/icon_padded.png
     background_color: "#ffffff"
     theme_color: "#c4161d"
-  adaptive_icon_background: "#00000000"
+  adaptive_icon_background: "#ffffff"
   adaptive_icon_foreground: assets/branding/icon_padded.png
 
 

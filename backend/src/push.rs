@@ -214,12 +214,26 @@ async fn send_fcm_message(
         notification: FcmNotification<'a>,
         #[serde(skip_serializing_if = "Option::is_none")]
         data: Option<serde_json::Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        android: Option<FcmAndroid<'a>>,
     }
 
     #[derive(Serialize)]
     struct FcmNotification<'a> {
         title: &'a str,
         body: &'a str,
+    }
+
+    #[derive(Serialize)]
+    struct FcmAndroid<'a> {
+        notification: FcmAndroidNotification<'a>,
+    }
+
+    #[derive(Serialize)]
+    struct FcmAndroidNotification<'a> {
+        icon: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        color: Option<&'a str>,
     }
 
     let mut data_map = serde_json::Map::new();
@@ -245,6 +259,12 @@ async fn send_fcm_message(
 
     let data = serde_json::Value::Object(data_map);
 
+    let icon = if body.body_type == "chat_message" || body.body_type == "feed_comment" {
+        "ic_notif_message"
+    } else {
+        "ic_notif_bell"
+    };
+
     let payload = FcmMessage {
         message: FcmMessageBody {
             token,
@@ -253,6 +273,12 @@ async fn send_fcm_message(
                 body: &preview,
             },
             data: Some(data),
+            android: Some(FcmAndroid {
+                notification: FcmAndroidNotification {
+                    icon,
+                    color: Some("#c4161d"),
+                },
+            }),
         },
     };
 
