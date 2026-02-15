@@ -2,6 +2,8 @@ name: Deploy to VPS
 
 on:
   push:
+    branches:
+      - master
     tags:
       - "v*"
   workflow_dispatch:
@@ -35,7 +37,11 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -e
-          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > frontend/android/app/upload-keystore.jks
+          if [[ -z "$ANDROID_KEYSTORE_BASE64" ]]; then
+            echo "ANDROID_KEYSTORE_BASE64 is empty" >&2
+            exit 1
+          fi
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\n\r' | base64 --decode > frontend/android/app/upload-keystore.jks
           cat > frontend/android/key.properties << 'EOF'
           storeFile=upload-keystore.jks
           storePassword=${ANDROID_KEYSTORE_PASSWORD}
@@ -62,6 +68,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+    if: github.ref == 'refs/heads/master'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -100,6 +107,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     needs: build-backend
+    if: github.ref == 'refs/heads/master'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -136,6 +144,7 @@ jobs:
           script: |
             set -e
             cd ${{ secrets.DEPLOY_PATH }}
+            git checkout -- deploy/Caddyfile
             git fetch --all
             git pull --ff-only
             docker compose -f deploy/docker-compose.prod.yml up -d
