@@ -216,8 +216,8 @@ class _LoginScreenState extends State<LoginScreen> {
     final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final logoAsset = isDark
-      ? 'assets/branding/logo bright.svg'
-      : 'assets/branding/logo dark.svg';
+      ? 'assets/branding/logo_bright.svg'
+      : 'assets/branding/logo_dark.svg';
 
     return Scaffold(
       appBar: AppBar(
@@ -237,7 +237,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     // Logo or App Title
                     SvgPicture.asset(
-                      'assets/branding/icon white note.svg',
+                      'assets/branding/icon_white_note.svg',
                       height: 72,
                       width: 72,
                     ),

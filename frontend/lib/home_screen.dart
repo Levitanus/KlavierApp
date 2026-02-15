@@ -436,8 +436,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final logoAsset = isDark
-        ? 'assets/branding/logo bright.svg'
-        : 'assets/branding/logo dark.svg';
+      ? 'assets/branding/logo_bright.svg'
+      : 'assets/branding/logo_dark.svg';
     final isNotificationsPage = _currentPage is NotificationsScreen;
     
     return Scaffold(
