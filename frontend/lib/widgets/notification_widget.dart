@@ -4,6 +4,7 @@ import '../services/notification_service.dart';
 import '../models/notification.dart';
 import '../home_screen.dart';
 import 'package:intl/intl.dart';
+import '../l10n/app_localizations.dart';
 
 void _navigateToRoute(BuildContext context, String route, Map<String, dynamic>? metadata) {
   // Parse the route and navigate accordingly
@@ -181,17 +182,18 @@ class _NotificationDropdownContentState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Header
         Row(
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
-                'Notifications',
+                l10n?.notificationsTitle ?? 'Notifications',
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
                 ),
@@ -201,7 +203,7 @@ class _NotificationDropdownContentState
               mainAxisSize: MainAxisSize.min,
               children: [
                 FilterChip(
-                  label: const Text('Unread'),
+                  label: Text(l10n?.notificationsUnread ?? 'Unread'),
                   selected: _showUnreadOnly,
                   onSelected: (selected) {
                     setState(() {
@@ -219,7 +221,7 @@ class _NotificationDropdownContentState
                       unreadOnly: _showUnreadOnly,
                     );
                   },
-                  tooltip: 'Refresh',
+                  tooltip: l10n?.commonRefresh ?? 'Refresh',
                 ),
               ],
             ),
@@ -235,15 +237,19 @@ class _NotificationDropdownContentState
               }
 
               if (service.notifications.isEmpty) {
-                return const Center(
+                return Center(
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.notifications_none, size: 64, color: Colors.grey),
-                      SizedBox(height: 16),
+                      const Icon(
+                        Icons.notifications_none,
+                        size: 64,
+                        color: Colors.grey,
+                      ),
+                      const SizedBox(height: 16),
                       Text(
-                        'No notifications',
-                        style: TextStyle(color: Colors.grey),
+                        l10n?.notificationsNone ?? 'No notifications',
+                        style: const TextStyle(color: Colors.grey),
                       ),
                     ],
                   ),

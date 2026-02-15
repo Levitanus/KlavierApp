@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'auth.dart';
 import 'home_screen.dart';
 import 'config/app_config.dart';
+import 'l10n/app_localizations.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -31,6 +32,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    final l10n = AppLocalizations.of(context);
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
@@ -57,7 +59,8 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } else {
         setState(() {
-          _errorMessage = result.errorMessage ?? 'Login failed';
+          _errorMessage = result.errorMessage ??
+              l10n?.loginFailed ?? 'Login failed';
         });
       }
     }
@@ -66,6 +69,7 @@ class _LoginScreenState extends State<LoginScreen> {
   void _handleForgotPassword() {
     final usernameController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    final l10n = AppLocalizations.of(context);
 
     showDialog(
       context: context,
@@ -74,29 +78,31 @@ class _LoginScreenState extends State<LoginScreen> {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Forgot Password'),
+        title: Text(l10n?.loginForgotTitle ?? 'Forgot Password'),
         content: Form(
           key: formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Enter your username to request a password reset.',
-                style: TextStyle(fontSize: 14),
+              Text(
+                l10n?.loginForgotPrompt ??
+                    'Enter your username to request a password reset.',
+                style: const TextStyle(fontSize: 14),
               ),
               const SizedBox(height: 16),
               TextFormField(
                 controller: usernameController,
                 autofillHints: const [AutofillHints.username],
-                decoration: const InputDecoration(
-                  labelText: 'Username',
-                  border: OutlineInputBorder(),
+                decoration: InputDecoration(
+                  labelText: l10n?.commonUsername ?? 'Username',
+                  border: const OutlineInputBorder(),
                 ),
                 textInputAction: TextInputAction.done,
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
-                    return 'Please enter your username';
+                    return l10n?.loginUsernameRequired ??
+                        'Please enter your username';
                   }
                   return null;
                 },
@@ -107,7 +113,7 @@ class _LoginScreenState extends State<LoginScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(l10n?.commonCancel ?? 'Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -116,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 await _sendPasswordResetRequest(usernameController.text.trim());
               }
             },
-            child: const Text('Send'),
+            child: Text(l10n?.commonSend ?? 'Send'),
           ),
         ],
       ),
@@ -124,6 +130,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _sendPasswordResetRequest(String username) async {
+    final l10n = AppLocalizations.of(context);
     try {
       final response = await http.post(
         Uri.parse('${AppConfig.instance.baseUrl}/api/auth/forgot-password'),
@@ -142,12 +149,16 @@ class _LoginScreenState extends State<LoginScreen> {
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            title: const Text('Request Sent'),
-            content: Text(data['message'] ?? 'Password reset request sent successfully.'),
+            title: Text(l10n?.loginRequestSentTitle ?? 'Request Sent'),
+            content: Text(
+              data['message'] ??
+                  l10n?.loginRequestSentMessage ??
+                  'Password reset request sent successfully.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
+                child: Text(l10n?.commonOk ?? 'OK'),
               ),
             ],
           ),
@@ -160,12 +171,15 @@ class _LoginScreenState extends State<LoginScreen> {
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            title: const Text('Error'),
-            content: const Text('Failed to send password reset request. Please try again.'),
+            title: Text(l10n?.commonErrorTitle ?? 'Error'),
+            content: Text(
+              l10n?.loginRequestFailedMessage ??
+                  'Failed to send password reset request. Please try again.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('OK'),
+                child: Text(l10n?.commonOk ?? 'OK'),
               ),
             ],
           ),
@@ -181,12 +195,15 @@ class _LoginScreenState extends State<LoginScreen> {
           titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
           contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
           actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-          title: const Text('Error'),
-          content: Text('An error occurred: $e'),
+          title: Text(l10n?.commonErrorTitle ?? 'Error'),
+          content: Text(
+            l10n?.loginErrorMessage(e.toString()) ??
+                'An error occurred: $e',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('OK'),
+              child: Text(l10n?.commonOk ?? 'OK'),
             ),
           ],
         ),
@@ -196,6 +213,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final logoAsset = isDark
       ? 'assets/branding/logo bright.svg'
@@ -203,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Login'),
+        title: Text(l10n?.loginTitle ?? 'Login'),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -234,15 +252,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextFormField(
                       controller: _usernameController,
                       autofillHints: const [AutofillHints.username],
-                      decoration: const InputDecoration(
-                        labelText: 'Username',
-                        prefixIcon: Icon(Icons.person),
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: l10n?.commonUsername ?? 'Username',
+                        prefixIcon: const Icon(Icons.person),
+                        border: const OutlineInputBorder(),
                       ),
                       textInputAction: TextInputAction.next,
                       validator: (value) {
                         if (value == null || value.trim().isEmpty) {
-                          return 'Please enter your username';
+                          return l10n?.loginUsernameRequired ??
+                              'Please enter your username';
                         }
                         return null;
                       },
@@ -255,7 +274,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       controller: _passwordController,
                       autofillHints: const [AutofillHints.password],
                       decoration: InputDecoration(
-                        labelText: 'Password',
+                        labelText: l10n?.commonPassword ?? 'Password',
                         prefixIcon: const Icon(Icons.lock),
                         border: const OutlineInputBorder(),
                         suffixIcon: IconButton(
@@ -274,7 +293,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       enableSuggestions: false,
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Please enter your password';
+                          return l10n?.loginPasswordRequired ??
+                              'Please enter your password';
                         }
                         return null;
                       },
@@ -309,9 +329,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
-                          : const Text(
-                              'Login',
-                              style: TextStyle(fontSize: 16),
+                          : Text(
+                              l10n?.loginButton ?? 'Login',
+                              style: const TextStyle(fontSize: 16),
                             ),
                     ),
                     const SizedBox(height: 16),
@@ -319,7 +339,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     // Forgot Password Button
                     TextButton(
                       onPressed: _isLoading ? null : _handleForgotPassword,
-                      child: const Text('Forgot Password?'),
+                      child: Text(
+                        l10n?.loginForgotPassword ?? 'Forgot Password?',
+                      ),
                     ),
                 ],
                 ),

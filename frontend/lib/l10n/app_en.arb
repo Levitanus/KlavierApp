@@ -1,3 +1,568 @@
 {
-  "appTitle": "Musikschule am Thomas-Mann-Platz"
+  "appTitle": "Musikschule am Thomas-Mann-Platz",
+  "languageTitle": "Language",
+  "languageGerman": "German",
+  "languageEnglish": "English",
+  "languageRussian": "Russian",
+  "securityTitle": "Security",
+  "changePasswordTitle": "Change Password",
+  "changePasswordSubtitle": "Update your account password",
+  "consentTitle": "Consent to Personal Data Processing",
+  "consentAgree": "Agree",
+  "consentGuardianConfirm": "If you register a child, you confirm that you are a parent, legal guardian, or otherwise authorized person.",
+  "consentRequired": "Please accept the consent to continue",
+  "consentFallback": "Consent (short)\n- Music learning content only.\n- You can edit or delete your profile.\n- Data is protected with TLS.\n- No sharing except email delivery (SendGrid).\nIf registering a child, you confirm you are a parent/guardian or authorized.",
+  "commonSettings": "Settings",
+  "commonOpen": "Open",
+  "commonPost": "Post",
+  "commonEdit": "Edit",
+  "commonReply": "Reply",
+  "commonDelete": "Delete",
+  "commonAdd": "Add",
+  "commonSave": "Save",
+  "commonCancel": "Cancel",
+  "commonRefresh": "Refresh",
+  "commonClose": "Close",
+  "commonDownload": "Download",
+  "commonDownloadSourceFile": "Download source file",
+  "commonDownloadStarted": "Download started",
+  "commonDownloadFailed": "Download failed",
+  "commonSavedToPath": "Saved to {path}",
+  "commonBack5s": "Back 5s",
+  "commonForward5s": "Forward 5s",
+  "commonBold": "Bold",
+  "commonItalic": "Italic",
+  "commonUnderline": "Underline",
+  "commonStrike": "Strike",
+  "commonSubscript": "Sub",
+  "commonSuperscript": "Super",
+  "commonTitle": "Title",
+  "commonSend": "Send",
+  "commonApply": "Apply",
+  "commonInsertLink": "Insert link",
+  "commonUrl": "URL",
+  "commonAttachFile": "Attach file",
+  "commonAudio": "Audio",
+  "commonVideo": "Video",
+  "commonImage": "Image",
+  "commonFile": "File",
+  "commonVoiceMessage": "Voice message",
+  "commonTapToPlay": "Tap to play",
+  "commonLoading": "Loading",
+  "commonFullscreen": "Fullscreen",
+  "commonExitFullscreen": "Exit fullscreen",
+  "commonPrevious": "Previous page",
+  "commonNext": "Next page",
+  "commonClearSearch": "Clear search",
+  "commonNoResults": "No results found",
+  "commonTypeToFilter": "Type to filter...",
+  "commonRequired": "Required",
+  "commonErrorMessage": "Error: {error}",
+  "commonCreated": "created",
+  "commonUpdated": "updated",
+  "commonCreate": "create",
+  "commonUpdate": "update",
+  "commonVideoLabel": "Video: {filename}",
+  "feedsTitle": "Feeds",
+  "feedsNone": "No feeds available",
+  "feedsSchool": "School",
+  "feedsTeacherFeeds": "Teacher feeds",
+  "feedsOwnerSchool": "School",
+  "feedsOwnerTeacher": "Teacher",
+  "feedsNewPostTooltip": "New post",
+  "feedsMarkAllRead": "Mark all as read",
+  "feedsImportant": "Important",
+  "feedsLatest": "Latest",
+  "feedsNoImportantPosts": "No important posts yet.",
+  "feedsAllPosts": "All posts",
+  "feedsNoPosts": "No posts yet.",
+  "feedsPostedAt": "Posted {timestamp}",
+  "feedsPostedEditedAt": "Posted {timestamp} · edited",
+  "feedsSubscriptionFailed": "Failed to update subscription",
+  "feedsDeleteDenied": "You do not have permission to delete this post",
+  "feedsDeleteTitle": "Delete Post",
+  "feedsDeleteMessage": "Are you sure you want to delete this post? This action cannot be undone.",
+  "feedsDeleteFailed": "Failed to delete post",
+  "feedsUnsupportedAttachment": "Unsupported attachment: {type}",
+  "feedsAttachmentActions": "Attachment actions",
+  "feedsEditPost": "Edit post",
+  "feedsNewPost": "New post",
+  "feedsTextTools": "Text tools",
+  "feedsTextFormatting": "Text formatting",
+  "feedsJustificationTools": "Justification tools",
+  "feedsListsPaddingTools": "Lists and padding tools",
+  "feedsAttachments": "Attachments",
+  "feedsAllowComments": "Allow comments",
+  "feedsMarkImportant": "Mark as important",
+  "feedsUploadFailed": "Failed to upload media",
+  "feedsEditComment": "Edit comment",
+  "feedsNewComment": "New comment",
+  "feedsComments": "Comments",
+  "feedsNoComments": "No comments yet.",
+  "feedsAddComment": "Add Comment",
+  "feedsSubscribeComments": "Subscribe to comments",
+  "feedsUnsubscribeComments": "Unsubscribe from comments",
+  "feedsAttachmentInline": "{typeLabel} (inline)",
+  "feedsSettingsTitle": "Feed settings",
+  "feedsAllowStudentPosts": "Allow student posts",
+  "feedsAutoSubscribe": "Auto-subscribe to new posts",
+  "feedsNotifyNewPosts": "Notify on new posts",
+  "feedsParagraphType": "Paragraph type",
+  "feedsFont": "Font",
+  "feedsSize": "Size",
+  "feedsAttach": "Attach",
+  "feedsPostTitle": "Post",
+  "feedsUnsupportedEmbed": "Unsupported embed: {data}",
+  "feedsUntitledPost": "Untitled post",
+  "videoWebLimited": "Web video player is limited. You can download the file or open it separately.",
+  "videoErrorTitle": "Video Error",
+  "videoLoadFailed": "Failed to load video",
+  "voiceRecordFailed": "Failed to record audio",
+  "voiceRecordUnavailable": "Voice recording not available",
+  "voiceRecordError": "Voice error: {error}",
+  "voiceStopRecording": "Stop recording",
+  "voiceRecord": "Record voice",
+  "hometasksChecklistUpdateFailed": "Failed to update checklist item.",
+  "hometasksItemsSaved": "Items saved successfully.",
+  "hometasksItemsSaveFailed": "Failed to save items.",
+  "hometasksProgressUpdateFailed": "Failed to update progress item.",
+  "hometasksUpdateFailed": "Failed to update hometask.",
+  "hometasksTeacherFallback": "Teacher #{teacherId}",
+  "hometasksItemNameRequired": "All items must have a name.",
+  "hometasksDueLabel": "Due: {date}",
+  "hometasksEditItems": "Edit items",
+  "hometasksMarkCompleted": "Mark completed",
+  "hometasksMarkAccomplished": "Mark accomplished",
+  "hometasksReturnActive": "Return to active",
+  "hometasksMarkUncompleted": "Mark uncompleted",
+  "hometasksProgressNotStarted": "Not started",
+  "hometasksProgressInProgress": "In progress",
+  "hometasksProgressNearlyDone": "Nearly done",
+  "hometasksProgressAlmostComplete": "Almost complete",
+  "hometasksProgressComplete": "Complete",
+  "hometasksItemHint": "Item {index}",
+  "hometasksAddItem": "Add item",
+  "notificationsTitle": "Notifications",
+  "notificationsUnread": "Unread",
+  "notificationsNone": "No notifications",
+  "chatNoTeachers": "No teachers found",
+  "chatSelectTeacher": "Select Teacher",
+  "chatStartFailed": "Failed to start chat",
+  "chatAdminOpenFailed": "Failed to open admin chat",
+  "chatMessages": "Messages",
+  "chatChats": "Chats",
+  "chatAdmin": "Admin",
+  "chatNoConversations": "No conversations yet",
+  "chatStartConversation": "Start a conversation",
+  "chatAdministration": "Administration",
+  "chatUnknownUser": "Unknown",
+  "chatNoMessages": "(No messages)",
+  "chatTeachers": "Teachers",
+  "chatNewChat": "New Chat",
+  "chatThreadNotFound": "Chat created, but thread not found",
+  "chatStartNew": "Start New Chat",
+  "chatSearchUsers": "Search users...",
+  "profileAdminControls": "Admin Controls",
+  "profileAdminAccess": "Admin Access",
+  "profileAdminAccessSubtitle": "Grant or revoke admin permissions",
+  "profileAdminAccessUpdate": "Update Admin Access",
+  "profileRoleManagement": "Role Management",
+  "profileMakeStudent": "Make Student",
+  "profileMakeParent": "Make Parent",
+  "profileMakeTeacher": "Make Teacher",
+  "profileArchiveRoles": "Archive Roles",
+  "profileSectionInfo": "Profile Information",
+  "profileSectionAdditional": "Additional Information",
+  "profileTitleProfile": "Profile",
+  "profileTitleUserProfile": "User Profile",
+  "profileEditTooltip": "Edit Profile",
+  "profileAdminViewLabel": "Admin View",
+  "profileEmailLabel": "Email",
+  "profilePhoneLabel": "Phone",
+  "profileMemberSinceLabel": "Member Since",
+  "profileNotSet": "Not set",
+  "profileUnknown": "Unknown",
+  "profileRolesTitle": "Roles",
+  "profileBirthdayLabel": "Birthday",
+  "profileBirthdayInputLabel": "Birthday (YYYY-MM-DD)",
+  "profileGenerateParentLink": "Generate Parent Registration Link",
+  "profileMyChildrenTitle": "My Children",
+  "profileChildrenSubtitle": "Tap on a child to view or edit their information",
+  "profileActionMessage": "Message",
+  "profileManageStudentsTitle": "Manage Students",
+  "profileActionAddStudent": "Add Student",
+  "profileManageStudentsSubtitle": "Manage students assigned to you",
+  "profileNoStudentsAssigned": "No students assigned yet",
+  "profileActionViewProfile": "View Profile",
+  "profileActionAssignHometask": "Assign Hometask",
+  "profileActionRemoveStudent": "Remove from Students",
+  "profileGenerateStudentLink": "Generate Student Registration Link",
+  "profileTeachersTitle": "Teachers",
+  "profileTeachersSubtitle": "Tap to view teacher profile or leave teacher",
+  "profileNoTeachersAssigned": "No teachers assigned yet",
+  "profileActionLeaveTeacher": "Leave Teacher",
+  "profileArchiveStudent": "Archive Student",
+  "profileUnarchiveStudent": "Unarchive Student",
+  "profileArchiveParent": "Archive Parent",
+  "profileUnarchiveParent": "Unarchive Parent",
+  "profileArchiveTeacher": "Archive Teacher",
+  "profileUnarchiveTeacher": "Unarchive Teacher",
+  "profileParentTools": "Parent Tools",
+  "profileAddChildren": "Add Children",
+  "adminPanelTitle": "Admin Panel",
+  "adminUserManagement": "User Management",
+  "adminSearchUsers": "Search by username or full name",
+  "adminNoUsers": "No users found",
+  "adminAddUser": "Add User",
+  "adminUser": "User",
+  "adminStudent": "Student",
+  "adminParent": "Parent",
+  "adminTeacher": "Teacher",
+  "adminAddStudent": "Add Student",
+  "adminAddParent": "Add Parent",
+  "adminAddTeacher": "Add Teacher",
+  "adminShowingRange": "Showing {start}-{end} of {total}",
+  "adminRows": "Rows:",
+  "adminResetLink": "Reset Link",
+  "adminViewProfile": "View Profile",
+  "adminEditUser": "Edit User",
+  "adminDeleteUser": "Delete User",
+  "adminFullName": "Full Name",
+  "adminUsername": "Username",
+  "adminActions": "Actions",
+  "adminLoadUsersFailed": "Failed to load users",
+  "adminUserSaved": "User {action} successfully",
+  "adminUserSaveFailed": "Failed to {action} user",
+  "adminResetLinkGenerated": "Reset Link Generated",
+  "adminResetLinkFor": "Reset link for {username}:",
+  "adminResetLinkExpires": "Expires: {expires}",
+  "adminCopyLink": "Copy Link",
+  "adminResetLinkCopied": "Reset link copied to clipboard",
+  "adminResetLinkFailed": "Failed to generate reset link",
+  "adminUserDeleted": "User {username} deleted",
+  "adminDeleteUserFailed": "Failed to delete user",
+  "adminConvertedStudent": "User converted to student",
+  "adminConvertedParent": "User converted to parent",
+  "adminConvertedTeacher": "User converted to teacher",
+  "adminStudentCreated": "Student created successfully",
+  "adminParentCreated": "Parent created successfully",
+  "adminTeacherCreated": "Teacher created successfully",
+  "adminDeleteUserTitle": "Delete User",
+  "adminDeleteUserMessage": "Delete {username}? This cannot be undone.",
+  "adminUsernameRequired": "Please enter a username",
+  "adminFullNameRequired": "Please enter a full name",
+  "adminPassword": "Password",
+  "adminNewPasswordOptional": "New Password (optional)",
+  "adminPasswordRequired": "Please enter a password",
+  "adminGeneratePassword": "Generate Password",
+  "adminEmailOptional": "Email (optional)",
+  "adminPhoneOptional": "Phone (optional)",
+  "adminRoleAdmin": "Admin",
+  "adminConvertRole": "Convert to Role:",
+  "adminCopyCredentials": "Copy Credentials",
+  "adminCredentialsRequired": "Fill username and password first",
+  "adminCredentialsCopied": "Credentials copied",
+  "adminMakeStudentTitle": "Make {username} a Student",
+  "adminMakeParentTitle": "Make {username} a Parent",
+  "adminMakeTeacherTitle": "Make {username} a Teacher",
+  "adminMakeTeacherNote": "This will grant teacher privileges to the user.",
+  "adminBirthdayLabel": "Birthday (YYYY-MM-DD)",
+  "adminBirthdayHint": "2010-01-15",
+  "adminBirthdayFormat": "Format: YYYY-MM-DD",
+  "adminConvert": "Convert",
+  "adminSelectStudentsLabel": "Select Students (at least one):",
+  "adminSelectChildrenLabel": "Select Children (at least one):",
+  "adminSearchStudents": "Search students",
+  "adminNoStudents": "No students found",
+  "adminSelectStudentRequired": "At least one student required",
+  "dashboardNoStudents": "No students available.",
+  "dashboardTitle": "Dashboard",
+  "dashboardTeacherFeeds": "Teacher feeds",
+  "dashboardNoTeacherFeeds": "No teacher feeds yet.",
+  "dashboardSchoolFeed": "School feed",
+  "dashboardNoSchoolFeed": "No school feed yet.",
+  "dashboardOwnerSchool": "School",
+  "dashboardOwnerTeacher": "Teacher",
+  "dashboardStudentLabel": "Student:",
+  "dashboardNoActiveHometasks": "No active hometasks.",
+  "homeClearAppCacheTitle": "Clear app data cache",
+  "homeClearAppCacheBody": "This will remove cached messages, feeds, hometasks, and profile data.",
+  "homeAppCacheCleared": "App data cache cleared.",
+  "homeClearMediaCacheTitle": "Clear media cache",
+  "homeClearMediaCacheBody": "This will remove cached images and media files.",
+  "homeMediaCacheCleared": "Media cache cleared.",
+  "homeLogoutTitle": "Logout",
+  "homeLogoutBody": "Are you sure you want to logout?",
+  "homeMenuTooltip": "Menu",
+  "homeRolesLabel": "Roles: {roles}",
+  "homeProfileInfo": "Your profile information",
+  "commonClear": "Clear",
+  "commonLogout": "Logout",
+  "commonNotifications": "Notifications",
+  "commonProfile": "Profile",
+  "commonUserManagement": "User Management",
+  "commonTheme": "Theme",
+  "commonSystem": "System",
+  "commonLight": "Light",
+  "commonDark": "Dark",
+  "commonDashboard": "Dashboard",
+  "commonHometasks": "Hometasks",
+  "commonFeeds": "Feeds",
+  "commonChats": "Chats",
+  "commonUsername": "Username",
+  "commonPassword": "Password",
+  "commonFullName": "Full Name",
+  "commonEmailOptional": "Email (optional)",
+  "commonPhoneOptional": "Phone (optional)",
+  "commonConfirmPassword": "Confirm Password",
+  "commonBackToLogin": "Back to Login",
+  "commonOk": "OK",
+  "commonErrorTitle": "Error",
+  "registerRoleStudent": "Student",
+  "registerRoleParent": "Parent",
+  "registerRoleTeacher": "Teacher",
+  "registerInvalidTokenTitle": "Invalid Registration Token",
+  "registerInvalidTokenMessage": "This registration link may be expired or already used.",
+  "registerGoToLogin": "Go to Login",
+  "registerTitle": "Register as {role}",
+  "registerParentOf": "You will be registered as parent of:",
+  "registerComplete": "Complete your registration",
+  "registerUsernameRequired": "Please enter a username",
+  "registerUsernameMin": "Username must be at least 3 characters",
+  "registerFullNameRequired": "Please enter your full name",
+  "registerBirthdayLabel": "Birthday (YYYY-MM-DD)",
+  "registerBirthdayHint": "2010-01-31",
+  "registerBirthdayRequired": "Please enter your birthday",
+  "registerBirthdayFormat": "Use format: YYYY-MM-DD",
+  "registerPasswordRequired": "Please enter a password",
+  "registerPasswordMin": "Password must be at least 6 characters",
+  "registerConfirmRequired": "Please confirm your password",
+  "registerPasswordsMismatch": "Passwords do not match",
+  "registerButton": "Register",
+  "registerLoginFailed": "Login failed",
+  "registerFailed": "Registration failed",
+  "registerNetworkError": "Network error: {error}",
+  "registerValidateFailed": "Failed to validate token",
+  "resetErrorValidating": "Error validating token: {error}",
+  "resetSuccessTitle": "Success",
+  "resetSuccessMessage": "Your password has been reset successfully. You can now log in with your new password.",
+  "resetFailed": "Failed to reset password",
+  "resetErrorGeneric": "Error: {error}",
+  "resetTitle": "Reset Password",
+  "resetValidating": "Validating reset token...",
+  "resetInvalidTitle": "Invalid or Expired Link",
+  "resetInvalidMessage": "This password reset link is invalid or has expired. Please request a new password reset link.",
+  "resetSetNewPassword": "Set New Password",
+  "resetForUser": "for user: {username}",
+  "resetNewPasswordLabel": "New Password",
+  "resetPasswordRequired": "Please enter a password",
+  "resetPasswordMin": "Password must be at least 6 characters",
+  "resetConfirmPasswordLabel": "Confirm Password",
+  "resetConfirmRequired": "Please confirm your password",
+  "loginTitle": "Login",
+  "loginForgotTitle": "Forgot Password",
+  "loginForgotPrompt": "Enter your username to request a password reset.",
+  "loginUsernameRequired": "Please enter your username",
+  "loginPasswordRequired": "Please enter your password",
+  "loginButton": "Login",
+  "loginForgotPassword": "Forgot Password?",
+  "loginRequestSentTitle": "Request Sent",
+  "loginRequestSentMessage": "Password reset request sent successfully.",
+  "loginRequestFailedMessage": "Failed to send password reset request. Please try again.",
+  "loginErrorMessage": "An error occurred: {error}",
+  "loginFailed": "Login failed",
+  "commonRetry": "Retry",
+  "hometasksNone": "No hometasks found.",
+  "hometasksUpdateOrderFailed": "Failed to update order.",
+  "hometasksAssignTitle": "Assign Hometask to {studentName}",
+  "hometasksTitleLabel": "Title",
+  "hometasksTitleRequired": "Title is required",
+  "hometasksDescriptionLabel": "Description (optional)",
+  "hometasksDueDate": "Due date",
+  "hometasksNoDueDate": "No due date",
+  "hometasksRepeatLabel": "Repeat",
+  "hometasksRepeatNone": "No repeat",
+  "hometasksRepeatDaily": "Each day",
+  "hometasksRepeatWeekly": "Each week",
+  "hometasksRepeatCustom": "Custom interval",
+  "hometasksRepeatEveryDays": "Repeat every (days)",
+  "hometasksRepeatCustomInvalid": "Enter a positive number of days",
+  "hometasksTypeLabel": "Hometask type",
+  "hometasksTypeSimple": "Simple",
+  "hometasksTypeChecklist": "Checklist",
+  "hometasksTypeProgress": "Progress",
+  "hometasksChecklistItems": "Checklist items",
+  "hometasksProgressItems": "Progress items",
+  "hometasksItemLabel": "Item {index}",
+  "hometasksRequired": "Required",
+  "hometasksAddAtLeastOne": "Add at least one {typeLabel} item.",
+  "hometasksRepeatIntervalInvalid": "Enter a valid repeat interval.",
+  "hometasksAssigned": "Hometask assigned.",
+  "hometasksAssignFailed": "Failed to assign hometask.",
+  "hometasksAssignAction": "Assign",
+  "hometasksActive": "Active",
+  "hometasksArchive": "Archive",
+  "hometasksAssign": "Assign Hometask",
+  "@commonSavedToPath": {
+    "placeholders": {
+      "path": {}
+    }
+  },
+  "@commonErrorMessage": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@commonVideoLabel": {
+    "placeholders": {
+      "filename": {}
+    }
+  },
+  "@feedsPostedAt": {
+    "placeholders": {
+      "timestamp": {}
+    }
+  },
+  "@feedsPostedEditedAt": {
+    "placeholders": {
+      "timestamp": {}
+    }
+  },
+  "@feedsUnsupportedAttachment": {
+    "placeholders": {
+      "type": {}
+    }
+  },
+  "@feedsAttachmentInline": {
+    "placeholders": {
+      "typeLabel": {}
+    }
+  },
+  "@feedsUnsupportedEmbed": {
+    "placeholders": {
+      "data": {}
+    }
+  },
+  "@voiceRecordError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@hometasksDueLabel": {
+    "placeholders": {
+      "date": {}
+    }
+  },
+  "@hometasksItemHint": {
+    "placeholders": {
+      "index": {}
+    }
+  },
+  "@hometasksTeacherFallback": {
+    "placeholders": {
+      "teacherId": {}
+    }
+  },
+  "@adminShowingRange": {
+    "placeholders": {
+      "start": {},
+      "end": {},
+      "total": {}
+    }
+  },
+  "@adminUserSaved": {
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "@adminUserSaveFailed": {
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "@adminResetLinkFor": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminResetLinkExpires": {
+    "placeholders": {
+      "expires": {}
+    }
+  },
+  "@adminUserDeleted": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminDeleteUserMessage": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminMakeStudentTitle": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminMakeParentTitle": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminMakeTeacherTitle": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@homeRolesLabel": {
+    "placeholders": {
+      "roles": {}
+    }
+  },
+  "@loginErrorMessage": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@registerTitle": {
+    "placeholders": {
+      "role": {}
+    }
+  },
+  "@registerNetworkError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@resetErrorValidating": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@resetErrorGeneric": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@resetForUser": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@hometasksAssignTitle": {
+    "placeholders": {
+      "studentName": {}
+    }
+  },
+  "@hometasksItemLabel": {
+    "placeholders": {
+      "index": {}
+    }
+  },
+  "@hometasksAddAtLeastOne": {
+    "placeholders": {
+      "typeLabel": {}
+    }
+  }
 }

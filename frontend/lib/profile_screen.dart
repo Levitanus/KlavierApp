@@ -11,9 +11,11 @@ import 'services/hometask_service.dart';
 import 'services/chat_service.dart';
 import 'services/app_data_cache_service.dart';
 import 'services/media_cache_service.dart';
+import 'services/locale_service.dart';
 import 'models/hometask.dart';
 import 'screens/chat_conversation.dart';
 import 'config/app_config.dart';
+import 'l10n/app_localizations.dart';
 
 part 'profile_screen/profile_screen_data.dart';
 part 'profile_screen/profile_screen_dialogs.dart';
@@ -36,9 +38,10 @@ class AdminUserProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('User Profile'),
+        title: Text(l10n?.profileTitleUserProfile ?? 'User Profile'),
       ),
       body: ProfileScreen(userId: userId),
     );
@@ -136,6 +139,8 @@ class _ProfileScreenState extends _ProfileScreenStateBase
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
+    final localeService = context.watch<LocaleService>();
+    final l10n = AppLocalizations.of(context);
 
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -160,7 +165,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadProfile,
-              child: const Text('Retry'),
+              child: Text(l10n?.commonRetry ?? 'Retry'),
             ),
           ],
         ),
@@ -184,7 +189,9 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
                     Text(
-                      _isAdminView ? 'User Profile' : 'Profile',
+                      _isAdminView
+                          ? (l10n?.profileTitleUserProfile ?? 'User Profile')
+                          : (l10n?.profileTitleProfile ?? 'Profile'),
                       style: Theme.of(context).textTheme.headlineMedium,
                     ),
                     Text(
@@ -204,7 +211,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                       _isEditing = true;
                     });
                   },
-                  tooltip: 'Edit Profile',
+                  tooltip: l10n?.profileEditTooltip ?? 'Edit Profile',
                 ),
             ],
           ),
@@ -221,9 +228,9 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(color: Colors.red.shade100),
                     ),
-                    child: const Text(
-                      'Admin View',
-                      style: TextStyle(
+                    child: Text(
+                      l10n?.profileAdminViewLabel ?? 'Admin View',
+                      style: const TextStyle(
                         color: Colors.red,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
@@ -243,7 +250,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Profile Information',
+                    l10n?.profileSectionInfo ?? 'Profile Information',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const Divider(),
@@ -251,7 +258,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                   
                   // Username (read-only)
                   _buildProfileField(
-                    label: 'Username',
+                    label: l10n?.commonUsername ?? 'Username',
                     value: _username,
                     icon: Icons.person_outline,
                     isEditable: false,
@@ -261,16 +268,16 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                   // Full Name
                   if (_isEditing)
                     _buildEditableField(
-                      label: 'Full Name',
+                      label: l10n?.commonFullName ?? 'Full Name',
                       controller: _fullNameController,
                       icon: Icons.badge_outlined,
                     )
                   else
                     _buildProfileField(
-                      label: 'Full Name',
+                      label: l10n?.commonFullName ?? 'Full Name',
                       value: _fullNameController.text.isNotEmpty
                           ? _fullNameController.text
-                          : 'Not set',
+                          : (l10n?.profileNotSet ?? 'Not set'),
                       icon: Icons.badge_outlined,
                       isEditable: true,
                     ),
@@ -279,15 +286,15 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                   // Email
                   if (_isEditing)
                     _buildEditableField(
-                      label: 'Email',
+                      label: l10n?.profileEmailLabel ?? 'Email',
                       controller: _emailController,
                       icon: Icons.email_outlined,
                       keyboardType: TextInputType.emailAddress,
                     )
                   else
                     _buildProfileField(
-                      label: 'Email',
-                      value: _email ?? 'Not set',
+                      label: l10n?.profileEmailLabel ?? 'Email',
+                      value: _email ?? (l10n?.profileNotSet ?? 'Not set'),
                       icon: Icons.email_outlined,
                       isEditable: true,
                     ),
@@ -296,15 +303,15 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                   // Phone
                   if (_isEditing)
                     _buildEditableField(
-                      label: 'Phone',
+                      label: l10n?.profilePhoneLabel ?? 'Phone',
                       controller: _phoneController,
                       icon: Icons.phone_outlined,
                       keyboardType: TextInputType.phone,
                     )
                   else
                     _buildProfileField(
-                      label: 'Phone',
-                      value: _phone ?? 'Not set',
+                      label: l10n?.profilePhoneLabel ?? 'Phone',
+                      value: _phone ?? (l10n?.profileNotSet ?? 'Not set'),
                       icon: Icons.phone_outlined,
                       isEditable: true,
                     ),
@@ -312,10 +319,10 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                   
                   // Created At (read-only)
                   _buildProfileField(
-                    label: 'Member Since',
+                    label: l10n?.profileMemberSinceLabel ?? 'Member Since',
                     value: _createdAt != null
                         ? '${_createdAt!.day}/${_createdAt!.month}/${_createdAt!.year}'
-                        : 'Unknown',
+                        : (l10n?.profileUnknown ?? 'Unknown'),
                     icon: Icons.calendar_today_outlined,
                     isEditable: false,
                   ),
@@ -328,7 +335,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                       children: [
                         TextButton(
                           onPressed: _isSaving ? null : _cancelEditing,
-                          child: const Text('Cancel'),
+                          child: Text(l10n?.commonCancel ?? 'Cancel'),
                         ),
                         const SizedBox(width: 8),
                         ElevatedButton(
@@ -341,7 +348,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                     strokeWidth: 2,
                                   ),
                                 )
-                              : const Text('Save'),
+                              : Text(l10n?.commonSave ?? 'Save'),
                         ),
                       ],
                     ),
@@ -361,7 +368,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Roles',
+                      l10n?.profileRolesTitle ?? 'Roles',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const Divider(),
@@ -409,7 +416,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Additional Information',
+                      l10n?.profileSectionAdditional ?? 'Additional Information',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const Divider(),
@@ -420,14 +427,16 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                       // Birthday
                       if (_isEditing)
                         _buildEditableField(
-                          label: 'Birthday (YYYY-MM-DD)',
+                          label: l10n?.profileBirthdayInputLabel ??
+                              'Birthday (YYYY-MM-DD)',
                           controller: _birthdayController,
                           icon: Icons.cake_outlined,
                         )
                       else
                         _buildProfileField(
-                          label: 'Birthday',
-                          value: _studentData!['birthday'] ?? 'Not set',
+                          label: l10n?.profileBirthdayLabel ?? 'Birthday',
+                          value: _studentData!['birthday'] ??
+                              (l10n?.profileNotSet ?? 'Not set'),
                           icon: Icons.cake_outlined,
                           isEditable: true,
                         ),
@@ -440,7 +449,10 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                         OutlinedButton.icon(
                           onPressed: _generateParentRegistrationLink,
                           icon: const Icon(Icons.person_add),
-                          label: const Text('Generate Parent Registration Link'),
+                          label: Text(
+                            l10n?.profileGenerateParentLink ??
+                                'Generate Parent Registration Link',
+                          ),
                           style: OutlinedButton.styleFrom(
                             minimumSize: const Size.fromHeight(48),
                           ),
@@ -454,12 +466,13 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                       const Divider(),
                       const SizedBox(height: 16),
                       Text(
-                        'My Children',
+                        l10n?.profileMyChildrenTitle ?? 'My Children',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Tap on a child to view or edit their information',
+                        l10n?.profileChildrenSubtitle ??
+                            'Tap on a child to view or edit their information',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -525,7 +538,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                   const SizedBox(height: 8),
                                   _buildInfoRow(
                                     Icons.cake_outlined,
-                                    'Birthday',
+                                    l10n?.profileBirthdayLabel ?? 'Birthday',
                                     child['birthday'],
                                   ),
                                   const SizedBox(height: 12),
@@ -538,7 +551,9 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                             child['full_name'] as String,
                                           ),
                                           icon: const Icon(Icons.message),
-                                          label: const Text('Message'),
+                                          label: Text(
+                                            l10n?.profileActionMessage ?? 'Message',
+                                          ),
                                         ),
                                       ),
                                     ],
@@ -558,19 +573,23 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Text(
-                            'Manage Students',
+                            l10n?.profileManageStudentsTitle ??
+                                'Manage Students',
                             style: Theme.of(context).textTheme.titleMedium,
                           ),
                           OutlinedButton.icon(
                             icon: const Icon(Icons.person_add_alt_1),
-                            label: const Text('Add Student'),
+                            label: Text(
+                              l10n?.profileActionAddStudent ?? 'Add Student',
+                            ),
                             onPressed: _showAddStudentsToTeacherDialog,
                           ),
                         ],
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Manage students assigned to you',
+                        l10n?.profileManageStudentsSubtitle ??
+                            'Manage students assigned to you',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -580,7 +599,8 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                       const SizedBox(height: 12),
                       if (_teacherStudents.isEmpty)
                         Text(
-                          'No students assigned yet',
+                          l10n?.profileNoStudentsAssigned ??
+                              'No students assigned yet',
                           style: TextStyle(color: Colors.grey[600]),
                         )
                       else
@@ -608,17 +628,25 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                     children: [
                                       OutlinedButton.icon(
                                         icon: const Icon(Icons.visibility),
-                                        label: const Text('View Profile'),
+                                        label: Text(
+                                          l10n?.profileActionViewProfile ??
+                                              'View Profile',
+                                        ),
                                         onPressed: () => _showStudentProfileDialog(student),
                                       ),
                                       ElevatedButton.icon(
                                         icon: const Icon(Icons.assignment_add),
-                                        label: const Text('Assign Hometask'),
+                                        label: Text(
+                                          l10n?.profileActionAssignHometask ??
+                                              'Assign Hometask',
+                                        ),
                                         onPressed: () => _showAssignHometaskDialog(student),
                                       ),
                                       ElevatedButton.icon(
                                         icon: const Icon(Icons.message),
-                                        label: const Text('Message'),
+                                        label: Text(
+                                          l10n?.profileActionMessage ?? 'Message',
+                                        ),
                                         onPressed: () => _startChatWithUser(
                                           student['user_id'] as int,
                                           student['full_name'] as String,
@@ -626,9 +654,10 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                       ),
                                       TextButton.icon(
                                         icon: const Icon(Icons.person_remove, color: Colors.red),
-                                        label: const Text(
-                                          'Remove from Students',
-                                          style: TextStyle(color: Colors.red),
+                                        label: Text(
+                                          l10n?.profileActionRemoveStudent ??
+                                              'Remove from Students',
+                                          style: const TextStyle(color: Colors.red),
                                         ),
                                         onPressed: () {
                                           final studentId = student['user_id'];
@@ -648,7 +677,10 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                       OutlinedButton.icon(
                         onPressed: _generateStudentRegistrationLinkForTeacher,
                         icon: const Icon(Icons.link),
-                        label: const Text('Generate Student Registration Link'),
+                        label: Text(
+                          l10n?.profileGenerateStudentLink ??
+                              'Generate Student Registration Link',
+                        ),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(48),
                         ),
@@ -659,12 +691,13 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                       const Divider(),
                       const SizedBox(height: 16),
                       Text(
-                        'Teachers',
+                        l10n?.profileTeachersTitle ?? 'Teachers',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Tap to view teacher profile or leave teacher',
+                        l10n?.profileTeachersSubtitle ??
+                            'Tap to view teacher profile or leave teacher',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey[600],
@@ -674,7 +707,8 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                       const SizedBox(height: 12),
                       if (_studentTeachers.isEmpty)
                         Text(
-                          'No teachers assigned yet',
+                          l10n?.profileNoTeachersAssigned ??
+                              'No teachers assigned yet',
                           style: TextStyle(color: Colors.grey[600]),
                         )
                       else
@@ -702,12 +736,17 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                     children: [
                                       OutlinedButton.icon(
                                         icon: const Icon(Icons.visibility),
-                                        label: const Text('View Profile'),
+                                        label: Text(
+                                          l10n?.profileActionViewProfile ??
+                                              'View Profile',
+                                        ),
                                         onPressed: () => _showTeacherProfileDialog(teacher),
                                       ),
                                       ElevatedButton.icon(
                                         icon: const Icon(Icons.message),
-                                        label: const Text('Message'),
+                                        label: Text(
+                                          l10n?.profileActionMessage ?? 'Message',
+                                        ),
                                         onPressed: () => _startChatWithUser(
                                           teacher['user_id'] as int,
                                           teacher['full_name'] as String,
@@ -715,9 +754,10 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                       ),
                                       TextButton.icon(
                                         icon: const Icon(Icons.logout, color: Colors.red),
-                                        label: const Text(
-                                          'Leave Teacher',
-                                          style: TextStyle(color: Colors.red),
+                                        label: Text(
+                                          l10n?.profileActionLeaveTeacher ??
+                                              'Leave Teacher',
+                                          style: const TextStyle(color: Colors.red),
                                         ),
                                         onPressed: () {
                                           final teacherId = teacher['user_id'];
@@ -743,7 +783,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
             const SizedBox(height: 16),
           ],
 
-          if (!_isAdminView)
+          if (!_isAdminView) ...[
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
@@ -751,15 +791,60 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Security',
+                      l10n?.languageTitle ?? 'Language',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const Divider(),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      value: localeService.locale?.languageCode ?? 'de',
+                      decoration: const InputDecoration(
+                        border: OutlineInputBorder(),
+                      ),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'de',
+                          child: Text(l10n?.languageGerman ?? 'German'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'en',
+                          child: Text(l10n?.languageEnglish ?? 'English'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'ru',
+                          child: Text(l10n?.languageRussian ?? 'Russian'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value != null) {
+                          localeService.setLocale(value);
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n?.securityTitle ?? 'Security',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const Divider(),
                     const SizedBox(height: 16),
                     ListTile(
                       leading: const Icon(Icons.lock_outline),
-                      title: const Text('Change Password'),
-                      subtitle: const Text('Update your account password'),
+                      title: Text(l10n?.changePasswordTitle ?? 'Change Password'),
+                      subtitle: Text(
+                        l10n?.changePasswordSubtitle ??
+                            'Update your account password',
+                      ),
                       trailing: const Icon(Icons.chevron_right),
                       onTap: _isEditing ? null : _showChangePasswordDialog,
                     ),
@@ -767,6 +852,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                 ),
               ),
             ),
+          ],
         ],
       ),
     );

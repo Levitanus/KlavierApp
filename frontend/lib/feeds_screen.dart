@@ -16,6 +16,7 @@ import 'widgets/quill_embed_builders.dart';
 import 'widgets/quill_editor_composer.dart';
 import 'widgets/feed_preview_card.dart';
 import 'widgets/floating_audio_player.dart';
+import 'l10n/app_localizations.dart';
 
 class FeedsScreen extends StatefulWidget {
   final int? initialFeedId;
@@ -45,13 +46,13 @@ class _FeedsScreenState extends State<FeedsScreen> {
     return feed.title.replaceFirst(RegExp(r'\s*Feed$'), '').trim();
   }
 
-  String _ownerLabel(Feed feed) {
+  String _ownerLabel(BuildContext context, Feed feed) {
     final ownerType = feed.ownerType.toLowerCase();
     if (ownerType == 'school') {
-      return 'School';
+      return AppLocalizations.of(context)?.feedsOwnerSchool ?? 'School';
     }
     if (ownerType == 'teacher') {
-      return 'Teacher';
+      return AppLocalizations.of(context)?.feedsOwnerTeacher ?? 'Teacher';
     }
     return feed.ownerType;
   }
@@ -60,6 +61,7 @@ class _FeedsScreenState extends State<FeedsScreen> {
   Widget build(BuildContext context) {
     return Consumer<FeedService>(
       builder: (context, feedService, child) {
+        final l10n = AppLocalizations.of(context);
         final feeds = feedService.feeds;
         final isLoading = feedService.isLoadingFeeds;
         final schoolFeeds = feeds
@@ -96,7 +98,7 @@ class _FeedsScreenState extends State<FeedsScreen> {
             Row(
               children: [
                 Text(
-                  'Feeds',
+                  l10n?.feedsTitle ?? 'Feeds',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const Spacer(),
@@ -108,14 +110,16 @@ class _FeedsScreenState extends State<FeedsScreen> {
             ),
             if (isLoading) const LinearProgressIndicator(),
             if (!isLoading && feeds.isEmpty)
-              const Padding(
+                Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
-                child: Text('No feeds available'),
+                  child: Text(
+                    l10n?.feedsNone ?? 'No feeds available',
+                  ),
               ),
             if (schoolFeeds.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
-                'School',
+                l10n?.feedsSchool ?? 'School',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -123,7 +127,7 @@ class _FeedsScreenState extends State<FeedsScreen> {
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),
-                  ownerLabel: _ownerLabel(feed),
+                  ownerLabel: _ownerLabel(context, feed),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -137,7 +141,7 @@ class _FeedsScreenState extends State<FeedsScreen> {
             if (teacherFeeds.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text(
-                'Teacher feeds',
+                l10n?.feedsTeacherFeeds ?? 'Teacher feeds',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -145,7 +149,7 @@ class _FeedsScreenState extends State<FeedsScreen> {
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),
-                  ownerLabel: _ownerLabel(feed),
+                  ownerLabel: _ownerLabel(context, feed),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -290,6 +294,7 @@ class _FeedDetailScreenState extends State<FeedDetailScreen> {
   Widget build(BuildContext context) {
     return Consumer<AuthService>(
       builder: (context, authService, child) {
+        final l10n = AppLocalizations.of(context);
         final canCreate = _canCreatePost(authService);
         return Scaffold(
           appBar: AppBar(
@@ -297,12 +302,12 @@ class _FeedDetailScreenState extends State<FeedDetailScreen> {
             actions: [
               if (canCreate)
                 IconButton(
-                  tooltip: 'New post',
+                  tooltip: l10n?.feedsNewPostTooltip ?? 'New post',
                   icon: const Icon(Icons.edit),
                   onPressed: () => _openComposer(context),
                 ),
               IconButton(
-                tooltip: 'Settings',
+                tooltip: l10n?.commonSettings ?? 'Settings',
                 icon: const Icon(Icons.settings),
                 onPressed: _loadingSettings
                     ? null
@@ -315,9 +320,11 @@ class _FeedDetailScreenState extends State<FeedDetailScreen> {
                   }
                 },
                 itemBuilder: (context) => [
-                  const PopupMenuItem(
+                  PopupMenuItem(
                     value: 'mark_all_read',
-                    child: Text('Mark all as read'),
+                    child: Text(
+                      l10n?.feedsMarkAllRead ?? 'Mark all as read',
+                    ),
                   ),
                 ],
               ),
@@ -385,13 +392,14 @@ class _FeedTimelineState extends State<FeedTimeline> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return RefreshIndicator(
       onRefresh: _refresh,
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
           Text(
-            'Important',
+            l10n?.feedsImportant ?? 'Important',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
@@ -403,7 +411,9 @@ class _FeedTimelineState extends State<FeedTimeline> {
                 return const Center(child: CircularProgressIndicator());
               }
               if (posts.isEmpty) {
-                return const Text('No important posts yet.');
+                return Text(
+                  l10n?.feedsNoImportantPosts ?? 'No important posts yet.',
+                );
               }
               return Column(
                 children: posts
@@ -432,7 +442,7 @@ class _FeedTimelineState extends State<FeedTimeline> {
           ),
           const SizedBox(height: 16),
           Text(
-            'All posts',
+            l10n?.feedsAllPosts ?? 'All posts',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
@@ -444,7 +454,9 @@ class _FeedTimelineState extends State<FeedTimeline> {
                 return const Center(child: CircularProgressIndicator());
               }
               if (posts.isEmpty) {
-                return const Text('No posts yet.');
+                return Text(
+                  l10n?.feedsNoPosts ?? 'No posts yet.',
+                );
               }
               return Column(
                 children: posts
@@ -491,6 +503,7 @@ class FeedPostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final controller = quill.QuillController(
       document: post.toDocument(),
       selection: const TextSelection.collapsed(offset: 0),
@@ -534,13 +547,16 @@ class FeedPostCard extends StatelessWidget {
             Row(
               children: [
                 Text(
-                  'Posted ${post.createdAt.toLocal()}'.split('.').first,
+                  l10n?.feedsPostedAt(
+                        '${post.createdAt.toLocal()}'.split('.').first,
+                      ) ??
+                      'Posted ${post.createdAt.toLocal()}'.split('.').first,
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 const Spacer(),
                 TextButton(
                   onPressed: onOpen,
-                  child: const Text('Open'),
+                  child: Text(l10n?.commonOpen ?? 'Open'),
                 ),
               ],
             ),
@@ -628,7 +644,12 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
 
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update subscription')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.feedsSubscriptionFailed ??
+                'Failed to update subscription',
+          ),
+        ),
       );
     }
   }
@@ -660,7 +681,12 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     
     if (!canDelete) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('You do not have permission to delete this post')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.feedsDeleteDenied ??
+                'You do not have permission to delete this post',
+          ),
+        ),
       );
       return;
     }
@@ -672,17 +698,22 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Delete Post'),
-        content: const Text('Are you sure you want to delete this post? This action cannot be undone.'),
+        title: Text(
+          AppLocalizations.of(context)?.feedsDeleteTitle ?? 'Delete Post',
+        ),
+        content: Text(
+          AppLocalizations.of(context)?.feedsDeleteMessage ??
+              'Are you sure you want to delete this post? This action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Delete'),
+            child: Text(AppLocalizations.of(context)?.commonDelete ?? 'Delete'),
           ),
         ],
       ),
@@ -707,7 +738,12 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
       Navigator.pop(context, true);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to delete post')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.feedsDeleteFailed ??
+                'Failed to delete post',
+          ),
+        ),
       );
     }
   }
@@ -746,10 +782,17 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
         content = ChatVideoPlayer(url: url);
         break;
       case 'audio':
-        content = ChatAudioPlayer(url: url, label: 'Audio');
+        content = ChatAudioPlayer(
+          url: url,
+          label: AppLocalizations.of(context)?.commonAudio ?? 'Audio',
+        );
         break;
       case 'voice':
-        content = ChatAudioPlayer(url: url, label: 'Voice message');
+        content = ChatAudioPlayer(
+          url: url,
+          label: AppLocalizations.of(context)?.commonVoiceMessage ??
+              'Voice message',
+        );
         break;
       case 'file':
         content = Row(
@@ -767,7 +810,12 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
         );
         break;
       default:
-        content = Text('Unsupported attachment: ${attachment.attachmentType}');
+        content = Text(
+          AppLocalizations.of(context)?.feedsUnsupportedAttachment(
+                attachment.attachmentType,
+              ) ??
+              'Unsupported attachment: ${attachment.attachmentType}',
+        );
     }
 
     return _buildAttachmentWithMenu(
@@ -788,16 +836,20 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           child: child,
         ),
         PopupMenuButton<String>(
-          tooltip: 'Attachment actions',
+          tooltip: AppLocalizations.of(context)?.feedsAttachmentActions ??
+              'Attachment actions',
           onSelected: (value) {
             if (value == 'download') {
               onDownload();
             }
           },
-          itemBuilder: (context) => const [
+          itemBuilder: (context) => [
             PopupMenuItem(
               value: 'download',
-              child: Text('Download source file'),
+              child: Text(
+                AppLocalizations.of(context)?.commonDownloadSourceFile ??
+                    'Download source file',
+              ),
             ),
           ],
           icon: const Icon(Icons.more_horiz, size: 20),
@@ -818,9 +870,15 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
 
     final message = result.success
         ? (result.filePath != null
-            ? 'Saved to ${result.filePath}'
-            : 'Download started')
-        : (result.errorMessage ?? 'Download failed');
+        ? (AppLocalizations.of(context)?.commonSavedToPath(
+            result.filePath!,
+          ) ??
+          'Saved to ${result.filePath}')
+        : (AppLocalizations.of(context)?.commonDownloadStarted ??
+          'Download started'))
+      : (result.errorMessage ??
+        AppLocalizations.of(context)?.commonDownloadFailed ??
+        'Download failed');
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
@@ -889,7 +947,11 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
               ],
               const SizedBox(height: 8),
               Text(
-                _formatTimestamp(comment.createdAt, comment.updatedAt),
+                _formatTimestamp(
+                  context,
+                  comment.createdAt,
+                  comment.updatedAt,
+                ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               Align(
@@ -900,11 +962,15 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                     if ((auth.userId ?? -1) == comment.authorUserId)
                       TextButton(
                         onPressed: () => _openCommentEditor(comment),
-                        child: const Text('Edit'),
+                        child: Text(
+                          AppLocalizations.of(context)?.commonEdit ?? 'Edit',
+                        ),
                       ),
                     TextButton(
                       onPressed: () => _openCommentComposer(comment.id),
-                      child: const Text('Reply'),
+                      child: Text(
+                        AppLocalizations.of(context)?.commonReply ?? 'Reply',
+                      ),
                     ),
                   ],
                 ),
@@ -933,9 +999,18 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     }
   }
 
-  String _formatTimestamp(DateTime createdAt, DateTime updatedAt) {
-    final base = 'Posted ${createdAt.toLocal()}'.split('.').first;
-    return updatedAt.isAfter(createdAt) ? '$base · edited' : base;
+  String _formatTimestamp(
+    BuildContext context,
+    DateTime createdAt,
+    DateTime updatedAt,
+  ) {
+    final l10n = AppLocalizations.of(context);
+    final timestamp = '${createdAt.toLocal()}'.split('.').first;
+    if (updatedAt.isAfter(createdAt)) {
+      return l10n?.feedsPostedEditedAt(timestamp) ??
+          'Posted $timestamp · edited';
+    }
+    return l10n?.feedsPostedAt(timestamp) ?? 'Posted $timestamp';
   }
 
   Future<void> _editPost() async {
@@ -1002,7 +1077,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
       create: (_) => AudioPlayerService(),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Post'),
+          title: Text(AppLocalizations.of(context)?.feedsPostTitle ?? 'Post'),
           actions: [
             if (canEdit)
               IconButton(
@@ -1056,7 +1131,11 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                         ],
                         const SizedBox(height: 8),
                         Text(
-                          _formatTimestamp(_post.createdAt, _post.updatedAt),
+                          _formatTimestamp(
+                            context,
+                            _post.createdAt,
+                            _post.updatedAt,
+                          ),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
                         const SizedBox(height: 16),
@@ -1071,21 +1150,26 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                     ),
                     label: Text(
                       _isSubscribed
-                          ? 'Unsubscribe from comments'
-                          : 'Subscribe to comments',
+                          ? (AppLocalizations.of(context)?.feedsUnsubscribeComments ??
+                              'Unsubscribe from comments')
+                          : (AppLocalizations.of(context)?.feedsSubscribeComments ??
+                              'Subscribe to comments'),
                     ),
                   ),
                 ),
                 const SizedBox(height: 24),
                 Text(
-                  'Comments',
+                  AppLocalizations.of(context)?.feedsComments ?? 'Comments',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 12),
                 if (_loading)
                   const Center(child: CircularProgressIndicator())
                 else if (_comments.isEmpty)
-                  const Text('No comments yet.')
+                  Text(
+                    AppLocalizations.of(context)?.feedsNoComments ??
+                        'No comments yet.',
+                  )
                         else
                           ..._buildCommentWidgets(tree, null, 0),
                       ],
@@ -1097,7 +1181,9 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
             ? FloatingActionButton.extended(
                 onPressed: () => _openCommentComposer(null),
                 icon: const Icon(Icons.add_comment),
-                label: const Text('Add Comment'),
+                label: Text(
+                  AppLocalizations.of(context)?.feedsAddComment ?? 'Add Comment',
+                ),
               )
             : null,
       ),
@@ -1220,7 +1306,12 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
         _isUploadingAttachment = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to upload media')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.feedsUploadFailed ??
+                'Failed to upload media',
+          ),
+        ),
       );
       return;
     }
@@ -1242,7 +1333,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
             children: [
               ListTile(
                 leading: const Icon(Icons.image),
-                title: const Text('Image'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonImage ?? 'Image',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickEditorAttachment(attachmentType: 'image');
@@ -1250,7 +1343,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
               ),
               ListTile(
                 leading: const Icon(Icons.video_library),
-                title: const Text('Video'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonVideo ?? 'Video',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickEditorAttachment(attachmentType: 'video');
@@ -1258,7 +1353,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
               ),
               ListTile(
                 leading: const Icon(Icons.audiotrack),
-                title: const Text('Audio'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonAudio ?? 'Audio',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickEditorAttachment(attachmentType: 'audio');
@@ -1266,7 +1363,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
               ),
               ListTile(
                 leading: const Icon(Icons.insert_drive_file),
-                title: const Text('File'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonFile ?? 'File',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickEditorAttachment(attachmentType: 'file');
@@ -1328,7 +1427,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     final typedExtra =
         extraOptions as quill.QuillToolbarSelectHeaderStyleDropdownButtonExtraOptions;
     return quill.QuillToolbarIconButton(
-      tooltip: typedOptions.tooltip ?? 'Paragraph type',
+      tooltip: typedOptions.tooltip ??
+          (AppLocalizations.of(context)?.feedsParagraphType ??
+              'Paragraph type'),
       isSelected: false,
       iconTheme: typedOptions.iconTheme,
       onPressed: typedExtra.onPressed,
@@ -1337,6 +1438,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
   }
 
   quill.QuillSimpleToolbarConfig _toolbarConfigForTab(int index) {
+    final l10n = AppLocalizations.of(context);
     final isText = index == 0;
     final isFormatting = index == 1;
     final isJustify = index == 2;
@@ -1347,16 +1449,16 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
       buttonOptions: quill.QuillSimpleToolbarButtonOptions(
         fontFamily: quill.QuillToolbarFontFamilyButtonOptions(
           childBuilder: _fontFamilyIconButton,
-          tooltip: 'Font',
+          tooltip: l10n?.feedsFont ?? 'Font',
         ),
         fontSize: quill.QuillToolbarFontSizeButtonOptions(
           childBuilder: _fontSizeIconButton,
-          tooltip: 'Size',
+          tooltip: l10n?.feedsSize ?? 'Size',
         ),
         selectHeaderStyleDropdownButton:
             quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions(
           childBuilder: _headerStyleIconButton,
-          tooltip: 'Paragraph type',
+          tooltip: l10n?.feedsParagraphType ?? 'Paragraph type',
         ),
       ),
       showFontFamily: isText,
@@ -1394,7 +1496,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
                       ? Icons.hourglass_top
                       : Icons.attach_file,
                 ),
-                tooltip: 'Attach',
+                tooltip: l10n?.feedsAttach ?? 'Attach',
                 onPressed: _isUploadingAttachment ? null : _showEditorAttachmentMenu,
               ),
             ]
@@ -1413,6 +1515,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     BuildContext context,
     quill.QuillRawEditorState editorState,
   ) {
+    final l10n = AppLocalizations.of(context);
     final controller = editorState.controller;
     final selection = controller.selection;
     
@@ -1446,7 +1549,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Bold',
+        label: l10n?.commonBold ?? 'Bold',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -1459,7 +1562,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Italic',
+        label: l10n?.commonItalic ?? 'Italic',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -1472,7 +1575,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Underline',
+        label: l10n?.commonUnderline ?? 'Underline',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -1485,7 +1588,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Strike',
+        label: l10n?.commonStrike ?? 'Strike',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -1498,7 +1601,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Sub',
+        label: l10n?.commonSubscript ?? 'Sub',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -1511,7 +1614,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Super',
+        label: l10n?.commonSuperscript ?? 'Super',
       ),
     ];
 
@@ -1565,7 +1668,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit post'),
+        title: Text(AppLocalizations.of(context)?.feedsEditPost ?? 'Edit post'),
       ),
       body: SafeArea(
         child: LayoutBuilder(
@@ -1582,14 +1685,18 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
                   children: [
                     TextField(
                       controller: _titleController,
-                      decoration: const InputDecoration(labelText: 'Title'),
+                      decoration: InputDecoration(
+                        labelText: AppLocalizations.of(context)?.commonTitle ??
+                            'Title',
+                      ),
                     ),
                     SizedBox(height: spacing),
                     Row(
                       children: [
                         Expanded(
                           child: IconButton(
-                            tooltip: 'Text tools',
+                            tooltip: AppLocalizations.of(context)?.feedsTextTools ??
+                                'Text tools',
                             onPressed: () => _toggleToolbarTab(0),
                             icon: Icon(
                               Icons.text_fields,
@@ -1601,7 +1708,8 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: 'Text formatting',
+                            tooltip: AppLocalizations.of(context)?.feedsTextFormatting ??
+                                'Text formatting',
                             onPressed: () => _toggleToolbarTab(1),
                             icon: Icon(
                               Icons.format_bold,
@@ -1613,7 +1721,8 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: 'Justification tools',
+                            tooltip: AppLocalizations.of(context)?.feedsJustificationTools ??
+                                'Justification tools',
                             onPressed: () => _toggleToolbarTab(2),
                             icon: Icon(
                               Icons.format_align_left,
@@ -1625,7 +1734,8 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: 'Lists and padding tools',
+                            tooltip: AppLocalizations.of(context)?.feedsListsPaddingTools ??
+                                'Lists and padding tools',
                             onPressed: () => _toggleToolbarTab(3),
                             icon: Icon(
                               Icons.format_list_bulleted,
@@ -1637,7 +1747,8 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: 'Attachments',
+                            tooltip: AppLocalizations.of(context)?.feedsAttachments ??
+                                'Attachments',
                             onPressed: () => _toggleToolbarTab(4),
                             icon: Icon(
                               Icons.attach_file,
@@ -1687,7 +1798,10 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
                             });
                           },
                         ),
-                        const Text('Allow comments'),
+                        Text(
+                          AppLocalizations.of(context)?.feedsAllowComments ??
+                              'Allow comments',
+                        ),
                       ],
                     ),
                     if (authService.isAdmin || authService.roles.contains('teacher'))
@@ -1701,7 +1815,10 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
                               });
                             },
                           ),
-                          const Text('Mark as important'),
+                          Text(
+                            AppLocalizations.of(context)?.feedsMarkImportant ??
+                                'Mark as important',
+                          ),
                         ],
                       ),
                     SizedBox(height: spacing),
@@ -1710,7 +1827,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
                         TextButton(
                           onPressed:
                               _isSubmitting ? null : () => Navigator.of(context).pop(),
-                          child: const Text('Cancel'),
+                          child: Text(
+                            AppLocalizations.of(context)?.commonCancel ?? 'Cancel',
+                          ),
                         ),
                         const Spacer(),
                         ElevatedButton(
@@ -1721,7 +1840,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
                                   width: 16,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Text('Save'),
+                              : Text(
+                                  AppLocalizations.of(context)?.commonSave ?? 'Save',
+                                ),
                         ),
                       ],
                     ),
@@ -1829,7 +1950,12 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
         _isUploadingAttachment = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to upload media')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.feedsUploadFailed ??
+                'Failed to upload media',
+          ),
+        ),
       );
       return;
     }
@@ -1864,7 +1990,9 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
             children: [
               ListTile(
                 leading: const Icon(Icons.image),
-                title: const Text('Image'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonImage ?? 'Image',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickAttachment(attachmentType: 'image', inline: true);
@@ -1872,7 +2000,9 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
               ),
               ListTile(
                 leading: const Icon(Icons.video_library),
-                title: const Text('Video'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonVideo ?? 'Video',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickAttachment(attachmentType: 'video', inline: true);
@@ -1880,7 +2010,9 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
               ),
               ListTile(
                 leading: const Icon(Icons.audiotrack),
-                title: const Text('Audio'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonAudio ?? 'Audio',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickAttachment(attachmentType: 'audio', inline: true);
@@ -1888,7 +2020,9 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
               ),
               ListTile(
                 leading: const Icon(Icons.insert_drive_file),
-                title: const Text('File'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonFile ?? 'File',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickAttachment(attachmentType: 'file', inline: false);
@@ -1950,7 +2084,9 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     final typedExtra =
         extraOptions as quill.QuillToolbarSelectHeaderStyleDropdownButtonExtraOptions;
     return quill.QuillToolbarIconButton(
-      tooltip: typedOptions.tooltip ?? 'Paragraph type',
+      tooltip: typedOptions.tooltip ??
+          (AppLocalizations.of(context)?.feedsParagraphType ??
+              'Paragraph type'),
       isSelected: false,
       iconTheme: typedOptions.iconTheme,
       onPressed: typedExtra.onPressed,
@@ -1959,6 +2095,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
   }
 
   quill.QuillSimpleToolbarConfig _toolbarConfigForTab(int index) {
+    final l10n = AppLocalizations.of(context);
     final isText = index == 0;
     final isFormatting = index == 1;
     final isJustify = index == 2;
@@ -1969,16 +2106,16 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
       buttonOptions: quill.QuillSimpleToolbarButtonOptions(
         fontFamily: quill.QuillToolbarFontFamilyButtonOptions(
           childBuilder: _fontFamilyIconButton,
-          tooltip: 'Font',
+          tooltip: l10n?.feedsFont ?? 'Font',
         ),
         fontSize: quill.QuillToolbarFontSizeButtonOptions(
           childBuilder: _fontSizeIconButton,
-          tooltip: 'Size',
+          tooltip: l10n?.feedsSize ?? 'Size',
         ),
         selectHeaderStyleDropdownButton:
             quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions(
           childBuilder: _headerStyleIconButton,
-          tooltip: 'Paragraph type',
+          tooltip: l10n?.feedsParagraphType ?? 'Paragraph type',
         ),
       ),
       showFontFamily: isText,
@@ -2016,7 +2153,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                       ? Icons.hourglass_top
                       : Icons.attach_file,
                 ),
-                tooltip: 'Attach',
+                tooltip: l10n?.feedsAttach ?? 'Attach',
                 onPressed: _isUploadingAttachment ? null : _showAttachmentMenu,
               ),
             ]
@@ -2028,6 +2165,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     BuildContext context,
     quill.QuillRawEditorState editorState,
   ) {
+    final l10n = AppLocalizations.of(context);
     final controller = editorState.controller;
     final selection = controller.selection;
 
@@ -2057,7 +2195,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Bold',
+        label: l10n?.commonBold ?? 'Bold',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -2070,7 +2208,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Italic',
+        label: l10n?.commonItalic ?? 'Italic',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -2083,7 +2221,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Underline',
+        label: l10n?.commonUnderline ?? 'Underline',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -2096,7 +2234,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Strike',
+        label: l10n?.commonStrike ?? 'Strike',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -2109,7 +2247,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Sub',
+        label: l10n?.commonSubscript ?? 'Sub',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -2122,7 +2260,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
           );
           ContextMenuController.removeAny();
         },
-        label: 'Super',
+        label: l10n?.commonSuperscript ?? 'Super',
       ),
     ];
 
@@ -2179,7 +2317,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('New post'),
+        title: Text(AppLocalizations.of(context)?.feedsNewPost ?? 'New post'),
       ),
       body: SafeArea(
         child: LayoutBuilder(
@@ -2196,14 +2334,18 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                   children: [
                     TextField(
                       controller: _titleController,
-                      decoration: const InputDecoration(labelText: 'Title'),
+                      decoration: InputDecoration(
+                        labelText: AppLocalizations.of(context)?.commonTitle ??
+                            'Title',
+                      ),
                     ),
                     SizedBox(height: spacing),
                     Row(
                       children: [
                         Expanded(
                           child: IconButton(
-                            tooltip: 'Text tools',
+                            tooltip: AppLocalizations.of(context)?.feedsTextTools ??
+                                'Text tools',
                             onPressed: () => _toggleToolbarTab(0),
                             icon: Icon(
                               Icons.text_fields,
@@ -2215,7 +2357,8 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: 'Text formatting',
+                            tooltip: AppLocalizations.of(context)?.feedsTextFormatting ??
+                                'Text formatting',
                             onPressed: () => _toggleToolbarTab(1),
                             icon: Icon(
                               Icons.format_bold,
@@ -2227,7 +2370,8 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: 'Justification tools',
+                            tooltip: AppLocalizations.of(context)?.feedsJustificationTools ??
+                                'Justification tools',
                             onPressed: () => _toggleToolbarTab(2),
                             icon: Icon(
                               Icons.format_align_left,
@@ -2239,7 +2383,8 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: 'Lists and padding tools',
+                            tooltip: AppLocalizations.of(context)?.feedsListsPaddingTools ??
+                                'Lists and padding tools',
                             onPressed: () => _toggleToolbarTab(3),
                             icon: Icon(
                               Icons.format_list_bulleted,
@@ -2251,7 +2396,8 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: 'Attachments',
+                            tooltip: AppLocalizations.of(context)?.feedsAttachments ??
+                                'Attachments',
                             onPressed: () => _toggleToolbarTab(4),
                             icon: Icon(
                               Icons.attach_file,
@@ -2297,7 +2443,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                         runSpacing: 8,
                         children: nonInlineAttachments.map((item) {
                           return Chip(
-                            label: Text(item.label),
+                            label: Text(item.label(context)),
                             onDeleted: () {
                               setState(() {
                                 _pendingAttachments.remove(item);
@@ -2318,7 +2464,10 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                             });
                           },
                         ),
-                        const Text('Allow comments'),
+                        Text(
+                          AppLocalizations.of(context)?.feedsAllowComments ??
+                              'Allow comments',
+                        ),
                       ],
                     ),
                     if (authService.isAdmin || authService.roles.contains('teacher'))
@@ -2332,7 +2481,10 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                               });
                             },
                           ),
-                          const Text('Mark as important'),
+                          Text(
+                            AppLocalizations.of(context)?.feedsMarkImportant ??
+                                'Mark as important',
+                          ),
                         ],
                       ),
                     SizedBox(height: spacing),
@@ -2341,7 +2493,9 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                         TextButton(
                           onPressed:
                               _isSubmitting ? null : () => Navigator.of(context).pop(false),
-                          child: const Text('Cancel'),
+                          child: Text(
+                            AppLocalizations.of(context)?.commonCancel ?? 'Cancel',
+                          ),
                         ),
                         const Spacer(),
                         ElevatedButton(
@@ -2352,7 +2506,9 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                                   width: 16,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Text('Post'),
+                              : Text(
+                                  AppLocalizations.of(context)?.commonPost ?? 'Post',
+                                ),
                         ),
                       ],
                     ),
@@ -2448,7 +2604,9 @@ class _FeedCommentEditorState extends State<FeedCommentEditor> {
       titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
       contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-      title: const Text('Edit comment'),
+      title: Text(
+        AppLocalizations.of(context)?.feedsEditComment ?? 'Edit comment',
+      ),
       content: SizedBox(
         width: 600,
         child: Column(
@@ -2470,7 +2628,7 @@ class _FeedCommentEditorState extends State<FeedCommentEditor> {
       actions: [
         TextButton(
           onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
         ),
         ElevatedButton(
           onPressed: _isSubmitting ? null : _submit,
@@ -2480,7 +2638,7 @@ class _FeedCommentEditorState extends State<FeedCommentEditor> {
                   width: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Save'),
+              : Text(AppLocalizations.of(context)?.commonSave ?? 'Save'),
         ),
       ],
     );
@@ -2574,7 +2732,12 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
         _isUploadingAttachment = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to upload media')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.feedsUploadFailed ??
+                'Failed to upload media',
+          ),
+        ),
       );
       return;
     }
@@ -2609,7 +2772,9 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
             children: [
               ListTile(
                 leading: const Icon(Icons.image),
-                title: const Text('Image'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonImage ?? 'Image',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickAttachment(attachmentType: 'image', inline: true);
@@ -2617,7 +2782,9 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
               ),
               ListTile(
                 leading: const Icon(Icons.video_library),
-                title: const Text('Video'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonVideo ?? 'Video',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickAttachment(attachmentType: 'video', inline: true);
@@ -2625,7 +2792,9 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
               ),
               ListTile(
                 leading: const Icon(Icons.audiotrack),
-                title: const Text('Audio'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonAudio ?? 'Audio',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickAttachment(attachmentType: 'audio', inline: true);
@@ -2633,7 +2802,9 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
               ),
               ListTile(
                 leading: const Icon(Icons.insert_drive_file),
-                title: const Text('File'),
+                title: Text(
+                  AppLocalizations.of(context)?.commonFile ?? 'File',
+                ),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickAttachment(attachmentType: 'file', inline: false);
@@ -2682,7 +2853,9 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
       titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
       contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-      title: const Text('New comment'),
+      title: Text(
+        AppLocalizations.of(context)?.feedsNewComment ?? 'New comment',
+      ),
       content: SizedBox(
         width: 600,
         child: Column(
@@ -2699,7 +2872,7 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
                   itemBuilder: (context, index) {
                     final item = _pendingAttachments[index];
                     return Chip(
-                      label: Text(item.label),
+                      label: Text(item.label(context)),
                       onDeleted: () {
                         setState(() {
                           _pendingAttachments.removeAt(index);
@@ -2727,7 +2900,7 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
       actions: [
         TextButton(
           onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
         ),
         ElevatedButton(
           onPressed: _isSubmitting ? null : _submit,
@@ -2737,7 +2910,7 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
                   width: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Post'),
+              : Text(AppLocalizations.of(context)?.commonPost ?? 'Post'),
         ),
       ],
     );
@@ -2757,7 +2930,30 @@ class _PendingAttachment {
     required this.inline,
   });
 
-  String get label => inline ? '$attachmentType (inline)' : attachmentType;
+  String label(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final localizedType = () {
+      switch (attachmentType) {
+        case 'image':
+          return l10n?.commonImage ?? 'Image';
+        case 'video':
+          return l10n?.commonVideo ?? 'Video';
+        case 'audio':
+          return l10n?.commonAudio ?? 'Audio';
+        case 'voice':
+          return l10n?.commonVoiceMessage ?? 'Voice message';
+        case 'file':
+          return l10n?.commonFile ?? 'File';
+        default:
+          return attachmentType;
+      }
+    }();
+    if (inline) {
+      return l10n?.feedsAttachmentInline(localizedType) ??
+          '$localizedType (inline)';
+    }
+    return localizedType;
+  }
 }
 
 class FeedSettingsDialog extends StatefulWidget {
@@ -2824,7 +3020,9 @@ class _FeedSettingsDialogState extends State<FeedSettingsDialog> {
       titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
       contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-      title: const Text('Feed settings'),
+      title: Text(
+        AppLocalizations.of(context)?.feedsSettingsTitle ?? 'Feed settings',
+      ),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -2837,7 +3035,10 @@ class _FeedSettingsDialogState extends State<FeedSettingsDialog> {
                   _allowStudentPosts = value;
                 });
               },
-              title: const Text('Allow student posts'),
+              title: Text(
+                AppLocalizations.of(context)?.feedsAllowStudentPosts ??
+                    'Allow student posts',
+              ),
             ),
           SwitchListTile(
             value: _autoSubscribe,
@@ -2846,7 +3047,10 @@ class _FeedSettingsDialogState extends State<FeedSettingsDialog> {
                 _autoSubscribe = value;
               });
             },
-            title: const Text('Auto-subscribe to new posts'),
+            title: Text(
+              AppLocalizations.of(context)?.feedsAutoSubscribe ??
+                  'Auto-subscribe to new posts',
+            ),
           ),
           SwitchListTile(
             value: _notifyNewPosts,
@@ -2855,14 +3059,17 @@ class _FeedSettingsDialogState extends State<FeedSettingsDialog> {
                 _notifyNewPosts = value;
               });
             },
-            title: const Text('Notify on new posts'),
+            title: Text(
+              AppLocalizations.of(context)?.feedsNotifyNewPosts ??
+                  'Notify on new posts',
+            ),
           ),
         ],
       ),
       actions: [
         TextButton(
           onPressed: _saving ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
         ),
         ElevatedButton(
           onPressed: _saving ? null : _save,
@@ -2872,7 +3079,7 @@ class _FeedSettingsDialogState extends State<FeedSettingsDialog> {
                   width: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Text('Save'),
+              : Text(AppLocalizations.of(context)?.commonSave ?? 'Save'),
         ),
       ],
     );

@@ -1,3 +1,568 @@
 {
-  "appTitle": "Музыкальная школа на Томас-Манн-Плац"
+  "appTitle": "Музыкальная школа на Томас-Манн-Плац",
+  "languageTitle": "Язык",
+  "languageGerman": "Немецкий",
+  "languageEnglish": "Английский",
+  "languageRussian": "Русский",
+  "securityTitle": "Безопасность",
+  "changePasswordTitle": "Сменить пароль",
+  "changePasswordSubtitle": "Обновить пароль учетной записи",
+  "consentTitle": "Согласие на обработку персональных данных",
+  "consentAgree": "Согласен",
+  "consentGuardianConfirm": "Если вы регистрируете ребенка, вы подтверждаете, что являетесь родителем, законным представителем или иным уполномоченным лицом.",
+  "consentRequired": "Пожалуйста, подтвердите согласие, чтобы продолжить",
+  "consentFallback": "Согласие (кратко)\n- Только материалы для обучения музыке.\n- Вы можете редактировать или удалить профиль.\n- Данные защищены TLS.\n- Передача только для отправки email (SendGrid).\nЕсли регистрируете ребенка, подтверждаете, что вы родитель/опекун или уполномочены.",
+  "commonSettings": "Настройки",
+  "commonOpen": "Открыть",
+  "commonPost": "Опубликовать",
+  "commonEdit": "Редактировать",
+  "commonReply": "Ответить",
+  "commonDelete": "Удалить",
+  "commonAdd": "Добавить",
+  "commonSave": "Сохранить",
+  "commonCancel": "Отмена",
+  "commonRefresh": "Обновить",
+  "commonClose": "Закрыть",
+  "commonDownload": "Скачать",
+  "commonDownloadSourceFile": "Скачать исходный файл",
+  "commonDownloadStarted": "Загрузка начата",
+  "commonDownloadFailed": "Загрузка не удалась",
+  "commonSavedToPath": "Сохранено в {path}",
+  "commonBack5s": "Назад 5с",
+  "commonForward5s": "Вперед 5с",
+  "commonBold": "Жирный",
+  "commonItalic": "Курсив",
+  "commonUnderline": "Подчеркнутый",
+  "commonStrike": "Зачеркнутый",
+  "commonSubscript": "Нижний индекс",
+  "commonSuperscript": "Верхний индекс",
+  "commonTitle": "Заголовок",
+  "commonSend": "Отправить",
+  "commonApply": "Применить",
+  "commonInsertLink": "Вставить ссылку",
+  "commonUrl": "URL",
+  "commonAttachFile": "Прикрепить файл",
+  "commonAudio": "Аудио",
+  "commonVideo": "Видео",
+  "commonImage": "Изображение",
+  "commonFile": "Файл",
+  "commonVoiceMessage": "Голосовое сообщение",
+  "commonTapToPlay": "Нажмите чтобы воспроизвести",
+  "commonLoading": "Загрузка",
+  "commonFullscreen": "Полноэкранный режим",
+  "commonExitFullscreen": "Выйти из полноэкранного режима",
+  "commonPrevious": "Предыдущая страница",
+  "commonNext": "Следующая страница",
+  "commonClearSearch": "Очистить поиск",
+  "commonNoResults": "Ничего не найдено",
+  "commonTypeToFilter": "Введите для фильтра...",
+  "commonRequired": "Обязательно",
+  "commonErrorMessage": "Ошибка: {error}",
+  "commonCreated": "создан",
+  "commonUpdated": "обновлен",
+  "commonCreate": "создать",
+  "commonUpdate": "обновить",
+  "commonVideoLabel": "Видео: {filename}",
+  "feedsTitle": "Ленты",
+  "feedsNone": "Нет доступных лент",
+  "feedsSchool": "Школа",
+  "feedsTeacherFeeds": "Ленты учителей",
+  "feedsOwnerSchool": "Школа",
+  "feedsOwnerTeacher": "Учитель",
+  "feedsNewPostTooltip": "Новый пост",
+  "feedsMarkAllRead": "Пометить все как прочитанные",
+  "feedsImportant": "Важно",
+  "feedsLatest": "Последние",
+  "feedsNoImportantPosts": "Пока нет важных постов.",
+  "feedsAllPosts": "Все посты",
+  "feedsNoPosts": "Пока нет постов.",
+  "feedsPostedAt": "Опубликовано {timestamp}",
+  "feedsPostedEditedAt": "Опубликовано {timestamp} · отредактировано",
+  "feedsSubscriptionFailed": "Не удалось обновить подписку",
+  "feedsDeleteDenied": "У вас нет прав на удаление этого поста",
+  "feedsDeleteTitle": "Удалить пост",
+  "feedsDeleteMessage": "Вы уверены, что хотите удалить этот пост? Это действие нельзя отменить.",
+  "feedsDeleteFailed": "Не удалось удалить пост",
+  "feedsUnsupportedAttachment": "Неподдерживаемое вложение: {type}",
+  "feedsAttachmentActions": "Действия с вложением",
+  "feedsEditPost": "Редактировать пост",
+  "feedsNewPost": "Новый пост",
+  "feedsTextTools": "Текстовые инструменты",
+  "feedsTextFormatting": "Форматирование текста",
+  "feedsJustificationTools": "Инструменты выравнивания",
+  "feedsListsPaddingTools": "Инструменты списков и отступов",
+  "feedsAttachments": "Вложения",
+  "feedsAllowComments": "Разрешить комментарии",
+  "feedsMarkImportant": "Отметить как важное",
+  "feedsUploadFailed": "Не удалось загрузить медиа",
+  "feedsEditComment": "Редактировать комментарий",
+  "feedsNewComment": "Новый комментарий",
+  "feedsComments": "Комментарии",
+  "feedsNoComments": "Пока нет комментариев.",
+  "feedsAddComment": "Добавить комментарий",
+  "feedsSubscribeComments": "Подписаться на комментарии",
+  "feedsUnsubscribeComments": "Отписаться от комментариев",
+  "feedsAttachmentInline": "{typeLabel} (в тексте)",
+  "feedsSettingsTitle": "Настройки ленты",
+  "feedsAllowStudentPosts": "Разрешить посты учеников",
+  "feedsAutoSubscribe": "Автоподписка на новые посты",
+  "feedsNotifyNewPosts": "Уведомлять о новых постах",
+  "feedsParagraphType": "Тип абзаца",
+  "feedsFont": "Шрифт",
+  "feedsSize": "Размер",
+  "feedsAttach": "Прикрепить",
+  "feedsPostTitle": "Пост",
+  "feedsUnsupportedEmbed": "Неподдерживаемое встраивание: {data}",
+  "feedsUntitledPost": "Без названия",
+  "videoWebLimited": "Веб-плеер видео ограничен. Вы можете скачать файл или открыть его отдельно.",
+  "videoErrorTitle": "Ошибка видео",
+  "videoLoadFailed": "Не удалось загрузить видео",
+  "voiceRecordFailed": "Не удалось записать аудио",
+  "voiceRecordUnavailable": "Запись голоса недоступна",
+  "voiceRecordError": "Ошибка записи: {error}",
+  "voiceStopRecording": "Остановить запись",
+  "voiceRecord": "Записать голос",
+  "hometasksChecklistUpdateFailed": "Не удалось обновить пункт списка.",
+  "hometasksItemsSaved": "Элементы успешно сохранены.",
+  "hometasksItemsSaveFailed": "Не удалось сохранить элементы.",
+  "hometasksProgressUpdateFailed": "Не удалось обновить прогресс.",
+  "hometasksUpdateFailed": "Не удалось обновить домашнее задание.",
+  "hometasksTeacherFallback": "Учитель #{teacherId}",
+  "hometasksItemNameRequired": "Все элементы должны иметь название.",
+  "hometasksDueLabel": "Срок: {date}",
+  "hometasksEditItems": "Редактировать элементы",
+  "hometasksMarkCompleted": "Отметить как выполнено",
+  "hometasksMarkAccomplished": "Отметить как завершено",
+  "hometasksReturnActive": "Вернуть в активные",
+  "hometasksMarkUncompleted": "Отметить как не выполнено",
+  "hometasksProgressNotStarted": "Не начато",
+  "hometasksProgressInProgress": "В процессе",
+  "hometasksProgressNearlyDone": "Почти готово",
+  "hometasksProgressAlmostComplete": "Почти завершено",
+  "hometasksProgressComplete": "Завершено",
+  "hometasksItemHint": "Элемент {index}",
+  "hometasksAddItem": "Добавить элемент",
+  "notificationsTitle": "Уведомления",
+  "notificationsUnread": "Непрочитанные",
+  "notificationsNone": "Нет уведомлений",
+  "chatNoTeachers": "Учителя не найдены",
+  "chatSelectTeacher": "Выбрать учителя",
+  "chatStartFailed": "Не удалось начать чат",
+  "chatAdminOpenFailed": "Не удалось открыть чат с администратором",
+  "chatMessages": "Сообщения",
+  "chatChats": "Чаты",
+  "chatAdmin": "Админ",
+  "chatNoConversations": "Пока нет диалогов",
+  "chatStartConversation": "Начать разговор",
+  "chatAdministration": "Администрация",
+  "chatUnknownUser": "Неизвестно",
+  "chatNoMessages": "(Нет сообщений)",
+  "chatTeachers": "Учителя",
+  "chatNewChat": "Новый чат",
+  "chatThreadNotFound": "Чат создан, но поток не найден",
+  "chatStartNew": "Начать новый чат",
+  "chatSearchUsers": "Поиск пользователей...",
+  "profileAdminControls": "Админ-панель",
+  "profileAdminAccess": "Доступ администратора",
+  "profileAdminAccessSubtitle": "Выдать или отозвать права администратора",
+  "profileAdminAccessUpdate": "Обновить доступ администратора",
+  "profileRoleManagement": "Управление ролями",
+  "profileMakeStudent": "Сделать учеником",
+  "profileMakeParent": "Сделать родителем",
+  "profileMakeTeacher": "Сделать учителем",
+  "profileArchiveRoles": "Архивировать роли",
+  "profileSectionInfo": "Информация профиля",
+  "profileSectionAdditional": "Дополнительная информация",
+  "profileTitleProfile": "Профиль",
+  "profileTitleUserProfile": "Профиль пользователя",
+  "profileEditTooltip": "Редактировать профиль",
+  "profileAdminViewLabel": "Админ-режим",
+  "profileEmailLabel": "Email",
+  "profilePhoneLabel": "Телефон",
+  "profileMemberSinceLabel": "В системе с",
+  "profileNotSet": "Не указано",
+  "profileUnknown": "Неизвестно",
+  "profileRolesTitle": "Роли",
+  "profileBirthdayLabel": "Дата рождения",
+  "profileBirthdayInputLabel": "Дата рождения (ГГГГ-ММ-ДД)",
+  "profileGenerateParentLink": "Создать ссылку регистрации родителя",
+  "profileMyChildrenTitle": "Мои дети",
+  "profileChildrenSubtitle": "Нажмите на ребенка, чтобы посмотреть или редактировать данные",
+  "profileActionMessage": "Сообщение",
+  "profileManageStudentsTitle": "Управление учениками",
+  "profileActionAddStudent": "Добавить ученика",
+  "profileManageStudentsSubtitle": "Управляйте учениками, закрепленными за вами",
+  "profileNoStudentsAssigned": "Пока нет назначенных учеников",
+  "profileActionViewProfile": "Открыть профиль",
+  "profileActionAssignHometask": "Назначить задание",
+  "profileActionRemoveStudent": "Удалить из учеников",
+  "profileGenerateStudentLink": "Создать ссылку регистрации ученика",
+  "profileTeachersTitle": "Учителя",
+  "profileTeachersSubtitle": "Нажмите, чтобы открыть профиль учителя или уйти от учителя",
+  "profileNoTeachersAssigned": "Пока нет назначенных учителей",
+  "profileActionLeaveTeacher": "Покинуть учителя",
+  "profileArchiveStudent": "Архивировать ученика",
+  "profileUnarchiveStudent": "Восстановить ученика",
+  "profileArchiveParent": "Архивировать родителя",
+  "profileUnarchiveParent": "Восстановить родителя",
+  "profileArchiveTeacher": "Архивировать учителя",
+  "profileUnarchiveTeacher": "Восстановить учителя",
+  "profileParentTools": "Инструменты для родителей",
+  "profileAddChildren": "Добавить детей",
+  "adminPanelTitle": "Админ-панель",
+  "adminUserManagement": "Управление пользователями",
+  "adminSearchUsers": "Поиск по имени пользователя или полному имени",
+  "adminNoUsers": "Пользователи не найдены",
+  "adminAddUser": "Добавить пользователя",
+  "adminUser": "Пользователь",
+  "adminStudent": "Ученик",
+  "adminParent": "Родитель",
+  "adminTeacher": "Учитель",
+  "adminAddStudent": "Добавить ученика",
+  "adminAddParent": "Добавить родителя",
+  "adminAddTeacher": "Добавить учителя",
+  "adminShowingRange": "Показано {start}-{end} из {total}",
+  "adminRows": "Строк:",
+  "adminResetLink": "Ссылка сброса",
+  "adminViewProfile": "Просмотр профиля",
+  "adminEditUser": "Редактировать пользователя",
+  "adminDeleteUser": "Удалить пользователя",
+  "adminFullName": "Полное имя",
+  "adminUsername": "Имя пользователя",
+  "adminActions": "Действия",
+  "adminLoadUsersFailed": "Не удалось загрузить пользователей",
+  "adminUserSaved": "Пользователь {action} успешно",
+  "adminUserSaveFailed": "Не удалось {action} пользователя",
+  "adminResetLinkGenerated": "Ссылка сброса создана",
+  "adminResetLinkFor": "Ссылка сброса для {username}:",
+  "adminResetLinkExpires": "Истекает: {expires}",
+  "adminCopyLink": "Копировать ссылку",
+  "adminResetLinkCopied": "Ссылка сброса скопирована в буфер обмена",
+  "adminResetLinkFailed": "Не удалось создать ссылку сброса",
+  "adminUserDeleted": "Пользователь {username} удален",
+  "adminDeleteUserFailed": "Не удалось удалить пользователя",
+  "adminConvertedStudent": "Пользователь преобразован в ученика",
+  "adminConvertedParent": "Пользователь преобразован в родителя",
+  "adminConvertedTeacher": "Пользователь преобразован в учителя",
+  "adminStudentCreated": "Ученик успешно создан",
+  "adminParentCreated": "Родитель успешно создан",
+  "adminTeacherCreated": "Учитель успешно создан",
+  "adminDeleteUserTitle": "Удалить пользователя",
+  "adminDeleteUserMessage": "Удалить {username}? Это действие нельзя отменить.",
+  "adminUsernameRequired": "Введите имя пользователя",
+  "adminFullNameRequired": "Введите полное имя",
+  "adminPassword": "Пароль",
+  "adminNewPasswordOptional": "Новый пароль (необязательно)",
+  "adminPasswordRequired": "Введите пароль",
+  "adminGeneratePassword": "Сгенерировать пароль",
+  "adminEmailOptional": "E-mail (необязательно)",
+  "adminPhoneOptional": "Телефон (необязательно)",
+  "adminRoleAdmin": "Админ",
+  "adminConvertRole": "Преобразовать в роль:",
+  "adminCopyCredentials": "Копировать данные",
+  "adminCredentialsRequired": "Сначала заполните имя пользователя и пароль",
+  "adminCredentialsCopied": "Данные скопированы",
+  "adminMakeStudentTitle": "Сделать {username} учеником",
+  "adminMakeParentTitle": "Сделать {username} родителем",
+  "adminMakeTeacherTitle": "Сделать {username} учителем",
+  "adminMakeTeacherNote": "Это даст пользователю права учителя.",
+  "adminBirthdayLabel": "Дата рождения (ГГГГ-ММ-ДД)",
+  "adminBirthdayHint": "2010-01-15",
+  "adminBirthdayFormat": "Формат: ГГГГ-ММ-ДД",
+  "adminConvert": "Преобразовать",
+  "adminSelectStudentsLabel": "Выберите учеников (минимум одного):",
+  "adminSelectChildrenLabel": "Выберите детей (минимум одного):",
+  "adminSearchStudents": "Поиск учеников",
+  "adminNoStudents": "Ученики не найдены",
+  "adminSelectStudentRequired": "Нужен минимум один ученик",
+  "dashboardNoStudents": "Нет доступных учеников.",
+  "dashboardTitle": "Панель",
+  "dashboardTeacherFeeds": "Ленты учителей",
+  "dashboardNoTeacherFeeds": "Пока нет лент учителей.",
+  "dashboardSchoolFeed": "Лента школы",
+  "dashboardNoSchoolFeed": "Пока нет ленты школы.",
+  "dashboardOwnerSchool": "Школа",
+  "dashboardOwnerTeacher": "Учитель",
+  "dashboardStudentLabel": "Ученик:",
+  "dashboardNoActiveHometasks": "Нет активных домашних заданий.",
+  "homeClearAppCacheTitle": "Очистить кэш данных приложения",
+  "homeClearAppCacheBody": "Это удалит кэшированные сообщения, ленты, задания и данные профиля.",
+  "homeAppCacheCleared": "Кэш данных приложения очищен.",
+  "homeClearMediaCacheTitle": "Очистить кэш медиа",
+  "homeClearMediaCacheBody": "Это удалит кэшированные изображения и медиафайлы.",
+  "homeMediaCacheCleared": "Кэш медиа очищен.",
+  "homeLogoutTitle": "Выйти",
+  "homeLogoutBody": "Вы уверены, что хотите выйти?",
+  "homeMenuTooltip": "Меню",
+  "homeRolesLabel": "Роли: {roles}",
+  "homeProfileInfo": "Информация вашего профиля",
+  "commonClear": "Очистить",
+  "commonLogout": "Выйти",
+  "commonNotifications": "Уведомления",
+  "commonProfile": "Профиль",
+  "commonUserManagement": "Управление пользователями",
+  "commonTheme": "Тема",
+  "commonSystem": "Системная",
+  "commonLight": "Светлая",
+  "commonDark": "Темная",
+  "commonDashboard": "Панель",
+  "commonHometasks": "Домашние задания",
+  "commonFeeds": "Ленты",
+  "commonChats": "Чаты",
+  "commonUsername": "Имя пользователя",
+  "commonPassword": "Пароль",
+  "commonFullName": "Полное имя",
+  "commonEmailOptional": "Email (необязательно)",
+  "commonPhoneOptional": "Телефон (необязательно)",
+  "commonConfirmPassword": "Подтвердите пароль",
+  "commonBackToLogin": "Назад ко входу",
+  "commonOk": "ОК",
+  "commonErrorTitle": "Ошибка",
+  "registerRoleStudent": "Ученик",
+  "registerRoleParent": "Родитель",
+  "registerRoleTeacher": "Учитель",
+  "registerInvalidTokenTitle": "Недействительный токен регистрации",
+  "registerInvalidTokenMessage": "Эта ссылка регистрации просрочена или уже использована.",
+  "registerGoToLogin": "Ко входу",
+  "registerTitle": "Регистрация как {role}",
+  "registerParentOf": "Вы будете зарегистрированы как родитель для:",
+  "registerComplete": "Завершите регистрацию",
+  "registerUsernameRequired": "Введите имя пользователя",
+  "registerUsernameMin": "Имя пользователя должно быть не короче 3 символов",
+  "registerFullNameRequired": "Введите полное имя",
+  "registerBirthdayLabel": "Дата рождения (ГГГГ-ММ-ДД)",
+  "registerBirthdayHint": "2010-01-31",
+  "registerBirthdayRequired": "Введите дату рождения",
+  "registerBirthdayFormat": "Формат: ГГГГ-ММ-ДД",
+  "registerPasswordRequired": "Введите пароль",
+  "registerPasswordMin": "Пароль должен быть не менее 6 символов",
+  "registerConfirmRequired": "Подтвердите пароль",
+  "registerPasswordsMismatch": "Пароли не совпадают",
+  "registerButton": "Зарегистрироваться",
+  "registerLoginFailed": "Вход не выполнен",
+  "registerFailed": "Регистрация не удалась",
+  "registerNetworkError": "Ошибка сети: {error}",
+  "registerValidateFailed": "Не удалось проверить токен",
+  "resetErrorValidating": "Ошибка проверки токена: {error}",
+  "resetSuccessTitle": "Успех",
+  "resetSuccessMessage": "Пароль успешно сброшен. Теперь вы можете войти с новым паролем.",
+  "resetFailed": "Не удалось сбросить пароль",
+  "resetErrorGeneric": "Ошибка: {error}",
+  "resetTitle": "Сброс пароля",
+  "resetValidating": "Проверка токена сброса...",
+  "resetInvalidTitle": "Недействительная или просроченная ссылка",
+  "resetInvalidMessage": "Эта ссылка для сброса пароля недействительна или просрочена. Пожалуйста, запросите новую ссылку.",
+  "resetSetNewPassword": "Установить новый пароль",
+  "resetForUser": "для пользователя: {username}",
+  "resetNewPasswordLabel": "Новый пароль",
+  "resetPasswordRequired": "Введите пароль",
+  "resetPasswordMin": "Пароль должен быть не менее 6 символов",
+  "resetConfirmPasswordLabel": "Подтвердите пароль",
+  "resetConfirmRequired": "Подтвердите пароль",
+  "loginTitle": "Вход",
+  "loginForgotTitle": "Забыли пароль",
+  "loginForgotPrompt": "Введите имя пользователя, чтобы запросить сброс пароля.",
+  "loginUsernameRequired": "Введите имя пользователя",
+  "loginPasswordRequired": "Введите пароль",
+  "loginButton": "Войти",
+  "loginForgotPassword": "Забыли пароль?",
+  "loginRequestSentTitle": "Запрос отправлен",
+  "loginRequestSentMessage": "Запрос на сброс пароля успешно отправлен.",
+  "loginRequestFailedMessage": "Не удалось отправить запрос на сброс пароля. Попробуйте еще раз.",
+  "loginErrorMessage": "Произошла ошибка: {error}",
+  "loginFailed": "Вход не выполнен",
+  "commonRetry": "Повторить",
+  "hometasksNone": "Домашние задания не найдены.",
+  "hometasksUpdateOrderFailed": "Не удалось обновить порядок.",
+  "hometasksAssignTitle": "Назначить задание для {studentName}",
+  "hometasksTitleLabel": "Название",
+  "hometasksTitleRequired": "Название обязательно",
+  "hometasksDescriptionLabel": "Описание (необязательно)",
+  "hometasksDueDate": "Срок",
+  "hometasksNoDueDate": "Без срока",
+  "hometasksRepeatLabel": "Повтор",
+  "hometasksRepeatNone": "Без повтора",
+  "hometasksRepeatDaily": "Каждый день",
+  "hometasksRepeatWeekly": "Каждую неделю",
+  "hometasksRepeatCustom": "Пользовательский интервал",
+  "hometasksRepeatEveryDays": "Повторять каждые (дни)",
+  "hometasksRepeatCustomInvalid": "Введите положительное число дней",
+  "hometasksTypeLabel": "Тип задания",
+  "hometasksTypeSimple": "Простое",
+  "hometasksTypeChecklist": "Список",
+  "hometasksTypeProgress": "Прогресс",
+  "hometasksChecklistItems": "Пункты списка",
+  "hometasksProgressItems": "Пункты прогресса",
+  "hometasksItemLabel": "Элемент {index}",
+  "hometasksRequired": "Обязательно",
+  "hometasksAddAtLeastOne": "Добавьте хотя бы один элемент {typeLabel}.",
+  "hometasksRepeatIntervalInvalid": "Введите корректный интервал.",
+  "hometasksAssigned": "Задание назначено.",
+  "hometasksAssignFailed": "Не удалось назначить задание.",
+  "hometasksAssignAction": "Назначить",
+  "hometasksActive": "Активные",
+  "hometasksArchive": "Архив",
+  "hometasksAssign": "Назначить задание",
+  "@commonSavedToPath": {
+    "placeholders": {
+      "path": {}
+    }
+  },
+  "@commonErrorMessage": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@commonVideoLabel": {
+    "placeholders": {
+      "filename": {}
+    }
+  },
+  "@feedsPostedAt": {
+    "placeholders": {
+      "timestamp": {}
+    }
+  },
+  "@feedsPostedEditedAt": {
+    "placeholders": {
+      "timestamp": {}
+    }
+  },
+  "@feedsUnsupportedAttachment": {
+    "placeholders": {
+      "type": {}
+    }
+  },
+  "@feedsAttachmentInline": {
+    "placeholders": {
+      "typeLabel": {}
+    }
+  },
+  "@feedsUnsupportedEmbed": {
+    "placeholders": {
+      "data": {}
+    }
+  },
+  "@voiceRecordError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@hometasksDueLabel": {
+    "placeholders": {
+      "date": {}
+    }
+  },
+  "@hometasksItemHint": {
+    "placeholders": {
+      "index": {}
+    }
+  },
+  "@hometasksTeacherFallback": {
+    "placeholders": {
+      "teacherId": {}
+    }
+  },
+  "@adminShowingRange": {
+    "placeholders": {
+      "start": {},
+      "end": {},
+      "total": {}
+    }
+  },
+  "@adminUserSaved": {
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "@adminUserSaveFailed": {
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "@adminResetLinkFor": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminResetLinkExpires": {
+    "placeholders": {
+      "expires": {}
+    }
+  },
+  "@adminUserDeleted": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminDeleteUserMessage": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminMakeStudentTitle": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminMakeParentTitle": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminMakeTeacherTitle": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@homeRolesLabel": {
+    "placeholders": {
+      "roles": {}
+    }
+  },
+  "@loginErrorMessage": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@registerTitle": {
+    "placeholders": {
+      "role": {}
+    }
+  },
+  "@registerNetworkError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@resetErrorValidating": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@resetErrorGeneric": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@resetForUser": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@hometasksAssignTitle": {
+    "placeholders": {
+      "studentName": {}
+    }
+  },
+  "@hometasksItemLabel": {
+    "placeholders": {
+      "index": {}
+    }
+  },
+  "@hometasksAddAtLeastOne": {
+    "placeholders": {
+      "typeLabel": {}
+    }
+  }
 }

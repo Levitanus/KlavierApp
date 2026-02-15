@@ -13,12 +13,17 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete User'),
-        content: Text('Delete ${user.username}? This cannot be undone.'),
+        title: Text(
+          AppLocalizations.of(context)?.adminDeleteUserTitle ?? 'Delete User',
+        ),
+        content: Text(
+          AppLocalizations.of(context)?.adminDeleteUserMessage(user.username) ??
+              'Delete ${user.username}? This cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
           ),
           ElevatedButton.icon(
             onPressed: () {
@@ -26,7 +31,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
               _deleteUser(user);
             },
             icon: const Icon(Icons.delete),
-            label: const Text('Delete'),
+            label: Text(AppLocalizations.of(context)?.commonDelete ?? 'Delete'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
@@ -56,7 +61,11 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: Text(isNewUser ? 'Add User' : 'Edit User'),
+        title: Text(
+          isNewUser
+              ? (AppLocalizations.of(context)?.adminAddUser ?? 'Add User')
+              : (AppLocalizations.of(context)?.adminEditUser ?? 'Edit User'),
+        ),
         content: StatefulBuilder(
           builder: (context, setDialogState) => SingleChildScrollView(
             child: Form(
@@ -67,13 +76,15 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 children: [
                   TextFormField(
                     controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminUsername ??
+                          'Username',
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter a username';
+                        return AppLocalizations.of(context)?.adminUsernameRequired ??
+                            'Please enter a username';
                       }
                       return null;
                     },
@@ -81,13 +92,15 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: fullNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminFullName ??
+                          'Full Name',
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
-                        return 'Please enter a full name';
+                        return AppLocalizations.of(context)?.adminFullNameRequired ??
+                            'Please enter a full name';
                       }
                       return null;
                     },
@@ -100,14 +113,17 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                           controller: passwordController,
                           decoration: InputDecoration(
                             labelText: isNewUser
-                                ? 'Password'
-                                : 'New Password (optional)',
+                                ? (AppLocalizations.of(context)?.adminPassword ??
+                                    'Password')
+                                : (AppLocalizations.of(context)?.adminNewPasswordOptional ??
+                                    'New Password (optional)'),
                             border: const OutlineInputBorder(),
                           ),
                           obscureText: true,
                           validator: (value) {
                             if (isNewUser && (value == null || value.isEmpty)) {
-                              return 'Please enter a password';
+                              return AppLocalizations.of(context)?.adminPasswordRequired ??
+                                  'Please enter a password';
                             }
                             return null;
                           },
@@ -116,7 +132,8 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                       const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.refresh),
-                        tooltip: 'Generate Password',
+                        tooltip: AppLocalizations.of(context)?.adminGeneratePassword ??
+                            'Generate Password',
                         onPressed: () {
                           setDialogState(() {
                             passwordController.text = _generatePassword();
@@ -128,26 +145,28 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email (optional)',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.email),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminEmailOptional ??
+                          'Email (optional)',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.email),
                     ),
                     keyboardType: TextInputType.emailAddress,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: phoneController,
-                    decoration: const InputDecoration(
-                      labelText: 'Phone (optional)',
-                      border: OutlineInputBorder(),
-                      prefixIcon: Icon(Icons.phone),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminPhoneOptional ??
+                          'Phone (optional)',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.phone),
                     ),
                     keyboardType: TextInputType.phone,
                   ),
                   const SizedBox(height: 16),
                   CheckboxListTile(
-                    title: const Text('Admin'),
+                    title: Text(AppLocalizations.of(context)?.adminRoleAdmin ?? 'Admin'),
                     value: selectedRoles.contains('admin'),
                     onChanged: (checked) {
                       setDialogState(() {
@@ -165,9 +184,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                     const SizedBox(height: 16),
                     const Divider(),
                     const SizedBox(height: 8),
-                    const Text(
-                      'Convert to Role:',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    Text(
+                      AppLocalizations.of(context)?.adminConvertRole ??
+                          'Convert to Role:',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     Wrap(
@@ -176,7 +196,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                         if (!user.roles.contains('student'))
                           OutlinedButton.icon(
                             icon: const Icon(Icons.school, size: 16),
-                            label: const Text('Make Student'),
+                            label: Text(
+                              AppLocalizations.of(context)?.profileMakeStudent ??
+                                  'Make Student',
+                            ),
                             onPressed: () {
                               Navigator.of(context).pop();
                               _showMakeStudentDialog(user);
@@ -185,7 +208,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                         if (!user.roles.contains('parent'))
                           OutlinedButton.icon(
                             icon: const Icon(Icons.family_restroom, size: 16),
-                            label: const Text('Make Parent'),
+                            label: Text(
+                              AppLocalizations.of(context)?.profileMakeParent ??
+                                  'Make Parent',
+                            ),
                             onPressed: () {
                               Navigator.of(context).pop();
                               _showMakeParentDialog(user);
@@ -194,7 +220,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                         if (!user.roles.contains('teacher'))
                           OutlinedButton.icon(
                             icon: const Icon(Icons.person, size: 16),
-                            label: const Text('Make Teacher'),
+                            label: Text(
+                              AppLocalizations.of(context)?.profileMakeTeacher ??
+                                  'Make Teacher',
+                            ),
                             onPressed: () {
                               Navigator.of(context).pop();
                               _showMakeTeacherDialog(user);
@@ -211,19 +240,25 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
           ),
           if (isNewUser)
             TextButton.icon(
               icon: const Icon(Icons.copy),
-              label: const Text('Copy Credentials'),
+              label: Text(
+                AppLocalizations.of(context)?.adminCopyCredentials ??
+                    'Copy Credentials',
+              ),
               onPressed: () async {
                 if (usernameController.text.isEmpty ||
                     passwordController.text.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content:
-                            Text('Please fill in username and password first')),
+                    SnackBar(
+                      content: Text(
+                        AppLocalizations.of(context)?.adminCredentialsRequired ??
+                            'Please fill in username and password first',
+                      ),
+                    ),
                   );
                   return;
                 }
@@ -232,8 +267,12 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 await Clipboard.setData(ClipboardData(text: credentials));
                 if (context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Credentials copied to clipboard')),
+                    SnackBar(
+                      content: Text(
+                        AppLocalizations.of(context)?.adminCredentialsCopied ??
+                            'Credentials copied to clipboard',
+                      ),
+                    ),
                   );
                 }
               },
@@ -259,7 +298,11 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 );
               }
             },
-            child: Text(isNewUser ? 'Add' : 'Save'),
+            child: Text(
+              isNewUser
+                  ? (AppLocalizations.of(context)?.commonAdd ?? 'Add')
+                  : (AppLocalizations.of(context)?.commonSave ?? 'Save'),
+            ),
           ),
         ],
       ),
@@ -277,7 +320,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: Text('Make ${user.username} a Student'),
+        title: Text(
+          AppLocalizations.of(context)?.adminMakeStudentTitle(user.username) ??
+              'Make ${user.username} a Student',
+        ),
         content: Form(
           key: formKey,
           child: SingleChildScrollView(
@@ -286,16 +332,22 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
               children: [
                 TextFormField(
                   controller: birthdayController,
-                  decoration: const InputDecoration(
-                    labelText: 'Birthday (YYYY-MM-DD)',
-                    border: OutlineInputBorder(),
-                    hintText: '2010-01-15',
+                  decoration: InputDecoration(
+                    labelText: AppLocalizations.of(context)?.adminBirthdayLabel ??
+                        'Birthday (YYYY-MM-DD)',
+                    border: const OutlineInputBorder(),
+                    hintText: AppLocalizations.of(context)?.adminBirthdayHint ??
+                        '2010-01-15',
                   ),
                   validator: (value) {
-                    if (value?.isEmpty ?? true) return 'Required';
+                    if (value?.isEmpty ?? true) {
+                      return AppLocalizations.of(context)?.commonRequired ??
+                          'Required';
+                    }
                     final regex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
                     if (!regex.hasMatch(value!)) {
-                      return 'Format: YYYY-MM-DD';
+                      return AppLocalizations.of(context)?.adminBirthdayFormat ??
+                          'Format: YYYY-MM-DD';
                     }
                     return null;
                   },
@@ -307,7 +359,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -319,7 +371,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 );
               }
             },
-            child: const Text('Convert'),
+            child: Text(AppLocalizations.of(context)?.adminConvert ?? 'Convert'),
           ),
         ],
       ),
@@ -368,7 +420,10 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: Text('Make ${user.username} a Parent'),
+        title: Text(
+          AppLocalizations.of(context)?.adminMakeParentTitle(user.username) ??
+              'Make ${user.username} a Parent',
+        ),
         content: StatefulBuilder(
           builder: (context, setDialogState) {
             final filteredStudents = studentFilter.isEmpty
@@ -385,18 +440,21 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      'Select Students (at least one):',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                    Text(
+                      AppLocalizations.of(context)?.adminSelectStudentsLabel ??
+                          'Select Students (at least one):',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
                     TextField(
                       controller: studentFilterController,
-                      decoration: const InputDecoration(
-                        labelText: 'Search students',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.search),
-                        hintText: 'Type to filter...',
+                      decoration: InputDecoration(
+                        labelText: AppLocalizations.of(context)?.adminSearchStudents ??
+                            'Search students',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.search),
+                        hintText: AppLocalizations.of(context)?.commonTypeToFilter ??
+                            'Type to filter...',
                       ),
                       onChanged: (value) {
                         setDialogState(() {
@@ -412,10 +470,13 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: filteredStudents.isEmpty
-                          ? const Center(
+                          ? Center(
                               child: Padding(
-                                padding: EdgeInsets.all(16.0),
-                                child: Text('No students found'),
+                                padding: const EdgeInsets.all(16.0),
+                                child: Text(
+                                  AppLocalizations.of(context)?.adminNoStudents ??
+                                      'No students found',
+                                ),
                               ),
                             )
                           : ListView.builder(
@@ -442,11 +503,12 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                             ),
                     ),
                     if (selectedStudents.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 8),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
                         child: Text(
-                          'At least one student required',
-                          style: TextStyle(color: Colors.red, fontSize: 12),
+                          AppLocalizations.of(context)?.adminSelectStudentRequired ??
+                              'At least one student required',
+                          style: const TextStyle(color: Colors.red, fontSize: 12),
                         ),
                       ),
                   ],
@@ -458,7 +520,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -471,7 +533,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 );
               }
             },
-            child: const Text('Convert'),
+            child: Text(AppLocalizations.of(context)?.adminConvert ?? 'Convert'),
           ),
         ],
       ),
@@ -486,19 +548,25 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: Text('Make ${user.username} a Teacher'),
-        content: const Text('This will grant teacher privileges to the user.'),
+        title: Text(
+          AppLocalizations.of(context)?.adminMakeTeacherTitle(user.username) ??
+              'Make ${user.username} a Teacher',
+        ),
+        content: Text(
+          AppLocalizations.of(context)?.adminMakeTeacherNote ??
+              'This will grant teacher privileges to the user.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
               Navigator.of(context).pop();
               await _makeUserTeacher(user.id);
             },
-            child: const Text('Convert'),
+            child: Text(AppLocalizations.of(context)?.adminConvert ?? 'Convert'),
           ),
         ],
       ),
@@ -521,7 +589,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Add Student'),
+        title: Text(AppLocalizations.of(context)?.adminAddStudent ?? 'Add Student'),
         content: StatefulBuilder(
           builder: (context, setDialogState) => SingleChildScrollView(
             child: Form(
@@ -531,12 +599,16 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 children: [
                   TextFormField(
                     controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminUsername ??
+                          'Username',
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (value) =>
-                        value?.isEmpty ?? true ? 'Required' : null,
+                        value?.isEmpty ?? true
+                            ? (AppLocalizations.of(context)?.commonRequired ??
+                                'Required')
+                            : null,
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -544,19 +616,24 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                       Expanded(
                         child: TextFormField(
                           controller: passwordController,
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: AppLocalizations.of(context)?.adminPassword ??
+                                'Password',
+                            border: const OutlineInputBorder(),
                           ),
                           obscureText: true,
                           validator: (value) =>
-                              value?.isEmpty ?? true ? 'Required' : null,
+                              value?.isEmpty ?? true
+                                  ? (AppLocalizations.of(context)?.commonRequired ??
+                                      'Required')
+                                  : null,
                         ),
                       ),
                       const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.refresh),
-                        tooltip: 'Generate Password',
+                        tooltip: AppLocalizations.of(context)?.adminGeneratePassword ??
+                            'Generate Password',
                         onPressed: () {
                           setDialogState(() {
                             passwordController.text = _generatePassword();
@@ -568,42 +645,54 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email (optional)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminEmailOptional ??
+                          'Email (optional)',
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: phoneController,
-                    decoration: const InputDecoration(
-                      labelText: 'Phone (optional)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminPhoneOptional ??
+                          'Phone (optional)',
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: fullNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminFullName ??
+                          'Full Name',
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (value) =>
-                        value?.isEmpty ?? true ? 'Required' : null,
+                        value?.isEmpty ?? true
+                            ? (AppLocalizations.of(context)?.commonRequired ??
+                                'Required')
+                            : null,
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: birthdayController,
-                    decoration: const InputDecoration(
-                      labelText: 'Birthday (YYYY-MM-DD)',
-                      border: OutlineInputBorder(),
-                      hintText: '2010-01-15',
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminBirthdayLabel ??
+                          'Birthday (YYYY-MM-DD)',
+                      border: const OutlineInputBorder(),
+                      hintText: AppLocalizations.of(context)?.adminBirthdayHint ??
+                          '2010-01-15',
                     ),
                     validator: (value) {
-                      if (value?.isEmpty ?? true) return 'Required';
+                      if (value?.isEmpty ?? true) {
+                        return AppLocalizations.of(context)?.commonRequired ??
+                            'Required';
+                      }
                       final regex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
                       if (!regex.hasMatch(value!)) {
-                        return 'Format: YYYY-MM-DD';
+                        return AppLocalizations.of(context)?.adminBirthdayFormat ??
+                            'Format: YYYY-MM-DD';
                       }
                       return null;
                     },
@@ -616,17 +705,24 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
           ),
           TextButton.icon(
             icon: const Icon(Icons.copy),
-            label: const Text('Copy Credentials'),
+            label: Text(
+              AppLocalizations.of(context)?.adminCopyCredentials ??
+                  'Copy Credentials',
+            ),
             onPressed: () async {
               if (usernameController.text.isEmpty ||
                   passwordController.text.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Fill username and password first')),
+                  SnackBar(
+                    content: Text(
+                      AppLocalizations.of(context)?.adminCredentialsRequired ??
+                          'Fill username and password first',
+                    ),
+                  ),
                 );
                 return;
               }
@@ -635,7 +731,12 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
               await Clipboard.setData(ClipboardData(text: credentials));
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Credentials copied')),
+                  SnackBar(
+                    content: Text(
+                      AppLocalizations.of(context)?.adminCredentialsCopied ??
+                          'Credentials copied',
+                    ),
+                  ),
                 );
               }
             },
@@ -654,7 +755,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 );
               }
             },
-            child: const Text('Add'),
+            child: Text(AppLocalizations.of(context)?.commonAdd ?? 'Add'),
           ),
         ],
       ),
@@ -708,7 +809,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Add Parent'),
+        title: Text(AppLocalizations.of(context)?.adminAddParent ?? 'Add Parent'),
         content: StatefulBuilder(
           builder: (context, setDialogState) {
             final filteredStudents = studentFilter.isEmpty
@@ -728,12 +829,16 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                     children: [
                       TextFormField(
                         controller: usernameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Username',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: AppLocalizations.of(context)?.adminUsername ??
+                              'Username',
+                          border: const OutlineInputBorder(),
                         ),
                         validator: (value) =>
-                            value?.isEmpty ?? true ? 'Required' : null,
+                            value?.isEmpty ?? true
+                                ? (AppLocalizations.of(context)?.commonRequired ??
+                                    'Required')
+                                : null,
                       ),
                       const SizedBox(height: 16),
                       Row(
@@ -741,19 +846,24 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                           Expanded(
                             child: TextFormField(
                               controller: passwordController,
-                              decoration: const InputDecoration(
-                                labelText: 'Password',
-                                border: OutlineInputBorder(),
+                              decoration: InputDecoration(
+                                labelText: AppLocalizations.of(context)?.adminPassword ??
+                                    'Password',
+                                border: const OutlineInputBorder(),
                               ),
                               obscureText: true,
                               validator: (value) =>
-                                  value?.isEmpty ?? true ? 'Required' : null,
+                                  value?.isEmpty ?? true
+                                      ? (AppLocalizations.of(context)?.commonRequired ??
+                                          'Required')
+                                      : null,
                             ),
                           ),
                           const SizedBox(width: 8),
                           IconButton(
                             icon: const Icon(Icons.refresh),
-                            tooltip: 'Generate Password',
+                            tooltip: AppLocalizations.of(context)?.adminGeneratePassword ??
+                                'Generate Password',
                             onPressed: () {
                               setDialogState(() {
                                 passwordController.text = _generatePassword();
@@ -765,42 +875,51 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: emailController,
-                        decoration: const InputDecoration(
-                          labelText: 'Email (optional)',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: AppLocalizations.of(context)?.adminEmailOptional ??
+                              'Email (optional)',
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: phoneController,
-                        decoration: const InputDecoration(
-                          labelText: 'Phone (optional)',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: AppLocalizations.of(context)?.adminPhoneOptional ??
+                              'Phone (optional)',
+                          border: const OutlineInputBorder(),
                         ),
                       ),
                       const SizedBox(height: 16),
                       TextFormField(
                         controller: fullNameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Full Name',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: AppLocalizations.of(context)?.adminFullName ??
+                              'Full Name',
+                          border: const OutlineInputBorder(),
                         ),
                         validator: (value) =>
-                            value?.isEmpty ?? true ? 'Required' : null,
+                            value?.isEmpty ?? true
+                                ? (AppLocalizations.of(context)?.commonRequired ??
+                                    'Required')
+                                : null,
                       ),
                       const SizedBox(height: 16),
-                      const Text(
-                        'Select Children (at least one):',
-                        style: TextStyle(fontWeight: FontWeight.bold),
+                      Text(
+                        AppLocalizations.of(context)?.adminSelectChildrenLabel ??
+                            'Select Children (at least one):',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 8),
                       TextField(
                         controller: studentFilterController,
-                        decoration: const InputDecoration(
-                          labelText: 'Search students',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.search),
-                          hintText: 'Type to filter...',
+                        decoration: InputDecoration(
+                          labelText: AppLocalizations.of(context)?.adminSearchStudents ??
+                              'Search students',
+                          border: const OutlineInputBorder(),
+                          prefixIcon: const Icon(Icons.search),
+                          hintText: AppLocalizations.of(context)?.commonTypeToFilter ??
+                              'Type to filter...',
                         ),
                         onChanged: (value) {
                           setDialogState(() {
@@ -816,10 +935,13 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: filteredStudents.isEmpty
-                            ? const Center(
+                            ? Center(
                                 child: Padding(
-                                  padding: EdgeInsets.all(16.0),
-                                  child: Text('No students found'),
+                                  padding: const EdgeInsets.all(16.0),
+                                  child: Text(
+                                    AppLocalizations.of(context)?.adminNoStudents ??
+                                        'No students found',
+                                  ),
                                 ),
                               )
                             : ListView.builder(
@@ -846,11 +968,12 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                               ),
                       ),
                       if (selectedStudents.isEmpty)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 8),
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
                           child: Text(
-                            'At least one student required',
-                            style: TextStyle(color: Colors.red, fontSize: 12),
+                            AppLocalizations.of(context)?.adminSelectStudentRequired ??
+                                'At least one student required',
+                            style: const TextStyle(color: Colors.red, fontSize: 12),
                           ),
                         ),
                     ],
@@ -863,17 +986,24 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
           ),
           TextButton.icon(
             icon: const Icon(Icons.copy),
-            label: const Text('Copy Credentials'),
+            label: Text(
+              AppLocalizations.of(context)?.adminCopyCredentials ??
+                  'Copy Credentials',
+            ),
             onPressed: () async {
               if (usernameController.text.isEmpty ||
                   passwordController.text.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Fill username and password first')),
+                  SnackBar(
+                    content: Text(
+                      AppLocalizations.of(context)?.adminCredentialsRequired ??
+                          'Fill username and password first',
+                    ),
+                  ),
                 );
                 return;
               }
@@ -882,7 +1012,12 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
               await Clipboard.setData(ClipboardData(text: credentials));
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Credentials copied')),
+                  SnackBar(
+                    content: Text(
+                      AppLocalizations.of(context)?.adminCredentialsCopied ??
+                          'Credentials copied',
+                    ),
+                  ),
                 );
               }
             },
@@ -902,7 +1037,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 );
               }
             },
-            child: const Text('Add'),
+            child: Text(AppLocalizations.of(context)?.commonAdd ?? 'Add'),
           ),
         ],
       ),
@@ -924,7 +1059,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Add Teacher'),
+        title: Text(AppLocalizations.of(context)?.adminAddTeacher ?? 'Add Teacher'),
         content: StatefulBuilder(
           builder: (context, setDialogState) => SingleChildScrollView(
             child: Form(
@@ -934,12 +1069,16 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 children: [
                   TextFormField(
                     controller: usernameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Username',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminUsername ??
+                          'Username',
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (value) =>
-                        value?.isEmpty ?? true ? 'Required' : null,
+                        value?.isEmpty ?? true
+                            ? (AppLocalizations.of(context)?.commonRequired ??
+                                'Required')
+                            : null,
                   ),
                   const SizedBox(height: 16),
                   Row(
@@ -947,19 +1086,24 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                       Expanded(
                         child: TextFormField(
                           controller: passwordController,
-                          decoration: const InputDecoration(
-                            labelText: 'Password',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: AppLocalizations.of(context)?.adminPassword ??
+                                'Password',
+                            border: const OutlineInputBorder(),
                           ),
                           obscureText: true,
                           validator: (value) =>
-                              value?.isEmpty ?? true ? 'Required' : null,
+                              value?.isEmpty ?? true
+                                  ? (AppLocalizations.of(context)?.commonRequired ??
+                                      'Required')
+                                  : null,
                         ),
                       ),
                       const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.refresh),
-                        tooltip: 'Generate Password',
+                        tooltip: AppLocalizations.of(context)?.adminGeneratePassword ??
+                            'Generate Password',
                         onPressed: () {
                           setDialogState(() {
                             passwordController.text = _generatePassword();
@@ -971,28 +1115,34 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: emailController,
-                    decoration: const InputDecoration(
-                      labelText: 'Email (optional)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminEmailOptional ??
+                          'Email (optional)',
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: phoneController,
-                    decoration: const InputDecoration(
-                      labelText: 'Phone (optional)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminPhoneOptional ??
+                          'Phone (optional)',
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
                   TextFormField(
                     controller: fullNameController,
-                    decoration: const InputDecoration(
-                      labelText: 'Full Name',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: AppLocalizations.of(context)?.adminFullName ??
+                          'Full Name',
+                      border: const OutlineInputBorder(),
                     ),
                     validator: (value) =>
-                        value?.isEmpty ?? true ? 'Required' : null,
+                        value?.isEmpty ?? true
+                            ? (AppLocalizations.of(context)?.commonRequired ??
+                                'Required')
+                            : null,
                   ),
                 ],
               ),
@@ -1002,17 +1152,24 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
           ),
           TextButton.icon(
             icon: const Icon(Icons.copy),
-            label: const Text('Copy Credentials'),
+            label: Text(
+              AppLocalizations.of(context)?.adminCopyCredentials ??
+                  'Copy Credentials',
+            ),
             onPressed: () async {
               if (usernameController.text.isEmpty ||
                   passwordController.text.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Fill username and password first')),
+                  SnackBar(
+                    content: Text(
+                      AppLocalizations.of(context)?.adminCredentialsRequired ??
+                          'Fill username and password first',
+                    ),
+                  ),
                 );
                 return;
               }
@@ -1021,7 +1178,12 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
               await Clipboard.setData(ClipboardData(text: credentials));
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Credentials copied')),
+                  SnackBar(
+                    content: Text(
+                      AppLocalizations.of(context)?.adminCredentialsCopied ??
+                          'Credentials copied',
+                    ),
+                  ),
                 );
               }
             },
@@ -1039,7 +1201,7 @@ mixin _AdminPanelDialogs on _AdminPanelStateBase {
                 );
               }
             },
-            child: const Text('Add'),
+            child: Text(AppLocalizations.of(context)?.commonAdd ?? 'Add'),
           ),
         ],
       ),

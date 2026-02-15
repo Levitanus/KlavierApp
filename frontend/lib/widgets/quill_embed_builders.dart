@@ -10,6 +10,7 @@ import '../config/app_config.dart';
 import '../services/audio_player_service.dart';
 import '../services/media_cache_service.dart';
 import '../utils/media_download.dart';
+import '../l10n/app_localizations.dart';
 
 String normalizeMediaUrl(String url) {
   if (url.startsWith('http://') || url.startsWith('https://')) {
@@ -87,7 +88,7 @@ class AudioEmbedBuilder extends quill.EmbedBuilder {
       child: _buildAudioEmbed(
         context,
         url: absoluteUrl,
-        label: 'Audio',
+        label: AppLocalizations.of(context)?.commonAudio ?? 'Audio',
         showMenu: embedContext.readOnly,
       ),
     );
@@ -107,7 +108,8 @@ class VoiceEmbedBuilder extends quill.EmbedBuilder {
       child: _buildAudioEmbed(
         context,
         url: absoluteUrl,
-        label: 'Voice message',
+        label: AppLocalizations.of(context)?.commonVoiceMessage ??
+            'Voice message',
         showMenu: embedContext.readOnly,
       ),
     );
@@ -152,16 +154,18 @@ Widget _buildAudioEmbed(
                   ),
                 ),
                 if (showMenu)
-                  const Text(
-                    'Tap to play',
-                    style: TextStyle(fontSize: 11, color: Colors.grey),
+                  Text(
+                    AppLocalizations.of(context)?.commonTapToPlay ??
+                        'Tap to play',
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
                   ),
               ],
             ),
           ),
           if (showMenu)
             IconButton(
-              tooltip: 'Download source file',
+              tooltip: AppLocalizations.of(context)?.commonDownloadSourceFile ??
+                  'Download source file',
               icon: const Icon(Icons.download),
               iconSize: 18,
               visualDensity: VisualDensity.compact,
@@ -191,19 +195,24 @@ Widget _buildVideoPreviewEmbed(
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            title: const Text('Video'),
-            content: const Text('Web video player is limited. You can download the file or open it separately.'),
+            title: Text(AppLocalizations.of(context)?.commonVideo ?? 'Video'),
+            content: Text(
+              AppLocalizations.of(context)?.videoWebLimited ??
+                  'Web video player is limited. You can download the file or open it separately.',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Close'),
+                child: Text(AppLocalizations.of(context)?.commonClose ?? 'Close'),
               ),
               TextButton(
                 onPressed: () {
                   Navigator.pop(context);
                   _downloadAttachment(context, url);
                 },
-                child: const Text('Download'),
+                child: Text(
+                  AppLocalizations.of(context)?.commonDownload ?? 'Download',
+                ),
               ),
             ],
           ),
@@ -259,7 +268,9 @@ Widget _buildVideoPreviewEmbed(
               top: 8,
               right: 8,
               child: IconButton(
-                tooltip: 'Download source file',
+                tooltip:
+                    AppLocalizations.of(context)?.commonDownloadSourceFile ??
+                        'Download source file',
                 icon: const Icon(Icons.download, color: Colors.white),
                 iconSize: 20,
                 visualDensity: VisualDensity.compact,
@@ -348,12 +359,16 @@ class __VideoPlayerDialogState extends State<_VideoPlayerDialog> {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Video Error'),
-        content: const Text('Failed to load video'),
+        title: Text(
+          AppLocalizations.of(context)?.videoErrorTitle ?? 'Video Error',
+        ),
+        content: Text(
+          AppLocalizations.of(context)?.videoLoadFailed ?? 'Failed to load video',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
+            child: Text(AppLocalizations.of(context)?.commonClose ?? 'Close'),
           ),
         ],
       );
@@ -365,7 +380,7 @@ class __VideoPlayerDialogState extends State<_VideoPlayerDialog> {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Loading'),
+        title: Text(AppLocalizations.of(context)?.commonLoading ?? 'Loading'),
         content: const SizedBox(
           height: 100,
           child: Center(child: CircularProgressIndicator()),
@@ -373,7 +388,7 @@ class __VideoPlayerDialogState extends State<_VideoPlayerDialog> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
           ),
         ],
       );
@@ -444,7 +459,8 @@ class __VideoPlayerDialogState extends State<_VideoPlayerDialog> {
                                   children: [
                                     if (!isLandscape) ...[
                                       IconButton(
-                                        tooltip: 'Back 5s',
+                                        tooltip: AppLocalizations.of(context)?.commonBack5s ??
+                                            'Back 5s',
                                         icon: const Icon(Icons.replay_5, color: Colors.white),
                                         iconSize: 20,
                                         visualDensity: VisualDensity.compact,
@@ -470,7 +486,8 @@ class __VideoPlayerDialogState extends State<_VideoPlayerDialog> {
                                     ),
                                     if (!isLandscape) ...[
                                       IconButton(
-                                        tooltip: 'Forward 5s',
+                                        tooltip: AppLocalizations.of(context)?.commonForward5s ??
+                                            'Forward 5s',
                                         icon: const Icon(Icons.forward_5, color: Colors.white),
                                         iconSize: 20,
                                         visualDensity: VisualDensity.compact,
@@ -492,7 +509,11 @@ class __VideoPlayerDialogState extends State<_VideoPlayerDialog> {
                                       ),
                                     ],
                                     IconButton(
-                                      tooltip: _isFullscreen ? 'Exit fullscreen' : 'Fullscreen',
+                                      tooltip: _isFullscreen
+                                          ? (AppLocalizations.of(context)?.commonExitFullscreen ??
+                                              'Exit fullscreen')
+                                          : (AppLocalizations.of(context)?.commonFullscreen ??
+                                              'Fullscreen'),
                                       icon: Icon(
                                         _isFullscreen
                                             ? Icons.fullscreen_exit
@@ -587,16 +608,20 @@ Widget _buildAttachmentWithMenu(
         child: content,
       ),
       PopupMenuButton<String>(
-        tooltip: 'Attachment actions',
+        tooltip: AppLocalizations.of(context)?.feedsAttachmentActions ??
+            'Attachment actions',
         onSelected: (value) {
           if (value == 'download') {
             _downloadAttachment(context, url);
           }
         },
-        itemBuilder: (context) => const [
+        itemBuilder: (context) => [
           PopupMenuItem(
             value: 'download',
-            child: Text('Download source file'),
+            child: Text(
+              AppLocalizations.of(context)?.commonDownloadSourceFile ??
+                  'Download source file',
+            ),
           ),
         ],
         icon: const Icon(Icons.more_horiz, size: 20),
@@ -616,8 +641,14 @@ Future<void> _downloadAttachment(BuildContext context, String url) async {
   if (!context.mounted) return;
 
   final message = result.success
-      ? (result.filePath != null ? 'Saved to ${result.filePath}' : 'Download started')
-      : (result.errorMessage ?? 'Download failed');
+      ? (result.filePath != null
+        ? (AppLocalizations.of(context)?.commonSavedToPath(result.filePath!) ??
+          'Saved to ${result.filePath}')
+        : (AppLocalizations.of(context)?.commonDownloadStarted ??
+          'Download started'))
+      : (result.errorMessage ??
+        AppLocalizations.of(context)?.commonDownloadFailed ??
+        'Download failed');
 
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(content: Text(message)),
@@ -643,7 +674,10 @@ class UnknownEmbedBuilder extends quill.EmbedBuilder {
         color: Colors.orange[100],
         padding: const EdgeInsets.all(8),
         child: Text(
-          'Unsupported embed: ${embedContext.node.value.data}',
+          AppLocalizations.of(context)?.feedsUnsupportedEmbed(
+                embedContext.node.value.data,
+              ) ??
+              'Unsupported embed: ${embedContext.node.value.data}',
           style: const TextStyle(fontStyle: FontStyle.italic),
         ),
       ),
@@ -728,7 +762,10 @@ class _ChatVideoPlayerState extends State<ChatVideoPlayer> {
         color: Colors.grey[200],
         child: Center(
           child: Text(
-            'Video: ${widget.url.split('/').last}',
+            AppLocalizations.of(context)?.commonVideoLabel(
+                  widget.url.split('/').last,
+                ) ??
+                'Video: ${widget.url.split('/').last}',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -766,7 +803,8 @@ class _ChatVideoPlayerState extends State<ChatVideoPlayer> {
             Row(
               children: [
                 IconButton(
-                  tooltip: 'Back 5s',
+                  tooltip: AppLocalizations.of(context)?.commonBack5s ??
+                      'Back 5s',
                   icon: const Icon(Icons.replay_5),
                   onPressed: () => _seekBy(-_skipOffset, duration),
                 ),
@@ -783,7 +821,8 @@ class _ChatVideoPlayerState extends State<ChatVideoPlayer> {
                   },
                 ),
                 IconButton(
-                  tooltip: 'Forward 5s',
+                  tooltip: AppLocalizations.of(context)?.commonForward5s ??
+                      'Forward 5s',
                   icon: const Icon(Icons.forward_5),
                   onPressed: () => _seekBy(_skipOffset, duration),
                 ),

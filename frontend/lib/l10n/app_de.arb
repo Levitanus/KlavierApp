@@ -1,3 +1,568 @@
 {
-  "appTitle": "Musikschule am Thomas-Mann-Platz"
+  "appTitle": "Musikschule am Thomas-Mann-Platz",
+  "languageTitle": "Sprache",
+  "languageGerman": "Deutsch",
+  "languageEnglish": "Englisch",
+  "languageRussian": "Russisch",
+  "securityTitle": "Sicherheit",
+  "changePasswordTitle": "Passwort aendern",
+  "changePasswordSubtitle": "Konto-Passwort aktualisieren",
+  "consentTitle": "Einwilligung zur Verarbeitung personenbezogener Daten",
+  "consentAgree": "Zustimmen",
+  "consentGuardianConfirm": "Wenn Sie ein Kind registrieren, bestaetigen Sie, dass Sie Elternteil, gesetzlicher Vertreter oder anderweitig berechtigt sind.",
+  "consentRequired": "Bitte stimmen Sie der Einwilligung zu, um fortzufahren",
+  "consentFallback": "Einwilligung (kurz)\n- Nur Inhalte zum Musiklernen.\n- Sie koennen Ihr Profil bearbeiten oder loeschen.\n- Daten sind mit TLS geschuetzt.\n- Keine Weitergabe ausser fuer E-Mail-Zustellung (SendGrid).\nWenn Sie ein Kind registrieren, bestaetigen Sie, dass Sie Elternteil/Erziehungsberechtigter oder autorisiert sind.",
+  "commonSettings": "Einstellungen",
+  "commonOpen": "Oeffnen",
+  "commonPost": "Posten",
+  "commonEdit": "Bearbeiten",
+  "commonReply": "Antworten",
+  "commonDelete": "Loeschen",
+  "commonAdd": "Hinzufuegen",
+  "commonSave": "Speichern",
+  "commonCancel": "Abbrechen",
+  "commonRefresh": "Aktualisieren",
+  "commonClose": "Schliessen",
+  "commonDownload": "Herunterladen",
+  "commonDownloadSourceFile": "Quelldatei herunterladen",
+  "commonDownloadStarted": "Download gestartet",
+  "commonDownloadFailed": "Download fehlgeschlagen",
+  "commonSavedToPath": "Gespeichert unter {path}",
+  "commonBack5s": "5s zurueck",
+  "commonForward5s": "5s vor",
+  "commonBold": "Fett",
+  "commonItalic": "Kursiv",
+  "commonUnderline": "Unterstrichen",
+  "commonStrike": "Durchgestrichen",
+  "commonSubscript": "Tiefgestellt",
+  "commonSuperscript": "Hochgestellt",
+  "commonTitle": "Titel",
+  "commonSend": "Senden",
+  "commonApply": "Anwenden",
+  "commonInsertLink": "Link einfuegen",
+  "commonUrl": "URL",
+  "commonAttachFile": "Datei anhaengen",
+  "commonAudio": "Audio",
+  "commonVideo": "Video",
+  "commonImage": "Bild",
+  "commonFile": "Datei",
+  "commonVoiceMessage": "Sprachnachricht",
+  "commonTapToPlay": "Zum Abspielen tippen",
+  "commonLoading": "Laedt",
+  "commonFullscreen": "Vollbild",
+  "commonExitFullscreen": "Vollbild beenden",
+  "commonPrevious": "Vorherige Seite",
+  "commonNext": "Naechste Seite",
+  "commonClearSearch": "Suche leeren",
+  "commonNoResults": "Keine Ergebnisse gefunden",
+  "commonTypeToFilter": "Zum Filtern tippen...",
+  "commonRequired": "Erforderlich",
+  "commonErrorMessage": "Fehler: {error}",
+  "commonCreated": "erstellt",
+  "commonUpdated": "aktualisiert",
+  "commonCreate": "erstellen",
+  "commonUpdate": "aktualisieren",
+  "commonVideoLabel": "Video: {filename}",
+  "feedsTitle": "Feeds",
+  "feedsNone": "Keine Feeds verfuegbar",
+  "feedsSchool": "Schule",
+  "feedsTeacherFeeds": "Lehrer-Feeds",
+  "feedsOwnerSchool": "Schule",
+  "feedsOwnerTeacher": "Lehrer",
+  "feedsNewPostTooltip": "Neuer Beitrag",
+  "feedsMarkAllRead": "Alle als gelesen markieren",
+  "feedsImportant": "Wichtig",
+  "feedsLatest": "Neueste",
+  "feedsNoImportantPosts": "Noch keine wichtigen Beitraege.",
+  "feedsAllPosts": "Alle Beitraege",
+  "feedsNoPosts": "Noch keine Beitraege.",
+  "feedsPostedAt": "Gepostet {timestamp}",
+  "feedsPostedEditedAt": "Gepostet {timestamp} · bearbeitet",
+  "feedsSubscriptionFailed": "Abo konnte nicht aktualisiert werden",
+  "feedsDeleteDenied": "Sie haben keine Berechtigung, diesen Beitrag zu loeschen",
+  "feedsDeleteTitle": "Beitrag loeschen",
+  "feedsDeleteMessage": "Sind Sie sicher, dass Sie diesen Beitrag loeschen moechten? Diese Aktion kann nicht rueckgaengig gemacht werden.",
+  "feedsDeleteFailed": "Beitrag konnte nicht geloescht werden",
+  "feedsUnsupportedAttachment": "Nicht unterstuetzter Anhang: {type}",
+  "feedsAttachmentActions": "Anhangaktionen",
+  "feedsEditPost": "Beitrag bearbeiten",
+  "feedsNewPost": "Neuer Beitrag",
+  "feedsTextTools": "Textwerkzeuge",
+  "feedsTextFormatting": "Textformatierung",
+  "feedsJustificationTools": "Ausrichtungswerkzeuge",
+  "feedsListsPaddingTools": "Listen- und Einrueckungswerkzeuge",
+  "feedsAttachments": "Anhaenge",
+  "feedsAllowComments": "Kommentare erlauben",
+  "feedsMarkImportant": "Als wichtig markieren",
+  "feedsUploadFailed": "Medien konnten nicht hochgeladen werden",
+  "feedsEditComment": "Kommentar bearbeiten",
+  "feedsNewComment": "Neuer Kommentar",
+  "feedsComments": "Kommentare",
+  "feedsNoComments": "Noch keine Kommentare.",
+  "feedsAddComment": "Kommentar hinzufuegen",
+  "feedsSubscribeComments": "Kommentare abonnieren",
+  "feedsUnsubscribeComments": "Kommentar-Abo beenden",
+  "feedsAttachmentInline": "{typeLabel} (inline)",
+  "feedsSettingsTitle": "Feed-Einstellungen",
+  "feedsAllowStudentPosts": "Beitraege von Schuelern erlauben",
+  "feedsAutoSubscribe": "Neue Beitraege automatisch abonnieren",
+  "feedsNotifyNewPosts": "Bei neuen Beitraegen benachrichtigen",
+  "feedsParagraphType": "Absatztyp",
+  "feedsFont": "Schriftart",
+  "feedsSize": "Groesse",
+  "feedsAttach": "Anhaengen",
+  "feedsPostTitle": "Beitrag",
+  "feedsUnsupportedEmbed": "Nicht unterstuetztes Embed: {data}",
+  "feedsUntitledPost": "Unbenannter Beitrag",
+  "videoWebLimited": "Der Web-Video-Player ist eingeschraenkt. Sie koennen die Datei herunterladen oder separat oeffnen.",
+  "videoErrorTitle": "Video-Fehler",
+  "videoLoadFailed": "Video konnte nicht geladen werden",
+  "voiceRecordFailed": "Audioaufnahme fehlgeschlagen",
+  "voiceRecordUnavailable": "Audioaufnahme nicht verfuegbar",
+  "voiceRecordError": "Sprachfehler: {error}",
+  "voiceStopRecording": "Aufnahme stoppen",
+  "voiceRecord": "Sprache aufnehmen",
+  "hometasksChecklistUpdateFailed": "Checklistenpunkt konnte nicht aktualisiert werden.",
+  "hometasksItemsSaved": "Elemente erfolgreich gespeichert.",
+  "hometasksItemsSaveFailed": "Elemente konnten nicht gespeichert werden.",
+  "hometasksProgressUpdateFailed": "Fortschritt konnte nicht aktualisiert werden.",
+  "hometasksUpdateFailed": "Hausaufgabe konnte nicht aktualisiert werden.",
+  "hometasksTeacherFallback": "Lehrer #{teacherId}",
+  "hometasksItemNameRequired": "Alle Elemente muessen einen Namen haben.",
+  "hometasksDueLabel": "Faellig: {date}",
+  "hometasksEditItems": "Elemente bearbeiten",
+  "hometasksMarkCompleted": "Als erledigt markieren",
+  "hometasksMarkAccomplished": "Als abgeschlossen markieren",
+  "hometasksReturnActive": "Zurueck zu aktiv",
+  "hometasksMarkUncompleted": "Als nicht erledigt markieren",
+  "hometasksProgressNotStarted": "Nicht begonnen",
+  "hometasksProgressInProgress": "In Bearbeitung",
+  "hometasksProgressNearlyDone": "Fast fertig",
+  "hometasksProgressAlmostComplete": "Beinahe abgeschlossen",
+  "hometasksProgressComplete": "Abgeschlossen",
+  "hometasksItemHint": "Element {index}",
+  "hometasksAddItem": "Element hinzufuegen",
+  "notificationsTitle": "Benachrichtigungen",
+  "notificationsUnread": "Ungelesen",
+  "notificationsNone": "Keine Benachrichtigungen",
+  "chatNoTeachers": "Keine Lehrer gefunden",
+  "chatSelectTeacher": "Lehrer waehlen",
+  "chatStartFailed": "Chat konnte nicht gestartet werden",
+  "chatAdminOpenFailed": "Admin-Chat konnte nicht geoeffnet werden",
+  "chatMessages": "Nachrichten",
+  "chatChats": "Chats",
+  "chatAdmin": "Admin",
+  "chatNoConversations": "Noch keine Unterhaltungen",
+  "chatStartConversation": "Unterhaltung starten",
+  "chatAdministration": "Administration",
+  "chatUnknownUser": "Unbekannt",
+  "chatNoMessages": "(Keine Nachrichten)",
+  "chatTeachers": "Lehrer",
+  "chatNewChat": "Neuer Chat",
+  "chatThreadNotFound": "Chat erstellt, aber Thread nicht gefunden",
+  "chatStartNew": "Neuen Chat starten",
+  "chatSearchUsers": "Benutzer suchen...",
+  "profileAdminControls": "Admin-Steuerung",
+  "profileAdminAccess": "Admin-Zugriff",
+  "profileAdminAccessSubtitle": "Admin-Berechtigungen erteilen oder entziehen",
+  "profileAdminAccessUpdate": "Admin-Zugriff aktualisieren",
+  "profileRoleManagement": "Rollenverwaltung",
+  "profileMakeStudent": "Zum Schueler machen",
+  "profileMakeParent": "Zum Elternteil machen",
+  "profileMakeTeacher": "Zum Lehrer machen",
+  "profileArchiveRoles": "Rollen archivieren",
+  "profileSectionInfo": "Profilinformationen",
+  "profileSectionAdditional": "Zusaetzliche Informationen",
+  "profileTitleProfile": "Profil",
+  "profileTitleUserProfile": "Benutzerprofil",
+  "profileEditTooltip": "Profil bearbeiten",
+  "profileAdminViewLabel": "Admin-Ansicht",
+  "profileEmailLabel": "E-Mail",
+  "profilePhoneLabel": "Telefon",
+  "profileMemberSinceLabel": "Mitglied seit",
+  "profileNotSet": "Nicht gesetzt",
+  "profileUnknown": "Unbekannt",
+  "profileRolesTitle": "Rollen",
+  "profileBirthdayLabel": "Geburtstag",
+  "profileBirthdayInputLabel": "Geburtstag (JJJJ-MM-TT)",
+  "profileGenerateParentLink": "Eltern-Registrierungslink erstellen",
+  "profileMyChildrenTitle": "Meine Kinder",
+  "profileChildrenSubtitle": "Tippen Sie auf ein Kind, um die Informationen anzuzeigen oder zu bearbeiten",
+  "profileActionMessage": "Nachricht",
+  "profileManageStudentsTitle": "Schueler verwalten",
+  "profileActionAddStudent": "Schueler hinzufuegen",
+  "profileManageStudentsSubtitle": "Schueler verwalten, die Ihnen zugeordnet sind",
+  "profileNoStudentsAssigned": "Noch keine Schueler zugeordnet",
+  "profileActionViewProfile": "Profil ansehen",
+  "profileActionAssignHometask": "Hausaufgabe zuweisen",
+  "profileActionRemoveStudent": "Aus Schuelern entfernen",
+  "profileGenerateStudentLink": "Schueler-Registrierungslink erstellen",
+  "profileTeachersTitle": "Lehrer",
+  "profileTeachersSubtitle": "Tippen, um das Lehrerprofil anzusehen oder den Lehrer zu verlassen",
+  "profileNoTeachersAssigned": "Noch keine Lehrer zugeordnet",
+  "profileActionLeaveTeacher": "Lehrer verlassen",
+  "profileArchiveStudent": "Schueler archivieren",
+  "profileUnarchiveStudent": "Schueler wiederherstellen",
+  "profileArchiveParent": "Eltern archivieren",
+  "profileUnarchiveParent": "Eltern wiederherstellen",
+  "profileArchiveTeacher": "Lehrer archivieren",
+  "profileUnarchiveTeacher": "Lehrer wiederherstellen",
+  "profileParentTools": "Eltern-Werkzeuge",
+  "profileAddChildren": "Kinder hinzufuegen",
+  "adminPanelTitle": "Admin-Panel",
+  "adminUserManagement": "Benutzerverwaltung",
+  "adminSearchUsers": "Nach Benutzername oder vollem Namen suchen",
+  "adminNoUsers": "Keine Benutzer gefunden",
+  "adminAddUser": "Benutzer hinzufuegen",
+  "adminUser": "Benutzer",
+  "adminStudent": "Schueler",
+  "adminParent": "Eltern",
+  "adminTeacher": "Lehrer",
+  "adminAddStudent": "Schueler hinzufuegen",
+  "adminAddParent": "Eltern hinzufuegen",
+  "adminAddTeacher": "Lehrer hinzufuegen",
+  "adminShowingRange": "Anzeige {start}-{end} von {total}",
+  "adminRows": "Zeilen:",
+  "adminResetLink": "Reset-Link",
+  "adminViewProfile": "Profil anzeigen",
+  "adminEditUser": "Benutzer bearbeiten",
+  "adminDeleteUser": "Benutzer loeschen",
+  "adminFullName": "Voller Name",
+  "adminUsername": "Benutzername",
+  "adminActions": "Aktionen",
+  "adminLoadUsersFailed": "Benutzer konnten nicht geladen werden",
+  "adminUserSaved": "Benutzer {action} erfolgreich",
+  "adminUserSaveFailed": "Benutzer konnte nicht {action} werden",
+  "adminResetLinkGenerated": "Reset-Link erstellt",
+  "adminResetLinkFor": "Reset-Link fuer {username}:",
+  "adminResetLinkExpires": "Laeuft ab: {expires}",
+  "adminCopyLink": "Link kopieren",
+  "adminResetLinkCopied": "Reset-Link in Zwischenablage kopiert",
+  "adminResetLinkFailed": "Reset-Link konnte nicht erstellt werden",
+  "adminUserDeleted": "Benutzer {username} geloescht",
+  "adminDeleteUserFailed": "Benutzer konnte nicht geloescht werden",
+  "adminConvertedStudent": "Benutzer zum Schueler umgewandelt",
+  "adminConvertedParent": "Benutzer zum Elternteil umgewandelt",
+  "adminConvertedTeacher": "Benutzer zum Lehrer umgewandelt",
+  "adminStudentCreated": "Schueler erfolgreich erstellt",
+  "adminParentCreated": "Eltern erfolgreich erstellt",
+  "adminTeacherCreated": "Lehrer erfolgreich erstellt",
+  "adminDeleteUserTitle": "Benutzer loeschen",
+  "adminDeleteUserMessage": "{username} loeschen? Dies kann nicht rueckgaengig gemacht werden.",
+  "adminUsernameRequired": "Bitte Benutzernamen eingeben",
+  "adminFullNameRequired": "Bitte vollen Namen eingeben",
+  "adminPassword": "Passwort",
+  "adminNewPasswordOptional": "Neues Passwort (optional)",
+  "adminPasswordRequired": "Bitte Passwort eingeben",
+  "adminGeneratePassword": "Passwort generieren",
+  "adminEmailOptional": "E-Mail (optional)",
+  "adminPhoneOptional": "Telefon (optional)",
+  "adminRoleAdmin": "Admin",
+  "adminConvertRole": "In Rolle umwandeln:",
+  "adminCopyCredentials": "Zugangsdaten kopieren",
+  "adminCredentialsRequired": "Bitte zuerst Benutzername und Passwort ausfuellen",
+  "adminCredentialsCopied": "Zugangsdaten kopiert",
+  "adminMakeStudentTitle": "{username} zum Schueler machen",
+  "adminMakeParentTitle": "{username} zum Elternteil machen",
+  "adminMakeTeacherTitle": "{username} zum Lehrer machen",
+  "adminMakeTeacherNote": "Dies gibt dem Benutzer Lehrerrechte.",
+  "adminBirthdayLabel": "Geburtstag (JJJJ-MM-TT)",
+  "adminBirthdayHint": "2010-01-15",
+  "adminBirthdayFormat": "Format: JJJJ-MM-TT",
+  "adminConvert": "Umwandeln",
+  "adminSelectStudentsLabel": "Schueler auswaehlen (mindestens einen):",
+  "adminSelectChildrenLabel": "Kinder auswaehlen (mindestens ein):",
+  "adminSearchStudents": "Schueler suchen",
+  "adminNoStudents": "Keine Schueler gefunden",
+  "adminSelectStudentRequired": "Mindestens ein Schueler erforderlich",
+  "dashboardNoStudents": "Keine Schueler verfuegbar.",
+  "dashboardTitle": "Uebersicht",
+  "dashboardTeacherFeeds": "Lehrer-Feeds",
+  "dashboardNoTeacherFeeds": "Noch keine Lehrer-Feeds.",
+  "dashboardSchoolFeed": "Schul-Feed",
+  "dashboardNoSchoolFeed": "Noch kein Schul-Feed.",
+  "dashboardOwnerSchool": "Schule",
+  "dashboardOwnerTeacher": "Lehrer",
+  "dashboardStudentLabel": "Schueler:",
+  "dashboardNoActiveHometasks": "Keine aktiven Hausaufgaben.",
+  "homeClearAppCacheTitle": "App-Daten-Cache leeren",
+  "homeClearAppCacheBody": "Dies entfernt zwischengespeicherte Nachrichten, Feeds, Hausaufgaben und Profildaten.",
+  "homeAppCacheCleared": "App-Daten-Cache geleert.",
+  "homeClearMediaCacheTitle": "Medien-Cache leeren",
+  "homeClearMediaCacheBody": "Dies entfernt zwischengespeicherte Bilder und Mediendateien.",
+  "homeMediaCacheCleared": "Medien-Cache geleert.",
+  "homeLogoutTitle": "Abmelden",
+  "homeLogoutBody": "Moechten Sie sich wirklich abmelden?",
+  "homeMenuTooltip": "Menue",
+  "homeRolesLabel": "Rollen: {roles}",
+  "homeProfileInfo": "Ihre Profilinformationen",
+  "commonClear": "Leeren",
+  "commonLogout": "Abmelden",
+  "commonNotifications": "Benachrichtigungen",
+  "commonProfile": "Profil",
+  "commonUserManagement": "Benutzerverwaltung",
+  "commonTheme": "Design",
+  "commonSystem": "System",
+  "commonLight": "Hell",
+  "commonDark": "Dunkel",
+  "commonDashboard": "Uebersicht",
+  "commonHometasks": "Hausaufgaben",
+  "commonFeeds": "Feeds",
+  "commonChats": "Chats",
+  "commonUsername": "Benutzername",
+  "commonPassword": "Passwort",
+  "commonFullName": "Voller Name",
+  "commonEmailOptional": "E-Mail (optional)",
+  "commonPhoneOptional": "Telefon (optional)",
+  "commonConfirmPassword": "Passwort bestaetigen",
+  "commonBackToLogin": "Zurueck zur Anmeldung",
+  "commonOk": "OK",
+  "commonErrorTitle": "Fehler",
+  "registerRoleStudent": "Schueler",
+  "registerRoleParent": "Elternteil",
+  "registerRoleTeacher": "Lehrer",
+  "registerInvalidTokenTitle": "Ungueltiger Registrierungs-Token",
+  "registerInvalidTokenMessage": "Dieser Registrierungslink ist abgelaufen oder wurde bereits verwendet.",
+  "registerGoToLogin": "Zur Anmeldung",
+  "registerTitle": "Registrieren als {role}",
+  "registerParentOf": "Sie werden als Elternteil registriert fuer:",
+  "registerComplete": "Registrierung abschliessen",
+  "registerUsernameRequired": "Bitte Benutzernamen eingeben",
+  "registerUsernameMin": "Benutzername muss mindestens 3 Zeichen haben",
+  "registerFullNameRequired": "Bitte vollen Namen eingeben",
+  "registerBirthdayLabel": "Geburtstag (JJJJ-MM-TT)",
+  "registerBirthdayHint": "2010-01-31",
+  "registerBirthdayRequired": "Bitte Geburtstag eingeben",
+  "registerBirthdayFormat": "Format: JJJJ-MM-TT",
+  "registerPasswordRequired": "Bitte Passwort eingeben",
+  "registerPasswordMin": "Passwort muss mindestens 6 Zeichen haben",
+  "registerConfirmRequired": "Bitte Passwort bestaetigen",
+  "registerPasswordsMismatch": "Passwoerter stimmen nicht ueberein",
+  "registerButton": "Registrieren",
+  "registerLoginFailed": "Anmeldung fehlgeschlagen",
+  "registerFailed": "Registrierung fehlgeschlagen",
+  "registerNetworkError": "Netzwerkfehler: {error}",
+  "registerValidateFailed": "Token konnte nicht validiert werden",
+  "resetErrorValidating": "Fehler beim Validieren des Tokens: {error}",
+  "resetSuccessTitle": "Erfolg",
+  "resetSuccessMessage": "Ihr Passwort wurde erfolgreich zurueckgesetzt. Sie koennen sich jetzt mit dem neuen Passwort anmelden.",
+  "resetFailed": "Passwort konnte nicht zurueckgesetzt werden",
+  "resetErrorGeneric": "Fehler: {error}",
+  "resetTitle": "Passwort zuruecksetzen",
+  "resetValidating": "Reset-Token wird geprueft...",
+  "resetInvalidTitle": "Ungueltiger oder abgelaufener Link",
+  "resetInvalidMessage": "Dieser Link zum Zuruecksetzen ist ungueltig oder abgelaufen. Bitte fordern Sie einen neuen Link an.",
+  "resetSetNewPassword": "Neues Passwort setzen",
+  "resetForUser": "fuer Benutzer: {username}",
+  "resetNewPasswordLabel": "Neues Passwort",
+  "resetPasswordRequired": "Bitte Passwort eingeben",
+  "resetPasswordMin": "Passwort muss mindestens 6 Zeichen haben",
+  "resetConfirmPasswordLabel": "Passwort bestaetigen",
+  "resetConfirmRequired": "Bitte Passwort bestaetigen",
+  "loginTitle": "Anmelden",
+  "loginForgotTitle": "Passwort vergessen",
+  "loginForgotPrompt": "Geben Sie Ihren Benutzernamen ein, um das Zuruecksetzen anzufordern.",
+  "loginUsernameRequired": "Bitte Benutzernamen eingeben",
+  "loginPasswordRequired": "Bitte Passwort eingeben",
+  "loginButton": "Anmelden",
+  "loginForgotPassword": "Passwort vergessen?",
+  "loginRequestSentTitle": "Anfrage gesendet",
+  "loginRequestSentMessage": "Anfrage zum Zuruecksetzen wurde gesendet.",
+  "loginRequestFailedMessage": "Anfrage zum Zuruecksetzen fehlgeschlagen. Bitte erneut versuchen.",
+  "loginErrorMessage": "Ein Fehler ist aufgetreten: {error}",
+  "loginFailed": "Anmeldung fehlgeschlagen",
+  "commonRetry": "Erneut versuchen",
+  "hometasksNone": "Keine Hausaufgaben gefunden.",
+  "hometasksUpdateOrderFailed": "Reihenfolge konnte nicht aktualisiert werden.",
+  "hometasksAssignTitle": "Hausaufgabe an {studentName} zuweisen",
+  "hometasksTitleLabel": "Titel",
+  "hometasksTitleRequired": "Titel ist erforderlich",
+  "hometasksDescriptionLabel": "Beschreibung (optional)",
+  "hometasksDueDate": "Faelligkeitsdatum",
+  "hometasksNoDueDate": "Kein Faelligkeitsdatum",
+  "hometasksRepeatLabel": "Wiederholen",
+  "hometasksRepeatNone": "Keine Wiederholung",
+  "hometasksRepeatDaily": "Taeglich",
+  "hometasksRepeatWeekly": "Woechentlich",
+  "hometasksRepeatCustom": "Benutzerdefiniertes Intervall",
+  "hometasksRepeatEveryDays": "Alle (Tage) wiederholen",
+  "hometasksRepeatCustomInvalid": "Bitte positive Anzahl Tage eingeben",
+  "hometasksTypeLabel": "Aufgabentyp",
+  "hometasksTypeSimple": "Einfach",
+  "hometasksTypeChecklist": "Checkliste",
+  "hometasksTypeProgress": "Fortschritt",
+  "hometasksChecklistItems": "Checklistenpunkte",
+  "hometasksProgressItems": "Fortschrittspunkte",
+  "hometasksItemLabel": "Element {index}",
+  "hometasksRequired": "Erforderlich",
+  "hometasksAddAtLeastOne": "Mindestens ein {typeLabel}-Element hinzufuegen.",
+  "hometasksRepeatIntervalInvalid": "Gueltiges Intervall eingeben.",
+  "hometasksAssigned": "Hausaufgabe zugewiesen.",
+  "hometasksAssignFailed": "Hausaufgabe konnte nicht zugewiesen werden.",
+  "hometasksAssignAction": "Zuweisen",
+  "hometasksActive": "Aktiv",
+  "hometasksArchive": "Archiv",
+  "hometasksAssign": "Hausaufgabe zuweisen",
+  "@commonSavedToPath": {
+    "placeholders": {
+      "path": {}
+    }
+  },
+  "@commonErrorMessage": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@commonVideoLabel": {
+    "placeholders": {
+      "filename": {}
+    }
+  },
+  "@feedsPostedAt": {
+    "placeholders": {
+      "timestamp": {}
+    }
+  },
+  "@feedsPostedEditedAt": {
+    "placeholders": {
+      "timestamp": {}
+    }
+  },
+  "@feedsUnsupportedAttachment": {
+    "placeholders": {
+      "type": {}
+    }
+  },
+  "@feedsAttachmentInline": {
+    "placeholders": {
+      "typeLabel": {}
+    }
+  },
+  "@feedsUnsupportedEmbed": {
+    "placeholders": {
+      "data": {}
+    }
+  },
+  "@voiceRecordError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@hometasksDueLabel": {
+    "placeholders": {
+      "date": {}
+    }
+  },
+  "@hometasksItemHint": {
+    "placeholders": {
+      "index": {}
+    }
+  },
+  "@hometasksTeacherFallback": {
+    "placeholders": {
+      "teacherId": {}
+    }
+  },
+  "@adminShowingRange": {
+    "placeholders": {
+      "start": {},
+      "end": {},
+      "total": {}
+    }
+  },
+  "@adminUserSaved": {
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "@adminUserSaveFailed": {
+    "placeholders": {
+      "action": {}
+    }
+  },
+  "@adminResetLinkFor": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminResetLinkExpires": {
+    "placeholders": {
+      "expires": {}
+    }
+  },
+  "@adminUserDeleted": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminDeleteUserMessage": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminMakeStudentTitle": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminMakeParentTitle": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@adminMakeTeacherTitle": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@homeRolesLabel": {
+    "placeholders": {
+      "roles": {}
+    }
+  },
+  "@loginErrorMessage": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@registerTitle": {
+    "placeholders": {
+      "role": {}
+    }
+  },
+  "@registerNetworkError": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@resetErrorValidating": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@resetErrorGeneric": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "@resetForUser": {
+    "placeholders": {
+      "username": {}
+    }
+  },
+  "@hometasksAssignTitle": {
+    "placeholders": {
+      "studentName": {}
+    }
+  },
+  "@hometasksItemLabel": {
+    "placeholders": {
+      "index": {}
+    }
+  },
+  "@hometasksAddAtLeastOne": {
+    "placeholders": {
+      "typeLabel": {}
+    }
+  }
 }

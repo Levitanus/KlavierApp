@@ -8,6 +8,7 @@ import 'services/feed_service.dart';
 import 'widgets/feed_preview_card.dart';
 import 'feeds_screen.dart';
 import 'home_screen.dart';
+import 'l10n/app_localizations.dart';
 
 class DashboardScreen extends StatefulWidget {
   final int? initialStudentId;
@@ -78,7 +79,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (students.isEmpty) {
       setState(() {
         _loadingStudents = false;
-        _studentsError = 'No students available.';
+        _studentsError = AppLocalizations.of(context)?.dashboardNoStudents ??
+            'No students available.';
       });
       return;
     }
@@ -122,6 +124,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Consumer3<AuthService, HometaskService, FeedService>(
       builder: (context, authService, hometaskService, feedService, child) {
         final hometasks = _sortedHometasks(hometaskService.hometasks);
@@ -137,7 +140,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           padding: const EdgeInsets.all(16),
           children: [
             Text(
-              'Dashboard',
+              l10n?.dashboardTitle ?? 'Dashboard',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 12),
@@ -149,13 +152,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
             const SizedBox(height: 20),
             Text(
-              'Teacher feeds',
+              l10n?.dashboardTeacherFeeds ?? 'Teacher feeds',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             if (teacherFeeds.isEmpty)
               Text(
-                'No teacher feeds yet.',
+                l10n?.dashboardNoTeacherFeeds ?? 'No teacher feeds yet.',
                 style: Theme.of(context).textTheme.bodySmall,
               )
             else
@@ -163,7 +166,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),
-                  ownerLabel: _ownerLabel(feed),
+                  ownerLabel: _ownerLabel(feed, l10n),
                   importantLimit: 2,
                   recentLimit: 2,
                   onTap: () {
@@ -177,13 +180,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             const SizedBox(height: 20),
             Text(
-              'School feed',
+              l10n?.dashboardSchoolFeed ?? 'School feed',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             if (schoolFeeds.isEmpty)
               Text(
-                'No school feed yet.',
+                l10n?.dashboardNoSchoolFeed ?? 'No school feed yet.',
                 style: Theme.of(context).textTheme.bodySmall,
               )
             else
@@ -191,7 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),
-                  ownerLabel: _ownerLabel(feed),
+                  ownerLabel: _ownerLabel(feed, l10n),
                   importantLimit: 2,
                   recentLimit: 2,
                   onTap: () {
@@ -215,6 +218,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     HometaskService hometaskService,
     List<Hometask> hometasks,
   ) {
+    final l10n = AppLocalizations.of(context);
     final showStudentSelector = _isParent(authService) || _isTeacher(authService);
 
     return Column(
@@ -223,12 +227,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
         Row(
           children: [
             Text(
-              'Hometasks',
+              l10n?.commonHometasks ?? 'Hometasks',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const Spacer(),
             IconButton(
-              tooltip: 'Refresh',
+              tooltip: l10n?.commonRefresh ?? 'Refresh',
               onPressed: _loadDashboard,
               icon: const Icon(Icons.refresh),
             ),
@@ -245,7 +249,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           else
             Row(
               children: [
-                const Text('Student:'),
+                Text(l10n?.dashboardStudentLabel ?? 'Student:'),
                 const SizedBox(width: 12),
                 DropdownButton<int>(
                   value: _selectedStudentId,
@@ -276,7 +280,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           const LinearProgressIndicator()
         else if (hometasks.isEmpty)
           Text(
-            'No active hometasks.',
+            l10n?.dashboardNoActiveHometasks ?? 'No active hometasks.',
             style: Theme.of(context).textTheme.bodySmall,
           )
         else
@@ -335,13 +339,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
     return feed.title.replaceFirst(RegExp(r'\s*Feed$'), '').trim();
   }
 
-  String _ownerLabel(Feed feed) {
+  String _ownerLabel(Feed feed, AppLocalizations? l10n) {
     final ownerType = feed.ownerType.toLowerCase();
     if (ownerType == 'school') {
-      return 'School';
+      return l10n?.dashboardOwnerSchool ?? 'School';
     }
     if (ownerType == 'teacher') {
-      return 'Teacher';
+      return l10n?.dashboardOwnerTeacher ?? 'Teacher';
     }
     return feed.ownerType;
   }

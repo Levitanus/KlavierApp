@@ -4,6 +4,7 @@ import 'auth.dart';
 import 'models/hometask.dart';
 import 'services/hometask_service.dart';
 import 'widgets/hometask_widget.dart';
+import 'l10n/app_localizations.dart';
 
 class HometasksScreen extends StatefulWidget {
   final int? initialStudentId;
@@ -90,7 +91,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
     if (students.isEmpty) {
       setState(() {
         _isLoadingStudents = false;
-        _studentsError = 'No students available.';
+        _studentsError = AppLocalizations.of(context)?.dashboardNoStudents ??
+            'No students available.';
       });
       return;
     }
@@ -146,6 +148,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final authService = context.watch<AuthService>();
     final hometaskService = context.watch<HometaskService>();
     final isStudent = _isStudent(authService);
@@ -177,12 +180,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      'Hometasks',
+                      l10n?.commonHometasks ?? 'Hometasks',
                       style: Theme.of(context).textTheme.headlineSmall,
                     ),
                   ),
                   IconButton(
-                    tooltip: 'Refresh',
+                    tooltip: l10n?.commonRefresh ?? 'Refresh',
                     onPressed: _loadHometasks,
                     icon: const Icon(Icons.refresh),
                   ),
@@ -200,7 +203,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
                 else
                   Row(
                     children: [
-                      const Text('Student:'),
+                      Text(l10n?.dashboardStudentLabel ?? 'Student:'),
                       const SizedBox(width: 12),
                       DropdownButton<int>(
                         value: _selectedStudentId,
@@ -227,7 +230,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
               Row(
                 children: [
                   ChoiceChip(
-                    label: const Text('Active'),
+                    label: Text(l10n?.hometasksActive ?? 'Active'),
                     selected: !_showArchive,
                     onSelected: (selected) async {
                       if (selected) {
@@ -240,7 +243,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
                   ),
                   const SizedBox(width: 8),
                   ChoiceChip(
-                    label: const Text('Archive'),
+                    label: Text(l10n?.hometasksArchive ?? 'Archive'),
                     selected: _showArchive,
                     onSelected: (selected) async {
                       if (selected) {
@@ -277,7 +280,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
                   ? null
                   : () => _showAssignHometaskDialog(selectedStudent!),
               icon: const Icon(Icons.assignment_add),
-              label: const Text('Assign Hometask'),
+              label: Text(l10n?.hometasksAssign ?? 'Assign Hometask'),
             ),
           ),
       ],
@@ -310,7 +313,9 @@ class _HometasksScreenState extends State<HometasksScreen> {
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: _loadHometasks,
-              child: const Text('Retry'),
+              child: Text(
+                AppLocalizations.of(context)?.commonRetry ?? 'Retry',
+              ),
             ),
           ],
         ),
@@ -322,8 +327,11 @@ class _HometasksScreenState extends State<HometasksScreen> {
         : hometaskService.hometasks;
 
     if (hometasks.isEmpty) {
-      return const Center(
-        child: Text('No hometasks found.'),
+      return Center(
+        child: Text(
+          AppLocalizations.of(context)?.hometasksNone ??
+              'No hometasks found.',
+        ),
       );
     }
 
@@ -352,7 +360,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
 
           if (!success && mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to update order.')),
+              SnackBar(
+                content: Text(
+                  AppLocalizations.of(context)?.hometasksUpdateOrderFailed ??
+                      'Failed to update order.',
+                ),
+              ),
             );
           }
         },
@@ -406,7 +419,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final grouped = <String, List<Hometask>>{};
     for (final task in hometasks) {
       final rawName = task.teacherName?.trim() ?? '';
-      final key = rawName.isNotEmpty ? rawName : 'Teacher #${task.teacherId}';
+      final key = rawName.isNotEmpty
+          ? rawName
+          : (AppLocalizations.of(context)?.hometasksTeacherFallback(
+                  task.teacherId,
+                ) ??
+              'Teacher #${task.teacherId}');
       grouped.putIfAbsent(key, () => []).add(task);
     }
 
@@ -473,6 +491,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
   }
 
   void _showAssignHometaskDialog(StudentSummary student) {
+    final l10n = AppLocalizations.of(context);
     final titleController = TextEditingController();
     final descriptionController = TextEditingController();
     final itemControllers = [TextEditingController()];
@@ -488,7 +507,10 @@ class _HometasksScreenState extends State<HometasksScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            title: Text('Assign Hometask to ${student.fullName}'),
+            title: Text(
+              l10n?.hometasksAssignTitle(student.fullName) ??
+                  'Assign Hometask to ${student.fullName}',
+            ),
             insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
@@ -504,21 +526,23 @@ class _HometasksScreenState extends State<HometasksScreen> {
                     children: [
                       TextFormField(
                         controller: titleController,
-                        decoration: const InputDecoration(
-                          labelText: 'Title',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n?.hometasksTitleLabel ?? 'Title',
+                          border: const OutlineInputBorder(),
                         ),
                         validator: (value) =>
                             value == null || value.trim().isEmpty
-                                ? 'Title is required'
+                                ? l10n?.hometasksTitleRequired ??
+                                    'Title is required'
                                 : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: descriptionController,
-                        decoration: const InputDecoration(
-                          labelText: 'Description (optional)',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n?.hometasksDescriptionLabel ??
+                              'Description (optional)',
+                          border: const OutlineInputBorder(),
                         ),
                         minLines: 2,
                         maxLines: 4,
@@ -526,11 +550,11 @@ class _HometasksScreenState extends State<HometasksScreen> {
                       const SizedBox(height: 12),
                       ListTile(
                         contentPadding: EdgeInsets.zero,
-                        title: const Text('Due date'),
+                        title: Text(l10n?.hometasksDueDate ?? 'Due date'),
                         subtitle: Text(
                           dueDate != null
                               ? '${dueDate!.year}-${dueDate!.month.toString().padLeft(2, '0')}-${dueDate!.day.toString().padLeft(2, '0')}'
-                              : 'No due date',
+                              : l10n?.hometasksNoDueDate ?? 'No due date',
                         ),
                         trailing: const Icon(Icons.calendar_today),
                         onTap: () async {
@@ -554,26 +578,26 @@ class _HometasksScreenState extends State<HometasksScreen> {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<String>(
                         initialValue: repeatSelection,
-                        decoration: const InputDecoration(
-                          labelText: 'Repeat',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n?.hometasksRepeatLabel ?? 'Repeat',
+                          border: const OutlineInputBorder(),
                         ),
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: 'none',
-                            child: Text('No repeat'),
+                            child: Text(l10n?.hometasksRepeatNone ?? 'No repeat'),
                           ),
                           DropdownMenuItem(
                             value: 'daily',
-                            child: Text('Each day'),
+                            child: Text(l10n?.hometasksRepeatDaily ?? 'Each day'),
                           ),
                           DropdownMenuItem(
                             value: 'weekly',
-                            child: Text('Each week'),
+                            child: Text(l10n?.hometasksRepeatWeekly ?? 'Each week'),
                           ),
                           DropdownMenuItem(
                             value: 'custom',
-                            child: Text('Custom interval'),
+                            child: Text(l10n?.hometasksRepeatCustom ?? 'Custom interval'),
                           ),
                         ],
                         onChanged: (value) {
@@ -587,9 +611,10 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: repeatDaysController,
-                          decoration: const InputDecoration(
-                            labelText: 'Repeat every (days)',
-                            border: OutlineInputBorder(),
+                          decoration: InputDecoration(
+                            labelText: l10n?.hometasksRepeatEveryDays ??
+                                'Repeat every (days)',
+                            border: const OutlineInputBorder(),
                           ),
                           keyboardType: TextInputType.number,
                           validator: (value) {
@@ -598,7 +623,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
                             }
                             final parsed = int.tryParse(value ?? '');
                             if (parsed == null || parsed <= 0) {
-                              return 'Enter a positive number of days';
+                              return l10n?.hometasksRepeatCustomInvalid ??
+                                  'Enter a positive number of days';
                             }
                             return null;
                           },
@@ -607,22 +633,22 @@ class _HometasksScreenState extends State<HometasksScreen> {
                       const SizedBox(height: 12),
                       DropdownButtonFormField<HometaskType>(
                         initialValue: selectedType,
-                        decoration: const InputDecoration(
-                          labelText: 'Hometask type',
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n?.hometasksTypeLabel ?? 'Hometask type',
+                          border: const OutlineInputBorder(),
                         ),
-                        items: const [
+                        items: [
                           DropdownMenuItem(
                             value: HometaskType.simple,
-                            child: Text('Simple'),
+                            child: Text(l10n?.hometasksTypeSimple ?? 'Simple'),
                           ),
                           DropdownMenuItem(
                             value: HometaskType.checklist,
-                            child: Text('Checklist'),
+                            child: Text(l10n?.hometasksTypeChecklist ?? 'Checklist'),
                           ),
                           DropdownMenuItem(
                             value: HometaskType.progress,
-                            child: Text('Progress'),
+                            child: Text(l10n?.hometasksTypeProgress ?? 'Progress'),
                           ),
                         ],
                         onChanged: (value) {
@@ -637,8 +663,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
                           selectedType == HometaskType.progress) ...[
                         Text(
                           selectedType == HometaskType.checklist
-                              ? 'Checklist items'
-                              : 'Progress items',
+                                ? (l10n?.hometasksChecklistItems ?? 'Checklist items')
+                                : (l10n?.hometasksProgressItems ?? 'Progress items'),
                           style: Theme.of(context).textTheme.titleSmall,
                         ),
                         const SizedBox(height: 8),
@@ -651,12 +677,13 @@ class _HometasksScreenState extends State<HometasksScreen> {
                                   child: TextFormField(
                                     controller: itemControllers[index],
                                     decoration: InputDecoration(
-                                      labelText: 'Item ${index + 1}',
+                                      labelText: l10n?.hometasksItemLabel(index + 1) ??
+                                          'Item ${index + 1}',
                                       border: const OutlineInputBorder(),
                                     ),
                                     validator: (value) =>
                                         value == null || value.trim().isEmpty
-                                            ? 'Required'
+                                            ? (l10n?.hometasksRequired ?? 'Required')
                                             : null,
                                   ),
                                 ),
@@ -682,7 +709,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
                               });
                             },
                             icon: const Icon(Icons.add),
-                            label: const Text('Add item'),
+                            label: Text(l10n?.hometasksAddItem ?? 'Add item'),
                           ),
                         ),
                       ],
@@ -696,7 +723,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
                 onPressed: isSubmitting
                     ? null
                     : () => Navigator.of(context).pop(),
-                child: const Text('Cancel'),
+                child: Text(l10n?.commonCancel ?? 'Cancel'),
               ),
               ElevatedButton(
                 onPressed: isSubmitting
@@ -717,10 +744,14 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         if ((selectedType == HometaskType.checklist ||
                                 selectedType == HometaskType.progress) &&
                             items.isEmpty) {
+                          final typeLabel = selectedType == HometaskType.checklist
+                              ? (l10n?.hometasksTypeChecklist ?? 'checklist')
+                              : (l10n?.hometasksTypeProgress ?? 'progress');
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
-                                'Add at least one ${selectedType == HometaskType.checklist ? 'checklist' : 'progress'} item.',
+                                l10n?.hometasksAddAtLeastOne(typeLabel) ??
+                                    'Add at least one $typeLabel item.',
                               ),
                             ),
                           );
@@ -740,8 +771,11 @@ class _HometasksScreenState extends State<HometasksScreen> {
                                 int.tryParse(repeatDaysController.text.trim());
                             if (repeatEveryDays == null || repeatEveryDays <= 0) {
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Enter a valid repeat interval.'),
+                                SnackBar(
+                                  content: Text(
+                                    l10n?.hometasksRepeatIntervalInvalid ??
+                                        'Enter a valid repeat interval.',
+                                  ),
                                 ),
                               );
                               return;
@@ -773,8 +807,10 @@ class _HometasksScreenState extends State<HometasksScreen> {
                           Navigator.of(context).pop();
                           await _loadHometasks();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Hometask assigned.'),
+                            SnackBar(
+                              content: Text(
+                                l10n?.hometasksAssigned ?? 'Hometask assigned.',
+                              ),
                             ),
                           );
                         } else if (context.mounted) {
@@ -782,13 +818,16 @@ class _HometasksScreenState extends State<HometasksScreen> {
                             isSubmitting = false;
                           });
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Failed to assign hometask.'),
+                            SnackBar(
+                              content: Text(
+                                l10n?.hometasksAssignFailed ??
+                                    'Failed to assign hometask.',
+                              ),
                             ),
                           );
                         }
                       },
-                child: const Text('Assign'),
+                child: Text(l10n?.hometasksAssignAction ?? 'Assign'),
               ),
             ],
           );
@@ -833,7 +872,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
     if (!success && mounted) {
       await _loadHometasks();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update checklist item.')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.hometasksChecklistUpdateFailed ??
+                'Failed to update checklist item.',
+          ),
+        ),
       );
     }
   }
@@ -850,12 +894,22 @@ class _HometasksScreenState extends State<HometasksScreen> {
 
     if (success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Items saved successfully.')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.hometasksItemsSaved ??
+                'Items saved successfully.',
+          ),
+        ),
       );
       await _loadHometasks();
     } else if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to save items.')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.hometasksItemsSaveFailed ??
+                'Failed to save items.',
+          ),
+        ),
       );
     }
   }
@@ -897,7 +951,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
     if (!success && mounted) {
       await _loadHometasks();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update progress item.')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.hometasksProgressUpdateFailed ??
+                'Failed to update progress item.',
+          ),
+        ),
       );
     }
   }
@@ -907,7 +966,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final success = await hometaskService.markCompleted(hometaskId);
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update hometask.')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.hometasksUpdateFailed ??
+                'Failed to update hometask.',
+          ),
+        ),
       );
     }
     if (success && mounted) {
@@ -920,7 +984,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final success = await hometaskService.markAccomplished(hometaskId);
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update hometask.')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.hometasksUpdateFailed ??
+                'Failed to update hometask.',
+          ),
+        ),
       );
     }
     if (success && mounted) {
@@ -933,7 +1002,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final success = await hometaskService.markReopened(hometaskId);
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to update hometask.')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.hometasksUpdateFailed ??
+                'Failed to update hometask.',
+          ),
+        ),
       );
     }
     if (success && mounted) {

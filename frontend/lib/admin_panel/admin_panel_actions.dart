@@ -47,7 +47,14 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content: Text(
-                    'User ${isNewUser ? 'created' : 'updated'} successfully')),
+                    AppLocalizations.of(context)?.adminUserSaved(
+                          isNewUser
+                              ? (AppLocalizations.of(context)?.commonCreated ??
+                                  'created')
+                              : (AppLocalizations.of(context)?.commonUpdated ??
+                                  'updated'),
+                        ) ??
+                        'User ${isNewUser ? 'created' : 'updated'} successfully')),
           );
         }
       } else {
@@ -55,14 +62,28 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
                 content:
-                    Text('Failed to ${isNewUser ? 'create' : 'update'} user')),
+                    Text(
+                      AppLocalizations.of(context)?.adminUserSaveFailed(
+                            isNewUser
+                                ? (AppLocalizations.of(context)?.commonCreate ??
+                                    'create')
+                                : (AppLocalizations.of(context)?.commonUpdate ??
+                                    'update'),
+                          ) ??
+                          'Failed to ${isNewUser ? 'create' : 'update'} user',
+                    )),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.commonErrorMessage(e.toString()) ??
+                  'Error: $e',
+            ),
+          ),
         );
       }
     }
@@ -92,12 +113,18 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            title: const Text('Reset Link Generated'),
+            title: Text(
+              AppLocalizations.of(context)?.adminResetLinkGenerated ??
+                  'Reset Link Generated',
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Reset link for ${user.username}:'),
+                Text(
+                  AppLocalizations.of(context)?.adminResetLinkFor(user.username) ??
+                      'Reset link for ${user.username}:',
+                ),
                 const SizedBox(height: 8),
                 SelectableText(
                   resetLink,
@@ -108,7 +135,10 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Expires: ${data['expires_at']}',
+                  AppLocalizations.of(context)?.adminResetLinkExpires(
+                        data['expires_at'].toString(),
+                      ) ??
+                      'Expires: ${data['expires_at']}',
                   style: const TextStyle(fontSize: 12, color: Colors.grey),
                 ),
               ],
@@ -116,16 +146,23 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Close'),
+                child: Text(AppLocalizations.of(context)?.commonClose ?? 'Close'),
               ),
               ElevatedButton.icon(
                 icon: const Icon(Icons.copy),
-                label: const Text('Copy Link'),
+                label: Text(
+                  AppLocalizations.of(context)?.adminCopyLink ?? 'Copy Link',
+                ),
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: resetLink));
                   if (context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Reset link copied to clipboard')),
+                      SnackBar(
+                        content: Text(
+                          AppLocalizations.of(context)?.adminResetLinkCopied ??
+                              'Reset link copied to clipboard',
+                        ),
+                      ),
                     );
                     Navigator.of(context).pop();
                   }
@@ -136,13 +173,23 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to generate reset link')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.adminResetLinkFailed ??
+                  'Failed to generate reset link',
+            ),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.commonErrorMessage(e.toString()) ??
+                  'Error: $e',
+            ),
+          ),
         );
       }
     }
@@ -164,18 +211,33 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
         await _loadUsers();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('User ${user.username} deleted')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.adminUserDeleted(user.username) ??
+                    'User ${user.username} deleted',
+              ),
+            ),
           );
         }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Failed to delete user')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.adminDeleteUserFailed ??
+                  'Failed to delete user',
+            ),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.commonErrorMessage(e.toString()) ??
+                  'Error: $e',
+            ),
+          ),
         );
       }
     }
@@ -200,21 +262,36 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
         _loadUsers();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('User converted to student')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.adminConvertedStudent ??
+                    'User converted to student',
+              ),
+            ),
           );
         }
       } else {
         if (mounted) {
           final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.commonErrorMessage(error) ??
+                    'Error: $error',
+              ),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.commonErrorMessage(e.toString()) ??
+                  'Error: $e',
+            ),
+          ),
         );
       }
     }
@@ -239,21 +316,36 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
         _loadUsers();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('User converted to parent')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.adminConvertedParent ??
+                    'User converted to parent',
+              ),
+            ),
           );
         }
       } else {
         if (mounted) {
           final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.commonErrorMessage(error) ??
+                    'Error: $error',
+              ),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.commonErrorMessage(e.toString()) ??
+                  'Error: $e',
+            ),
+          ),
         );
       }
     }
@@ -275,21 +367,36 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
         _loadUsers();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('User converted to teacher')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.adminConvertedTeacher ??
+                    'User converted to teacher',
+              ),
+            ),
           );
         }
       } else {
         if (mounted) {
           final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.commonErrorMessage(error) ??
+                    'Error: $error',
+              ),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.commonErrorMessage(e.toString()) ??
+                  'Error: $e',
+            ),
+          ),
         );
       }
     }
@@ -319,21 +426,36 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
         _loadUsers();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Student created successfully')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.adminStudentCreated ??
+                    'Student created successfully',
+              ),
+            ),
           );
         }
       } else {
         if (mounted) {
           final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.commonErrorMessage(error) ??
+                    'Error: $error',
+              ),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.commonErrorMessage(e.toString()) ??
+                  'Error: $e',
+            ),
+          ),
         );
       }
     }
@@ -363,21 +485,36 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
         _loadUsers();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Parent created successfully')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.adminParentCreated ??
+                    'Parent created successfully',
+              ),
+            ),
           );
         }
       } else {
         if (mounted) {
           final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.commonErrorMessage(error) ??
+                    'Error: $error',
+              ),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.commonErrorMessage(e.toString()) ??
+                  'Error: $e',
+            ),
+          ),
         );
       }
     }
@@ -406,21 +543,36 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
         _loadUsers();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Teacher created successfully')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.adminTeacherCreated ??
+                    'Teacher created successfully',
+              ),
+            ),
           );
         }
       } else {
         if (mounted) {
           final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error')),
+            SnackBar(
+              content: Text(
+                AppLocalizations.of(context)?.commonErrorMessage(error) ??
+                    'Error: $error',
+              ),
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.commonErrorMessage(e.toString()) ??
+                  'Error: $e',
+            ),
+          ),
         );
       }
     }

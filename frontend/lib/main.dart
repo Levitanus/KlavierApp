@@ -12,6 +12,7 @@ import 'services/feed_service.dart';
 import 'services/chat_service.dart';
 import 'services/websocket_service.dart';
 import 'services/theme_service.dart';
+import 'services/locale_service.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 import 'reset_password_screen.dart';
@@ -89,6 +90,7 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeService()),
+        ChangeNotifierProvider(create: (_) => LocaleService()),
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProxyProvider<AuthService, NotificationService>(
           create: (context) => NotificationService(
@@ -163,10 +165,11 @@ class MyApp extends StatelessWidget {
           },
         ),
       ],
-      child: Consumer<ThemeService>(
-        builder: (context, themeService, child) => MaterialApp(
+      child: Consumer2<ThemeService, LocaleService>(
+        builder: (context, themeService, localeService, child) => MaterialApp(
           onGenerateTitle: (context) =>
               AppLocalizations.of(context)?.appTitle ?? 'Music School App',
+          locale: localeService.locale ?? const Locale('de'),
           theme: ThemeData(
             useMaterial3: true,
             colorScheme: _lightColorScheme,

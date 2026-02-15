@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'config/app_config.dart';
+import 'l10n/app_localizations.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   final String token;
@@ -63,7 +64,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
       setState(() {
         _isValidating = false;
         _isValidToken = false;
-        _errorMessage = 'Error validating token: $e';
+        _errorMessage = AppLocalizations.of(context)
+            ?.resetErrorValidating(e.toString()) ??
+          'Error validating token: $e';
       });
     }
   }
@@ -97,15 +100,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
               contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
               actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-              title: const Text('Success'),
-              content: const Text('Your password has been reset successfully. You can now log in with your new password.'),
+              title: Text(AppLocalizations.of(context)?.resetSuccessTitle ?? 'Success'),
+              content: Text(
+                AppLocalizations.of(context)?.resetSuccessMessage ??
+                    'Your password has been reset successfully. You can now log in with your new password.',
+              ),
               actions: [
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).pop();
                     Navigator.of(context).pop(); // Go back to login screen
                   },
-                  child: const Text('OK'),
+                  child: Text(AppLocalizations.of(context)?.commonOk ?? 'OK'),
                 ),
               ],
             ),
@@ -113,14 +119,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
         } else {
           final data = jsonDecode(response.body);
           setState(() {
-            _errorMessage = data['error'] ?? 'Failed to reset password';
+            _errorMessage = data['error'] ??
+                AppLocalizations.of(context)?.resetFailed ??
+                'Failed to reset password';
           });
         }
       } catch (e) {
         if (!mounted) return;
         setState(() {
           _isLoading = false;
-          _errorMessage = 'Error: $e';
+          _errorMessage = AppLocalizations.of(context)
+                  ?.resetErrorGeneric(e.toString()) ??
+              'Error: $e';
         });
       }
     }
@@ -128,9 +138,10 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reset Password'),
+        title: Text(l10n?.resetTitle ?? 'Reset Password'),
         centerTitle: true,
       ),
       body: SafeArea(
@@ -138,12 +149,14 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
           child: SingleChildScrollView(
             padding: const EdgeInsets.all(24.0),
             child: _isValidating
-                ? const Column(
+                ? Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      CircularProgressIndicator(),
-                      SizedBox(height: 16),
-                      Text('Validating reset token...'),
+                      const CircularProgressIndicator(),
+                      const SizedBox(height: 16),
+                      Text(
+                        l10n?.resetValidating ?? 'Validating reset token...'
+                      ),
                     ],
                   )
                 : !_isValidToken
@@ -156,17 +169,18 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                             color: Colors.red,
                           ),
                           const SizedBox(height: 16),
-                          const Text(
-                            'Invalid or Expired Link',
-                            style: TextStyle(
+                          Text(
+                            l10n?.resetInvalidTitle ?? 'Invalid or Expired Link',
+                            style: const TextStyle(
                               fontSize: 24,
                               fontWeight: FontWeight.bold,
                             ),
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            'This password reset link is invalid or has expired. Please request a new password reset link.',
+                          Text(
+                            l10n?.resetInvalidMessage ??
+                                'This password reset link is invalid or has expired. Please request a new password reset link.',
                             textAlign: TextAlign.center,
                           ),
                           if (_errorMessage != null) ...[
@@ -180,7 +194,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                           const SizedBox(height: 24),
                           ElevatedButton(
                             onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('Back to Login'),
+                            child: Text(
+                              l10n?.commonBackToLogin ?? 'Back to Login',
+                            ),
                           ),
                         ],
                       )
@@ -196,9 +212,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               color: Colors.blue,
                             ),
                             const SizedBox(height: 16),
-                            const Text(
-                              'Set New Password',
-                              style: TextStyle(
+                            Text(
+                              l10n?.resetSetNewPassword ?? 'Set New Password',
+                              style: const TextStyle(
                                 fontSize: 28,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -207,7 +223,8 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                             const SizedBox(height: 8),
                             if (_username != null)
                               Text(
-                                'for user: $_username',
+                                l10n?.resetForUser(_username ?? '') ??
+                                    'for user: $_username',
                                 style: const TextStyle(
                                   fontSize: 16,
                                   color: Colors.grey,
@@ -220,7 +237,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                             TextFormField(
                               controller: _passwordController,
                               decoration: InputDecoration(
-                                labelText: 'New Password',
+                                labelText: l10n?.resetNewPasswordLabel ?? 'New Password',
                                 prefixIcon: const Icon(Icons.lock),
                                 border: const OutlineInputBorder(),
                                 suffixIcon: IconButton(
@@ -237,10 +254,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               obscureText: _obscurePassword,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Please enter a password';
+                                  return l10n?.resetPasswordRequired ??
+                                      'Please enter a password';
                                 }
                                 if (value.length < 6) {
-                                  return 'Password must be at least 6 characters';
+                                  return l10n?.resetPasswordMin ??
+                                      'Password must be at least 6 characters';
                                 }
                                 return null;
                               },
@@ -252,7 +271,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                             TextFormField(
                               controller: _confirmPasswordController,
                               decoration: InputDecoration(
-                                labelText: 'Confirm Password',
+                                labelText: l10n?.resetConfirmPasswordLabel ?? 'Confirm Password',
                                 prefixIcon: const Icon(Icons.lock_outline),
                                 border: const OutlineInputBorder(),
                                 suffixIcon: IconButton(
@@ -269,10 +288,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                               obscureText: _obscureConfirmPassword,
                               validator: (value) {
                                 if (value == null || value.isEmpty) {
-                                  return 'Please confirm your password';
+                                  return l10n?.resetConfirmRequired ??
+                                      'Please confirm your password';
                                 }
                                 if (value != _passwordController.text) {
-                                  return 'Passwords do not match';
+                                  return l10n?.registerPasswordsMismatch ??
+                                      'Passwords do not match';
                                 }
                                 return null;
                               },
@@ -307,9 +328,9 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                                       width: 20,
                                       child: CircularProgressIndicator(strokeWidth: 2),
                                     )
-                                  : const Text(
-                                      'Reset Password',
-                                      style: TextStyle(fontSize: 16),
+                                  : Text(
+                                      l10n?.resetTitle ?? 'Reset Password',
+                                      style: const TextStyle(fontSize: 16),
                                     ),
                             ),
                           ],

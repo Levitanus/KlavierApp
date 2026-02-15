@@ -22,6 +22,7 @@ import 'feeds_screen.dart';
 import 'chat_screen.dart';
 import 'notifications_screen.dart';
 import 'config/app_config.dart';
+import 'l10n/app_localizations.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? adminUsername;
@@ -88,7 +89,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final hasAccepted = prefs.getBool(_consentKey) ?? false;
     if (hasAccepted || !mounted) return;
 
-    final consentText = await _loadConsentText();
+    final localeCode = Localizations.localeOf(context).languageCode;
+    final consentText = await _loadConsentText(localeCode);
     bool consentAccepted = false;
 
     await showDialog<void>(
@@ -100,7 +102,10 @@ class _HomeScreenState extends State<HomeScreen> {
           titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
           contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
           actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-          title: const Text('Consent to Personal Data Processing'),
+          title: Text(
+            AppLocalizations.of(context)?.consentTitle ??
+                'Consent to Personal Data Processing',
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -115,8 +120,9 @@ class _HomeScreenState extends State<HomeScreen> {
                     consentAccepted = value ?? false;
                   });
                 },
-                title: const Text(
-                  'If you register a child, you confirm that you are a parent, legal guardian, or otherwise authorized person.',
+                title: Text(
+                  AppLocalizations.of(context)?.consentGuardianConfirm ??
+                      'If you register a child, you confirm that you are a parent, legal guardian, or otherwise authorized person.',
                 ),
               ),
             ],
@@ -131,7 +137,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       }
                     }
                   : null,
-              child: const Text('Agree'),
+              child: Text(
+                AppLocalizations.of(context)?.consentAgree ?? 'Agree',
+              ),
             ),
           ],
         ),
@@ -139,9 +147,15 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Future<String> _loadConsentText() async {
+  Future<String> _loadConsentText(String localeCode) async {
     try {
-      final text = await rootBundle.loadString('assets/consent.txt');
+      final localizedPath = 'assets/consent_${localeCode}.txt';
+      String text;
+      try {
+        text = await rootBundle.loadString(localizedPath);
+      } catch (_) {
+        text = await rootBundle.loadString('assets/consent.txt');
+      }
       final trimmed = text.trim();
       if (trimmed.isNotEmpty) {
         return trimmed;
@@ -244,6 +258,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _confirmClearAppCache() async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -251,16 +266,19 @@ class _HomeScreenState extends State<HomeScreen> {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Clear app data cache'),
-        content: const Text('This will remove cached messages, feeds, hometasks, and profile data.'),
+        title: Text(l10n?.homeClearAppCacheTitle ?? 'Clear app data cache'),
+        content: Text(
+          l10n?.homeClearAppCacheBody ??
+              'This will remove cached messages, feeds, hometasks, and profile data.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n?.commonCancel ?? 'Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear'),
+            child: Text(l10n?.commonClear ?? 'Clear'),
           ),
         ],
       ),
@@ -282,12 +300,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('App data cache cleared.')),
+        SnackBar(
+          content: Text(
+            l10n?.homeAppCacheCleared ?? 'App data cache cleared.',
+          ),
+        ),
       );
     }
   }
 
   Future<void> _confirmClearMediaCache() async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -295,16 +318,19 @@ class _HomeScreenState extends State<HomeScreen> {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Clear media cache'),
-        content: const Text('This will remove cached images and media files.'),
+        title: Text(l10n?.homeClearMediaCacheTitle ?? 'Clear media cache'),
+        content: Text(
+          l10n?.homeClearMediaCacheBody ??
+              'This will remove cached images and media files.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n?.commonCancel ?? 'Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Clear'),
+            child: Text(l10n?.commonClear ?? 'Clear'),
           ),
         ],
       ),
@@ -316,7 +342,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Media cache cleared.')),
+        SnackBar(
+          content: Text(
+            l10n?.homeMediaCacheCleared ?? 'Media cache cleared.',
+          ),
+        ),
       );
     }
   }
@@ -362,6 +392,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _handleLogout() async {
+    final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -369,16 +400,18 @@ class _HomeScreenState extends State<HomeScreen> {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Logout'),
-        content: const Text('Are you sure you want to logout?'),
+        title: Text(l10n?.homeLogoutTitle ?? 'Logout'),
+        content: Text(
+          l10n?.homeLogoutBody ?? 'Are you sure you want to logout?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n?.commonCancel ?? 'Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Logout'),
+            child: Text(l10n?.commonLogout ?? 'Logout'),
           ),
         ],
       ),
@@ -400,6 +433,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
     final themeService = context.watch<ThemeService>();
+    final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final logoAsset = isDark
         ? 'assets/branding/logo bright.svg'
@@ -416,13 +450,13 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: _NotificationNavIcon(active: isNotificationsPage),
-            tooltip: 'Notifications',
+            tooltip: l10n?.commonNotifications ?? 'Notifications',
             onPressed: () => _navigateToPage(const NotificationsScreen()),
           ),
           Builder(
             builder: (context) => IconButton(
               icon: const Icon(Icons.menu),
-              tooltip: 'Menu',
+              tooltip: l10n?.homeMenuTooltip ?? 'Menu',
               onPressed: () => Scaffold.of(context).openEndDrawer(),
             ),
           ),
@@ -497,7 +531,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 12),
                   if (authService.roles.isNotEmpty)
                     Text(
-                      'Roles: ${authService.roles.join(', ')}',
+                      l10n?.homeRolesLabel(authService.roles.join(', ')) ??
+                          'Roles: ${authService.roles.join(', ')}',
                       style: const TextStyle(
                         color: Colors.white70,
                         fontSize: 12,
@@ -517,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.person),
-              title: const Text('Profile'),
+              title: Text(l10n?.commonProfile ?? 'Profile'),
               selected: _selectedDrawerIndex == 200,
               onTap: () => _navigateTo(const ProfileScreen(), 200),
             ),
@@ -525,7 +560,7 @@ class _HomeScreenState extends State<HomeScreen> {
             if (authService.isAdmin) ...[
               ListTile(
                 leading: const Icon(Icons.people),
-                title: const Text('User Management'),
+                title: Text(l10n?.commonUserManagement ?? 'User Management'),
                 selected: _selectedDrawerIndex == 100,
                 onTap: () => _navigateTo(const AdminPanel(), 100),
               ),
@@ -533,7 +568,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
             ListTile(
               leading: const Icon(Icons.brightness_6),
-              title: const Text('Theme'),
+              title: Text(l10n?.commonTheme ?? 'Theme'),
               trailing: DropdownButton<ThemeMode>(
                 value: themeService.themeMode,
                 onChanged: (value) {
@@ -541,18 +576,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     themeService.setThemeMode(value);
                   }
                 },
-                items: const [
+                items: [
                   DropdownMenuItem(
                     value: ThemeMode.system,
-                    child: Text('System'),
+                    child: Text(l10n?.commonSystem ?? 'System'),
                   ),
                   DropdownMenuItem(
                     value: ThemeMode.light,
-                    child: Text('Light'),
+                    child: Text(l10n?.commonLight ?? 'Light'),
                   ),
                   DropdownMenuItem(
                     value: ThemeMode.dark,
-                    child: Text('Dark'),
+                    child: Text(l10n?.commonDark ?? 'Dark'),
                   ),
                 ],
               ),
@@ -560,18 +595,18 @@ class _HomeScreenState extends State<HomeScreen> {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.cached),
-              title: const Text('Clear app data cache'),
+              title: Text(l10n?.homeClearAppCacheTitle ?? 'Clear app data cache'),
               onTap: _confirmClearAppCache,
             ),
             ListTile(
               leading: const Icon(Icons.image_not_supported),
-              title: const Text('Clear media cache'),
+              title: Text(l10n?.homeClearMediaCacheTitle ?? 'Clear media cache'),
               onTap: _confirmClearMediaCache,
             ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.logout),
-              title: const Text('Logout'),
+              title: Text(l10n?.commonLogout ?? 'Logout'),
               onTap: _handleLogout,
             ),
           ],
@@ -582,31 +617,31 @@ class _HomeScreenState extends State<HomeScreen> {
         currentIndex: _selectedTabIndex,
         type: BottomNavigationBarType.fixed,
         onTap: _navigateToTab,
-        items: const [
+        items: [
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard_outlined),
             activeIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+            label: l10n?.commonDashboard ?? 'Dashboard',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.checklist),
             activeIcon: Icon(Icons.checklist),
-            label: 'Hometasks',
+            label: l10n?.commonHometasks ?? 'Hometasks',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.dynamic_feed_outlined),
             activeIcon: Icon(Icons.dynamic_feed),
-            label: 'Feeds',
+            label: l10n?.commonFeeds ?? 'Feeds',
           ),
           BottomNavigationBarItem(
             icon: _ChatNavIcon(active: false),
             activeIcon: _ChatNavIcon(active: true),
-            label: 'Chats',
+            label: l10n?.commonChats ?? 'Chats',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),
             activeIcon: Icon(Icons.person),
-            label: 'Profile',
+            label: l10n?.commonProfile ?? 'Profile',
           ),
         ],
       ),
@@ -728,6 +763,7 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -739,13 +775,13 @@ class ProfilePage extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Profile',
+            l10n?.commonProfile ?? 'Profile',
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: 8),
-          const Text(
-            'Your profile information',
-            style: TextStyle(color: Colors.grey),
+          Text(
+            l10n?.homeProfileInfo ?? 'Your profile information',
+            style: const TextStyle(color: Colors.grey),
           ),
         ],
       ),

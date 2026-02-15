@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/audio_player_service.dart';
 import '../utils/media_download.dart';
+import '../l10n/app_localizations.dart';
 
 String _formatDuration(Duration value) {
   final minutes = value.inMinutes.remainder(60).toString().padLeft(2, '0');
@@ -92,7 +93,8 @@ class _FloatingAudioPlayerState extends State<FloatingAudioPlayer> {
                 Row(
                   children: [
                     IconButton(
-                      tooltip: 'Back 5s',
+                      tooltip: AppLocalizations.of(context)?.commonBack5s ??
+                          'Back 5s',
                       icon: const Icon(Icons.replay_5, color: Colors.white),
                       iconSize: 20,
                       visualDensity: VisualDensity.compact,
@@ -114,7 +116,8 @@ class _FloatingAudioPlayerState extends State<FloatingAudioPlayer> {
                       },
                     ),
                     IconButton(
-                      tooltip: 'Forward 5s',
+                      tooltip: AppLocalizations.of(context)?.commonForward5s ??
+                          'Forward 5s',
                       icon: const Icon(Icons.forward_5, color: Colors.white),
                       iconSize: 20,
                       visualDensity: VisualDensity.compact,
@@ -127,7 +130,9 @@ class _FloatingAudioPlayerState extends State<FloatingAudioPlayer> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              currentLabel ?? 'Audio',
+                              currentLabel ??
+                                  (AppLocalizations.of(context)?.commonAudio ??
+                                      'Audio'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
@@ -148,14 +153,15 @@ class _FloatingAudioPlayerState extends State<FloatingAudioPlayer> {
                       ),
                     ),
                     IconButton(
-                      tooltip: 'Download source file',
+                      tooltip: AppLocalizations.of(context)?.commonDownloadSourceFile ??
+                          'Download source file',
                       icon: const Icon(Icons.download, color: Colors.white),
                       iconSize: 20,
                       visualDensity: VisualDensity.compact,
                       onPressed: () => _downloadAttachment(context, currentUrl),
                     ),
                     IconButton(
-                      tooltip: 'Close',
+                      tooltip: AppLocalizations.of(context)?.commonClose ?? 'Close',
                       icon: const Icon(Icons.close, color: Colors.white),
                       iconSize: 20,
                       visualDensity: VisualDensity.compact,
@@ -184,8 +190,16 @@ class _FloatingAudioPlayerState extends State<FloatingAudioPlayer> {
     if (!context.mounted) return;
 
     final message = result.success
-        ? (result.filePath != null ? 'Saved to ${result.filePath}' : 'Download started')
-        : (result.errorMessage ?? 'Download failed');
+      ? (result.filePath != null
+        ? (AppLocalizations.of(context)?.commonSavedToPath(
+            result.filePath!,
+          ) ??
+          'Saved to ${result.filePath}')
+        : (AppLocalizations.of(context)?.commonDownloadStarted ??
+          'Download started'))
+      : (result.errorMessage ??
+        AppLocalizations.of(context)?.commonDownloadFailed ??
+        'Download failed');
 
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),

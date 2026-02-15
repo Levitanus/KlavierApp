@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/feed.dart';
 import '../services/feed_service.dart';
+import '../l10n/app_localizations.dart';
 
 class FeedPreviewCard extends StatelessWidget {
   final Feed feed;
@@ -38,6 +39,7 @@ class FeedPreviewCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return FutureBuilder<_FeedPreviewData>(
       future: _loadPreview(context),
       builder: (context, snapshot) {
@@ -70,13 +72,13 @@ class FeedPreviewCard extends StatelessWidget {
                     const LinearProgressIndicator()
                   else if (preview == null || (preview.important.isEmpty && preview.recent.isEmpty))
                     Text(
-                      'No posts yet.',
+                      l10n?.feedsNoPosts ?? 'No posts yet.',
                       style: Theme.of(context).textTheme.bodySmall,
                     )
                   else ...[
                     if (preview.important.isNotEmpty) ...[
                       Text(
-                        'Important',
+                        l10n?.feedsImportant ?? 'Important',
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
                       const SizedBox(height: 4),
@@ -85,7 +87,7 @@ class FeedPreviewCard extends StatelessWidget {
                     ],
                     if (preview.recent.isNotEmpty) ...[
                       Text(
-                        'Latest',
+                        l10n?.feedsLatest ?? 'Latest',
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
                       const SizedBox(height: 4),
@@ -102,8 +104,9 @@ class FeedPreviewCard extends StatelessWidget {
   }
 
   Widget _buildPostLine(BuildContext context, FeedPost post) {
+    final l10n = AppLocalizations.of(context);
     final title = (post.title == null || post.title!.isEmpty)
-        ? 'Untitled post'
+      ? (l10n?.feedsUntitledPost ?? 'Untitled post')
         : post.title!;
     final baseStyle = Theme.of(context).textTheme.bodyMedium;
     final unreadStyle = baseStyle?.copyWith(

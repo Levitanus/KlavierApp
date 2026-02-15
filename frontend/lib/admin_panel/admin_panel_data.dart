@@ -61,13 +61,15 @@ mixin _AdminPanelData on _AdminPanelStateBase {
         }
       } else {
         setState(() {
-          _errorMessage = 'Failed to load users';
+          _errorMessage = AppLocalizations.of(context)?.adminLoadUsersFailed ??
+              'Failed to load users';
           _isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Error: $e';
+        _errorMessage = AppLocalizations.of(context)?.commonErrorMessage(e.toString()) ??
+            'Error: $e';
         _isLoading = false;
       });
     }

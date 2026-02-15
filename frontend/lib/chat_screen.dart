@@ -6,6 +6,7 @@ import 'services/chat_service.dart';
 import 'services/media_cache_service.dart';
 import 'screens/chat_conversation.dart';
 import 'config/app_config.dart';
+import 'l10n/app_localizations.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({Key? key}) : super(key: key);
@@ -77,7 +78,12 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
     if (teachers.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No teachers found')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.chatNoTeachers ??
+                'No teachers found',
+          ),
+        ),
       );
       return;
     }
@@ -85,7 +91,9 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Select Teacher'),
+        title: Text(
+          AppLocalizations.of(context)?.chatSelectTeacher ?? 'Select Teacher',
+        ),
         content: SizedBox(
           width: double.maxFinite,
           child: ListView.builder(
@@ -126,7 +134,13 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       }
     } else if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to start chat')),
+        SnackBar(
+          content: Text(
+            chatService.errorMessage ??
+                (AppLocalizations.of(context)?.chatStartFailed ??
+                    'Failed to start chat'),
+          ),
+        ),
       );
     }
   }
@@ -139,7 +153,13 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
 
     if (thread == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to open admin chat')),
+        SnackBar(
+          content: Text(
+            chatService.errorMessage ??
+                (AppLocalizations.of(context)?.chatAdminOpenFailed ??
+                    'Failed to open admin chat'),
+          ),
+        ),
       );
       return;
     }
@@ -152,7 +172,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
     final isAdminTab = _isAdmin && _activeTabIndex == 1;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Messages'),
+        title: Text(AppLocalizations.of(context)?.chatMessages ?? 'Messages'),
         elevation: 0,
         bottom: _isAdmin
             ? PreferredSize(
@@ -163,13 +183,13 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                     tabs: [
                       Tab(
                         child: _TabLabel(
-                          label: 'Chats',
+                          label: AppLocalizations.of(context)?.chatChats ?? 'Chats',
                           count: chatService.personalUnreadCount,
                         ),
                       ),
                       Tab(
                         child: _TabLabel(
-                          label: 'Admin',
+                          label: AppLocalizations.of(context)?.chatAdmin ?? 'Admin',
                           count: chatService.adminUnreadCount,
                         ),
                       ),
@@ -192,15 +212,19 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                 children: [
                   const Icon(Icons.mail_outline, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
-                  const Text(
-                    'No conversations yet',
-                    style: TextStyle(fontSize: 18, color: Colors.grey),
+                  Text(
+                    AppLocalizations.of(context)?.chatNoConversations ??
+                        'No conversations yet',
+                    style: const TextStyle(fontSize: 18, color: Colors.grey),
                   ),
                   const SizedBox(height: 32),
                   ElevatedButton.icon(
                     onPressed: _showNewChatDialog,
                     icon: const Icon(Icons.add),
-                    label: const Text('Start a conversation'),
+                    label: Text(
+                      AppLocalizations.of(context)?.chatStartConversation ??
+                          'Start a conversation',
+                    ),
                   ),
                 ],
               ),
@@ -248,9 +272,11 @@ class _ThreadListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final lastMsg = thread.lastMessage;
     final displayName = thread.isAdminChat && !showAdminPeerName
-        ? 'Administration'
-        : (thread.peerName ?? 'Unknown');
-    final preview = lastMsg?.plainText ?? '(No messages)';
+      ? (AppLocalizations.of(context)?.chatAdministration ?? 'Administration')
+      : (thread.peerName ??
+        (AppLocalizations.of(context)?.chatUnknownUser ?? 'Unknown'));
+    final preview = lastMsg?.plainText ??
+      (AppLocalizations.of(context)?.chatNoMessages ?? '(No messages)');
 
     return ListTile(
       onTap: onTap,
@@ -312,7 +338,7 @@ class _BottomChatToolbar extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onMessageAdmin,
                 icon: const Icon(Icons.shield),
-                label: const Text('Admin'),
+                label: Text(AppLocalizations.of(context)?.chatAdmin ?? 'Admin'),
               ),
               const SizedBox(width: 8),
             ],
@@ -320,14 +346,16 @@ class _BottomChatToolbar extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: onMessageTeacher,
                 icon: const Icon(Icons.person),
-                label: const Text('Teachers'),
+                label: Text(
+                  AppLocalizations.of(context)?.chatTeachers ?? 'Teachers',
+                ),
               ),
               const SizedBox(width: 8),
             ],
             ElevatedButton.icon(
               onPressed: onNewChat,
               icon: const Icon(Icons.add),
-              label: const Text('New Chat'),
+              label: Text(AppLocalizations.of(context)?.chatNewChat ?? 'New Chat'),
             ),
           ],
         ),
@@ -450,7 +478,13 @@ class _NewChatDialogState extends State<_NewChatDialog> {
     if (!mounted) return;
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to start chat')),
+        SnackBar(
+          content: Text(
+            chatService.errorMessage ??
+                (AppLocalizations.of(context)?.chatStartFailed ??
+                    'Failed to start chat'),
+          ),
+        ),
       );
       return;
     }
@@ -472,7 +506,12 @@ class _NewChatDialogState extends State<_NewChatDialog> {
 
     if (thread.id == -1) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Chat created, but thread not found')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.chatThreadNotFound ??
+                'Chat created, but thread not found',
+          ),
+        ),
       );
       return;
     }
@@ -500,7 +539,9 @@ class _NewChatDialogState extends State<_NewChatDialog> {
       titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
       contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
       actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-      title: const Text('Start New Chat'),
+      title: Text(
+        AppLocalizations.of(context)?.chatStartNew ?? 'Start New Chat',
+      ),
       content: SizedBox(
         width: double.maxFinite,
         child: Column(
@@ -508,9 +549,10 @@ class _NewChatDialogState extends State<_NewChatDialog> {
           children: [
             TextField(
               controller: _searchController,
-              decoration: const InputDecoration(
-                hintText: 'Search users...',
-                prefixIcon: Icon(Icons.search),
+              decoration: InputDecoration(
+                hintText: AppLocalizations.of(context)?.chatSearchUsers ??
+                    'Search users...',
+                prefixIcon: const Icon(Icons.search),
               ),
               onChanged: _searchUsers,
             ),
@@ -526,9 +568,12 @@ class _NewChatDialogState extends State<_NewChatDialog> {
                 ),
               )
             else if (_filteredUsers.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('No results found'),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  AppLocalizations.of(context)?.commonNoResults ??
+                      'No results found',
+                ),
               )
             else
               Expanded(

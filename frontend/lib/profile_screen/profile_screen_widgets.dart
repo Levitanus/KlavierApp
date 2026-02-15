@@ -129,13 +129,20 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Admin Controls',
+              AppLocalizations.of(context)?.profileAdminControls ??
+                  'Admin Controls',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const Divider(),
             CheckboxListTile(
-              title: const Text('Admin Access'),
-              subtitle: const Text('Grant or revoke admin permissions'),
+              title: Text(
+                AppLocalizations.of(context)?.profileAdminAccess ??
+                    'Admin Access',
+              ),
+              subtitle: Text(
+                AppLocalizations.of(context)?.profileAdminAccessSubtitle ??
+                    'Grant or revoke admin permissions',
+              ),
               value: _adminRoleSelected,
               onChanged: canUpdate
                   ? (checked) {
@@ -152,12 +159,16 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
               child: ElevatedButton.icon(
                 onPressed: canUpdate ? _updateAdminRole : null,
                 icon: const Icon(Icons.save),
-                label: const Text('Update Admin Access'),
+                label: Text(
+                  AppLocalizations.of(context)?.profileAdminAccessUpdate ??
+                      'Update Admin Access',
+                ),
               ),
             ),
             const SizedBox(height: 16),
             Text(
-              'Role Management',
+              AppLocalizations.of(context)?.profileRoleManagement ??
+                  'Role Management',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
@@ -168,19 +179,28 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
                 if (!_roles.contains('student'))
                   OutlinedButton.icon(
                     icon: const Icon(Icons.school, size: 16),
-                    label: const Text('Make Student'),
+                    label: Text(
+                      AppLocalizations.of(context)?.profileMakeStudent ??
+                          'Make Student',
+                    ),
                     onPressed: canUpdate ? _showMakeStudentDialog : null,
                   ),
                 if (!_roles.contains('parent'))
                   OutlinedButton.icon(
                     icon: const Icon(Icons.family_restroom, size: 16),
-                    label: const Text('Make Parent'),
+                    label: Text(
+                      AppLocalizations.of(context)?.profileMakeParent ??
+                          'Make Parent',
+                    ),
                     onPressed: canUpdate ? _showMakeParentDialog : null,
                   ),
                 if (!_roles.contains('teacher'))
                   OutlinedButton.icon(
                     icon: const Icon(Icons.person, size: 16),
-                    label: const Text('Make Teacher'),
+                    label: Text(
+                      AppLocalizations.of(context)?.profileMakeTeacher ??
+                          'Make Teacher',
+                    ),
                     onPressed: canUpdate ? _showMakeTeacherDialog : null,
                   ),
               ],
@@ -188,7 +208,8 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
             const SizedBox(height: 16),
             if (_roles.any((role) => role == 'student' || role == 'parent' || role == 'teacher')) ...[
               Text(
-                'Archive Roles',
+                AppLocalizations.of(context)?.profileArchiveRoles ??
+                    'Archive Roles',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
@@ -204,8 +225,11 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
                       ),
                       label: Text(
                         _isRoleArchived('student')
-                            ? 'Unarchive Student'
-                            : 'Archive Student',
+                          ? (AppLocalizations.of(context)?.
+                              profileUnarchiveStudent ??
+                            'Unarchive Student')
+                          : (AppLocalizations.of(context)?.profileArchiveStudent ??
+                            'Archive Student'),
                       ),
                       onPressed: canUpdate
                           ? () => _toggleRoleArchive('student')
@@ -219,8 +243,11 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
                       ),
                       label: Text(
                         _isRoleArchived('parent')
-                            ? 'Unarchive Parent'
-                            : 'Archive Parent',
+                          ? (AppLocalizations.of(context)?.
+                              profileUnarchiveParent ??
+                            'Unarchive Parent')
+                          : (AppLocalizations.of(context)?.profileArchiveParent ??
+                            'Archive Parent'),
                       ),
                       onPressed: canUpdate
                           ? () => _toggleRoleArchive('parent')
@@ -234,8 +261,11 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
                       ),
                       label: Text(
                         _isRoleArchived('teacher')
-                            ? 'Unarchive Teacher'
-                            : 'Archive Teacher',
+                          ? (AppLocalizations.of(context)?.
+                              profileUnarchiveTeacher ??
+                            'Unarchive Teacher')
+                          : (AppLocalizations.of(context)?.profileArchiveTeacher ??
+                            'Archive Teacher'),
                       ),
                       onPressed: canUpdate
                           ? () => _toggleRoleArchive('teacher')
@@ -247,13 +277,17 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
             if (_roles.contains('parent')) ...[
               const SizedBox(height: 16),
               Text(
-                'Parent Tools',
+                AppLocalizations.of(context)?.profileParentTools ??
+                    'Parent Tools',
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 icon: const Icon(Icons.person_add_alt_1),
-                label: const Text('Add Children'),
+                label: Text(
+                  AppLocalizations.of(context)?.profileAddChildren ??
+                      'Add Children',
+                ),
                 onPressed: canUpdate ? _showAddChildrenDialog : null,
               ),
             ],

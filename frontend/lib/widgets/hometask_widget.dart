@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/hometask.dart';
+import '../l10n/app_localizations.dart';
 
 class HometaskWidget extends StatefulWidget {
   final Hometask hometask;
@@ -77,7 +78,12 @@ class _HometaskWidgetState extends State<HometaskWidget> {
     final hasEmptyItems = _editingItems.any((item) => item.text.trim().isEmpty);
     if (hasEmptyItems) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All items must have a name.')),
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.hometasksItemNameRequired ??
+                'All items must have a name.',
+          ),
+        ),
       );
       return;
     }
@@ -190,7 +196,10 @@ class _HometaskWidgetState extends State<HometaskWidget> {
               Padding(
                 padding: const EdgeInsets.only(top: 8),
                 child: Text(
-                  'Due: ${_formatDate(widget.hometask.dueDate!)}',
+                  AppLocalizations.of(context)?.hometasksDueLabel(
+                        _formatDate(widget.hometask.dueDate!),
+                      ) ??
+                      'Due: ${_formatDate(widget.hometask.dueDate!)}',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -204,7 +213,10 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                 child: TextButton.icon(
                   onPressed: _enterEditMode,
                   icon: const Icon(Icons.edit),
-                  label: const Text('Edit items'),
+                  label: Text(
+                    AppLocalizations.of(context)?.hometasksEditItems ??
+                        'Edit items',
+                  ),
                 ),
               ),
             if (widget.hometask.status == HometaskStatus.assigned &&
@@ -216,7 +228,10 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                   child: ElevatedButton.icon(
                     onPressed: widget.onMarkCompleted,
                     icon: const Icon(Icons.check),
-                    label: const Text('Mark completed'),
+                    label: Text(
+                      AppLocalizations.of(context)?.hometasksMarkCompleted ??
+                          'Mark completed',
+                    ),
                   ),
                 ),
               ),
@@ -229,7 +244,10 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                   child: OutlinedButton.icon(
                     onPressed: widget.onMarkAccomplished,
                     icon: const Icon(Icons.verified),
-                    label: const Text('Mark accomplished'),
+                    label: Text(
+                      AppLocalizations.of(context)?.hometasksMarkAccomplished ??
+                          'Mark accomplished',
+                    ),
                   ),
                 ),
               ),
@@ -244,8 +262,10 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                     icon: const Icon(Icons.restore),
                     label: Text(
                       widget.hometask.status == HometaskStatus.accomplishedByTeacher
-                          ? 'Return to active'
-                          : 'Mark uncompleted',
+                          ? (AppLocalizations.of(context)?.hometasksReturnActive ??
+                              'Return to active')
+                          : (AppLocalizations.of(context)?.hometasksMarkUncompleted ??
+                              'Mark uncompleted'),
                     ),
                   ),
                 ),
@@ -318,7 +338,11 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        const Text('Not started'),
+                                        Text(
+                                          AppLocalizations.of(context)?.
+                                                  hometasksProgressNotStarted ??
+                                              'Not started',
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -338,7 +362,11 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        const Text('In progress'),
+                                        Text(
+                                          AppLocalizations.of(context)?.
+                                                  hometasksProgressInProgress ??
+                                              'In progress',
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -358,7 +386,11 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        const Text('Nearly done'),
+                                        Text(
+                                          AppLocalizations.of(context)?.
+                                                  hometasksProgressNearlyDone ??
+                                              'Nearly done',
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -378,7 +410,11 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        const Text('Almost complete'),
+                                        Text(
+                                          AppLocalizations.of(context)?.
+                                                  hometasksProgressAlmostComplete ??
+                                              'Almost complete',
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -398,7 +434,11 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                                           ),
                                         ),
                                         const SizedBox(width: 8),
-                                        const Text('Complete'),
+                                        Text(
+                                          AppLocalizations.of(context)?.
+                                                  hometasksProgressComplete ??
+                                              'Complete',
+                                        ),
                                       ],
                                     ),
                                   ),
@@ -488,7 +528,9 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                     child: TextField(
                       controller: controller,
                       decoration: InputDecoration(
-                        hintText: 'Item ${index + 1}',
+                        hintText: AppLocalizations.of(context)?.
+                                hometasksItemHint(index + 1) ??
+                            'Item ${index + 1}',
                         border: OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       ),
@@ -510,7 +552,9 @@ class _HometaskWidgetState extends State<HometaskWidget> {
             child: TextButton.icon(
               onPressed: _addItem,
               icon: const Icon(Icons.add),
-              label: const Text('Add item'),
+              label: Text(
+                AppLocalizations.of(context)?.hometasksAddItem ?? 'Add item',
+              ),
             ),
           ),
           Padding(
@@ -520,12 +564,12 @@ class _HometaskWidgetState extends State<HometaskWidget> {
               children: [
                 TextButton(
                   onPressed: _cancelEdit,
-                  child: const Text('Cancel'),
+                  child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
                   onPressed: _saveEdit,
-                  child: const Text('Save'),
+                  child: Text(AppLocalizations.of(context)?.commonSave ?? 'Save'),
                 ),
               ],
             ),

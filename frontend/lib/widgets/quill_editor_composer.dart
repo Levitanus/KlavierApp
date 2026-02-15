@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import '../widgets/quill_embed_builders.dart';
 import '../utils/voice_recorder.dart';
+import '../l10n/app_localizations.dart';
 
 /// Configuration for the QuillEditorComposer
 class QuillEditorComposerConfig {
@@ -90,7 +91,12 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
         if (audio == null) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Failed to record audio')),
+              SnackBar(
+                content: Text(
+                  AppLocalizations.of(context)?.voiceRecordFailed ??
+                      'Failed to record audio',
+                ),
+              ),
             );
           }
           return;
@@ -111,7 +117,12 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
         if (!available) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Voice recording not available')),
+              SnackBar(
+                content: Text(
+                  AppLocalizations.of(context)?.voiceRecordUnavailable ??
+                      'Voice recording not available',
+                ),
+              ),
             );
           }
           return;
@@ -125,7 +136,12 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Voice error: ${e.toString()}')),
+          SnackBar(
+            content: Text(
+              AppLocalizations.of(context)?.voiceRecordError(e.toString()) ??
+                  'Voice error: ${e.toString()}',
+            ),
+          ),
         );
       }
     }
@@ -153,23 +169,25 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Insert link'),
+        title: Text(
+          AppLocalizations.of(context)?.commonInsertLink ?? 'Insert link',
+        ),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'URL',
-            border: OutlineInputBorder(),
+          decoration: InputDecoration(
+            labelText: AppLocalizations.of(context)?.commonUrl ?? 'URL',
+            border: const OutlineInputBorder(),
           ),
           autofocus: true,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)?.commonCancel ?? 'Cancel'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Apply'),
+            child: Text(AppLocalizations.of(context)?.commonApply ?? 'Apply'),
           ),
         ],
       ),
@@ -188,6 +206,7 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
     BuildContext context,
     quill.QuillRawEditorState editorState,
   ) {
+    final l10n = AppLocalizations.of(context);
     final controller = editorState.controller;
     final selection = controller.selection;
 
@@ -215,7 +234,7 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
           final length = selection.end - selection.start;
           controller.formatText(index, length, quill.Attribute.bold);
         },
-        label: 'Bold',
+        label: l10n?.commonBold ?? 'Bold',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -223,7 +242,7 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
           final length = selection.end - selection.start;
           controller.formatText(index, length, quill.Attribute.italic);
         },
-        label: 'Italic',
+        label: l10n?.commonItalic ?? 'Italic',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -231,7 +250,7 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
           final length = selection.end - selection.start;
           controller.formatText(index, length, quill.Attribute.underline);
         },
-        label: 'Underline',
+        label: l10n?.commonUnderline ?? 'Underline',
       ),
       ContextMenuButtonItem(
         onPressed: () {
@@ -239,7 +258,7 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
           final length = selection.end - selection.start;
           controller.formatText(index, length, quill.Attribute.strikeThrough);
         },
-        label: 'Strike',
+        label: l10n?.commonStrike ?? 'Strike',
       ),
     ];
 
@@ -358,7 +377,8 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
           if (widget.config.showAttachButton) ...[
             const SizedBox(width: 1),
             IconButton(
-              tooltip: 'Attach file',
+              tooltip: AppLocalizations.of(context)?.commonAttachFile ??
+                  'Attach file',
               icon: Icon(
                 _isUploadingAttachment ? Icons.hourglass_top : Icons.attach_file,
               ),
@@ -371,7 +391,10 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
           if (widget.config.showVoiceButton) ...[
             const SizedBox(width: 1),
             IconButton(
-              tooltip: _voiceRecorder.isRecording ? 'Stop recording' : 'Record voice',
+              tooltip: _voiceRecorder.isRecording
+                  ? (AppLocalizations.of(context)?.voiceStopRecording ??
+                      'Stop recording')
+                  : (AppLocalizations.of(context)?.voiceRecord ?? 'Record voice'),
               icon: Icon(
                 _voiceRecorder.isRecording ? Icons.stop_circle : Icons.mic,
                 color: _voiceRecorder.isRecording ? Colors.red : null,
@@ -385,7 +408,8 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
           if (widget.config.showSendButton) ...[
             const SizedBox(width: 1),
             IconButton(
-              tooltip: widget.config.sendButtonTooltip ?? 'Send',
+              tooltip: widget.config.sendButtonTooltip ??
+                  (AppLocalizations.of(context)?.commonSend ?? 'Send'),
               icon: const Icon(Icons.send),
               onPressed: widget.onSendPressed,
               visualDensity: VisualDensity.compact,

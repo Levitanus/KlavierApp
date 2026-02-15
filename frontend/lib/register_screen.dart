@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'auth.dart';
 import 'config/app_config.dart';
+import 'l10n/app_localizations.dart';
 
 class RegisterScreen extends StatefulWidget {
   final String token;
@@ -35,6 +36,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _obscureConfirmPassword = true;
   bool _consentAccepted = false;
   String _consentText = '';
+  String? _consentLocaleCode;
   String? _errorMessage;
   
   // Token info
@@ -46,7 +48,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void initState() {
     super.initState();
     _validateToken();
-    _loadConsentText();
+  }
+
+  String _roleLabel(AppLocalizations? l10n) {
+    switch (_role) {
+      case 'student':
+        return l10n?.registerRoleStudent ?? 'Student';
+      case 'parent':
+        return l10n?.registerRoleParent ?? 'Parent';
+      case 'teacher':
+        return l10n?.registerRoleTeacher ?? 'Teacher';
+      default:
+        return _role?.toUpperCase() ?? '';
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final localeCode = Localizations.localeOf(context).languageCode;
+    if (_consentLocaleCode != localeCode) {
+      _consentLocaleCode = localeCode;
+      _loadConsentText(localeCode);
+    }
   }
 
   @override
@@ -61,9 +85,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
-  Future<void> _loadConsentText() async {
+  Future<void> _loadConsentText(String localeCode) async {
     try {
-      final text = await rootBundle.loadString('assets/consent.txt');
+      final localizedPath = 'assets/consent_${localeCode}.txt';
+      String text;
+      try {
+        text = await rootBundle.loadString(localizedPath);
+      } catch (_) {
+        text = await rootBundle.loadString('assets/consent.txt');
+      }
       if (mounted) {
         setState(() {
           _consentText = text.trim();
@@ -88,6 +118,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   }
 
   Future<void> _validateToken() async {
+    final l10n = AppLocalizations.of(context);
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -108,40 +139,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
           _isLoading = false;
 
           if (!_tokenValid) {
-            _errorMessage = 'Invalid or expired registration token';
+            _errorMessage = l10n?.registerInvalidTokenTitle ??
+                'Invalid Registration Token';
           }
         });
       } else {
         setState(() {
           _tokenValid = false;
-          _errorMessage = 'Failed to validate token';
+          _errorMessage = l10n?.registerValidateFailed ??
+              'Failed to validate token';
           _isLoading = false;
         });
       }
     } catch (e) {
       setState(() {
         _tokenValid = false;
-        _errorMessage = 'Network error: $e';
+        _errorMessage = l10n?.registerNetworkError(e.toString()) ??
+            'Network error: $e';
         _isLoading = false;
       });
     }
   }
 
   Future<void> _register() async {
+    final l10n = AppLocalizations.of(context);
     if (!_formKey.currentState!.validate()) {
       return;
     }
 
     if (_passwordController.text != _confirmPasswordController.text) {
       setState(() {
-        _errorMessage = 'Passwords do not match';
+        _errorMessage = l10n?.registerPasswordsMismatch ??
+            'Passwords do not match';
       });
       return;
     }
 
     if (!_consentAccepted) {
+      final l10n = AppLocalizations.of(context);
       setState(() {
-        _errorMessage = 'Please accept the consent to continue';
+        _errorMessage = l10n?.consentRequired ??
+            'Please accept the consent to continue';
       });
       return;
     }
@@ -187,7 +225,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
         if (!loginResult.success) {
           setState(() {
-            _errorMessage = loginResult.errorMessage ?? 'Login failed';
+            _errorMessage = loginResult.errorMessage ??
+                l10n?.registerLoginFailed ?? 'Login failed';
             _isSubmitting = false;
           });
           return;
@@ -199,13 +238,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       } else {
         final error = jsonDecode(response.body);
         setState(() {
-          _errorMessage = error['error'] ?? 'Registration failed';
+          _errorMessage = error['error'] ??
+              l10n?.registerFailed ?? 'Registration failed';
           _isSubmitting = false;
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'Network error: $e';
+        _errorMessage = l10n?.registerNetworkError(e.toString()) ??
+            'Network error: $e';
         _isSubmitting = false;
       });
     }
@@ -213,6 +254,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     // Show loading while validating token
     if (_isLoading) {
       return const Scaffold(
@@ -238,7 +280,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  _errorMessage ?? 'Invalid Registration Token',
+                    _errorMessage ??
+                      l10n?.registerInvalidTokenTitle ??
+                      'Invalid Registration Token',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -246,8 +290,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  'This registration link may be expired or already used.',
+                Text(
+                  l10n?.registerInvalidTokenMessage ??
+                      'This registration link may be expired or already used.',
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 24),
@@ -255,7 +300,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   onPressed: () {
                     Navigator.of(context).pushReplacementNamed('/');
                   },
-                  child: const Text('Go to Login'),
+                  child: Text(l10n?.registerGoToLogin ?? 'Go to Login'),
                 ),
               ],
             ),
@@ -294,7 +339,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Register as ${_role?.toUpperCase()}',
+                        l10n?.registerTitle(_roleLabel(l10n)) ??
+                            'Register as ${_role?.toUpperCase()}',
                         style: Theme.of(context).textTheme.headlineMedium,
                         textAlign: TextAlign.center,
                       ),
@@ -312,7 +358,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           child: Column(
                             children: [
                               Text(
-                                'You will be registered as parent of:',
+                                l10n?.registerParentOf ??
+                                    'You will be registered as parent of:',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: Colors.green[800],
@@ -339,7 +386,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         ),
                       ] else ...[
                         Text(
-                          'Complete your registration',
+                          l10n?.registerComplete ??
+                              'Complete your registration',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: Colors.grey[600],
                               ),
@@ -376,17 +424,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       // Username field
                       TextFormField(
                         controller: _usernameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Username',
-                          prefixIcon: Icon(Icons.person),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n?.commonUsername ?? 'Username',
+                          prefixIcon: const Icon(Icons.person),
+                          border: const OutlineInputBorder(),
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter a username';
+                            return l10n?.registerUsernameRequired ??
+                                'Please enter a username';
                           }
                           if (value.length < 3) {
-                            return 'Username must be at least 3 characters';
+                            return l10n?.registerUsernameMin ??
+                                'Username must be at least 3 characters';
                           }
                           return null;
                         },
@@ -397,14 +447,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       // Full Name field (required for all roles except admin)
                       TextFormField(
                         controller: _fullNameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Full Name',
-                          prefixIcon: Icon(Icons.badge),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n?.commonFullName ?? 'Full Name',
+                          prefixIcon: const Icon(Icons.badge),
+                          border: const OutlineInputBorder(),
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter your full name';
+                            return l10n?.registerFullNameRequired ??
+                                'Please enter your full name';
                           }
                           return null;
                         },
@@ -416,20 +467,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (_role == 'student') ...[
                         TextFormField(
                           controller: _birthdayController,
-                          decoration: const InputDecoration(
-                            labelText: 'Birthday (YYYY-MM-DD)',
-                            prefixIcon: Icon(Icons.cake),
-                            border: OutlineInputBorder(),
-                            hintText: '2010-01-31',
+                          decoration: InputDecoration(
+                            labelText: l10n?.registerBirthdayLabel ??
+                                'Birthday (YYYY-MM-DD)',
+                            prefixIcon: const Icon(Icons.cake),
+                            border: const OutlineInputBorder(),
+                            hintText: l10n?.registerBirthdayHint ?? '2010-01-31',
                           ),
                           validator: (value) {
                             if (value == null || value.isEmpty) {
-                              return 'Please enter your birthday';
+                              return l10n?.registerBirthdayRequired ??
+                                  'Please enter your birthday';
                             }
                             // Basic date format validation
                             final dateRegex = RegExp(r'^\d{4}-\d{2}-\d{2}$');
                             if (!dateRegex.hasMatch(value)) {
-                              return 'Use format: YYYY-MM-DD';
+                              return l10n?.registerBirthdayFormat ??
+                                  'Use format: YYYY-MM-DD';
                             }
                             return null;
                           },
@@ -441,10 +495,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       // Email field (optional)
                       TextFormField(
                         controller: _emailController,
-                        decoration: const InputDecoration(
-                          labelText: 'Email (optional)',
-                          prefixIcon: Icon(Icons.email),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n?.commonEmailOptional ??
+                              'Email (optional)',
+                          prefixIcon: const Icon(Icons.email),
+                          border: const OutlineInputBorder(),
                         ),
                         keyboardType: TextInputType.emailAddress,
                         enabled: !_isSubmitting,
@@ -454,10 +509,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       // Phone field (optional)
                       TextFormField(
                         controller: _phoneController,
-                        decoration: const InputDecoration(
-                          labelText: 'Phone (optional)',
-                          prefixIcon: Icon(Icons.phone),
-                          border: OutlineInputBorder(),
+                        decoration: InputDecoration(
+                          labelText: l10n?.commonPhoneOptional ??
+                              'Phone (optional)',
+                          prefixIcon: const Icon(Icons.phone),
+                          border: const OutlineInputBorder(),
                         ),
                         keyboardType: TextInputType.phone,
                         enabled: !_isSubmitting,
@@ -468,7 +524,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         controller: _passwordController,
                         decoration: InputDecoration(
-                          labelText: 'Password',
+                          labelText: l10n?.commonPassword ?? 'Password',
                           prefixIcon: const Icon(Icons.lock),
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
@@ -487,10 +543,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         obscureText: _obscurePassword,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please enter a password';
+                            return l10n?.registerPasswordRequired ??
+                                'Please enter a password';
                           }
                           if (value.length < 6) {
-                            return 'Password must be at least 6 characters';
+                            return l10n?.registerPasswordMin ??
+                                'Password must be at least 6 characters';
                           }
                           return null;
                         },
@@ -502,7 +560,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       TextFormField(
                         controller: _confirmPasswordController,
                         decoration: InputDecoration(
-                          labelText: 'Confirm Password',
+                          labelText: l10n?.commonConfirmPassword ??
+                              'Confirm Password',
                           prefixIcon: const Icon(Icons.lock_outline),
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
@@ -521,7 +580,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         obscureText: _obscureConfirmPassword,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Please confirm your password';
+                            return l10n?.registerConfirmRequired ??
+                                'Please confirm your password';
                           }
                           return null;
                         },
@@ -540,7 +600,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               Text(
                                 _consentText.isNotEmpty
                                     ? _consentText
-                                    : _consentTextFallback,
+                                    : (l10n?.consentFallback ??
+                                        _consentTextFallback),
                               ),
                               const SizedBox(height: 12),
                               CheckboxListTile(
@@ -553,8 +614,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                           _consentAccepted = value ?? false;
                                         });
                                       },
-                                title: const Text(
-                                  'If you register a child, you confirm that you are a parent, legal guardian, or otherwise authorized person.',
+                                title: Text(
+                                  AppLocalizations.of(context)
+                                          ?.consentGuardianConfirm ??
+                                      'If you register a child, you confirm that you are a parent, legal guardian, or otherwise authorized person.',
                                 ),
                               ),
                             ],
@@ -577,7 +640,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text('Register'),
+                            : Text(l10n?.registerButton ?? 'Register'),
                       ),
                       const SizedBox(height: 16),
 
@@ -588,7 +651,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             : () {
                                 Navigator.of(context).pushReplacementNamed('/');
                               },
-                        child: const Text('Back to Login'),
+                        child: Text(
+                          l10n?.commonBackToLogin ?? 'Back to Login',
+                        ),
                       ),
                     ],
                   ),

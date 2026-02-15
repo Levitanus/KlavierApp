@@ -8,6 +8,7 @@ import 'dart:math';
 import 'auth.dart';
 import 'profile_screen.dart';
 import 'config/app_config.dart';
+import 'l10n/app_localizations.dart';
 
 part 'admin_panel/admin_panel_actions.dart';
 part 'admin_panel/admin_panel_data.dart';
@@ -147,12 +148,15 @@ class _AdminPanelState extends _AdminPanelStateBase
     final maxPage = (_totalUsers / _pageSize).ceil().clamp(1, 999999);
     final start = min((_currentPage - 1) * _pageSize + 1, _totalUsers);
     final end = min(_currentPage * _pageSize, _totalUsers);
-    final pageLabel = Text('Showing $start-$end of $_totalUsers');
+    final pageLabel = Text(
+      AppLocalizations.of(context)?.adminShowingRange(start, end, _totalUsers) ??
+          'Showing $start-$end of $_totalUsers',
+    );
 
     final sizeDropdown = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('Rows:'),
+        Text(AppLocalizations.of(context)?.adminRows ?? 'Rows:'),
         const SizedBox(width: 8),
         DropdownButtonHideUnderline(
           child: DropdownButton<int>(
@@ -177,13 +181,14 @@ class _AdminPanelState extends _AdminPanelStateBase
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          tooltip: 'Previous page',
+          tooltip: AppLocalizations.of(context)?.commonPrevious ??
+              'Previous page',
           onPressed: _currentPage > 1 ? () => _changePage(-1) : null,
           icon: const Icon(Icons.chevron_left),
         ),
         Text('$_currentPage / $maxPage'),
         IconButton(
-          tooltip: 'Next page',
+          tooltip: AppLocalizations.of(context)?.commonNext ?? 'Next page',
           onPressed: _currentPage < maxPage ? () => _changePage(1) : null,
           icon: const Icon(Icons.chevron_right),
         ),
@@ -232,7 +237,7 @@ class _AdminPanelState extends _AdminPanelStateBase
       children: [
         OutlinedButton.icon(
           icon: const Icon(Icons.link, size: 16),
-          label: const Text('Reset Link'),
+          label: Text(AppLocalizations.of(context)?.adminResetLink ?? 'Reset Link'),
           style: OutlinedButton.styleFrom(
             padding: buttonPadding,
             visualDensity: compactDensity,
@@ -242,7 +247,9 @@ class _AdminPanelState extends _AdminPanelStateBase
         ),
         OutlinedButton.icon(
           icon: const Icon(Icons.visibility, size: 16),
-          label: const Text('View Profile'),
+          label: Text(
+            AppLocalizations.of(context)?.adminViewProfile ?? 'View Profile',
+          ),
           style: OutlinedButton.styleFrom(
             padding: buttonPadding,
             visualDensity: compactDensity,
@@ -258,7 +265,7 @@ class _AdminPanelState extends _AdminPanelStateBase
         ),
         ElevatedButton.icon(
           icon: const Icon(Icons.edit, size: 16),
-          label: const Text('Edit User'),
+          label: Text(AppLocalizations.of(context)?.adminEditUser ?? 'Edit User'),
           style: ElevatedButton.styleFrom(
             padding: buttonPadding,
             visualDensity: compactDensity,
@@ -268,7 +275,7 @@ class _AdminPanelState extends _AdminPanelStateBase
         ),
         OutlinedButton.icon(
           icon: const Icon(Icons.delete, size: 16),
-          label: const Text('Delete'),
+          label: Text(AppLocalizations.of(context)?.commonDelete ?? 'Delete'),
           style: OutlinedButton.styleFrom(
             padding: buttonPadding,
             visualDensity: compactDensity,
@@ -313,13 +320,15 @@ class _AdminPanelState extends _AdminPanelStateBase
                   runSpacing: 4,
                   children: [
                     IconButton(
-                      tooltip: 'Reset Link',
+                      tooltip: AppLocalizations.of(context)?.adminResetLink ??
+                          'Reset Link',
                       icon: const Icon(Icons.link),
                       visualDensity: VisualDensity.compact,
                       onPressed: () => _generateResetLink(user),
                     ),
                     IconButton(
-                      tooltip: 'View Profile',
+                      tooltip: AppLocalizations.of(context)?.adminViewProfile ??
+                          'View Profile',
                       icon: const Icon(Icons.visibility),
                       visualDensity: VisualDensity.compact,
                       onPressed: () {
@@ -332,13 +341,15 @@ class _AdminPanelState extends _AdminPanelStateBase
                       },
                     ),
                     IconButton(
-                      tooltip: 'Edit User',
+                      tooltip: AppLocalizations.of(context)?.adminEditUser ??
+                          'Edit User',
                       icon: const Icon(Icons.edit),
                       visualDensity: VisualDensity.compact,
                       onPressed: () => _showEditUserDialog(user),
                     ),
                     IconButton(
-                      tooltip: 'Delete User',
+                      tooltip: AppLocalizations.of(context)?.adminDeleteUser ??
+                          'Delete User',
                       icon: const Icon(Icons.delete, color: Colors.red),
                       visualDensity: VisualDensity.compact,
                       onPressed: () => _confirmDeleteUser(user),
@@ -363,10 +374,22 @@ class _AdminPanelState extends _AdminPanelStateBase
             dataRowMinHeight: 48,
             dataRowMaxHeight: 64,
             columnSpacing: 24,
-            columns: const [
-              DataColumn(label: Text('Full Name')),
-              DataColumn(label: Text('Username')),
-              DataColumn(label: Text('Actions')),
+            columns: [
+              DataColumn(
+                label: Text(
+                  AppLocalizations.of(context)?.adminFullName ?? 'Full Name',
+                ),
+              ),
+              DataColumn(
+                label: Text(
+                  AppLocalizations.of(context)?.adminUsername ?? 'Username',
+                ),
+              ),
+              DataColumn(
+                label: Text(
+                  AppLocalizations.of(context)?.adminActions ?? 'Actions',
+                ),
+              ),
             ],
             rows: _users.map((user) {
               return DataRow(
@@ -394,6 +417,7 @@ class _AdminPanelState extends _AdminPanelStateBase
   Widget build(BuildContext context) {
     final outlineColor = Theme.of(context).colorScheme.outline;
     final isMobile = MediaQuery.of(context).size.width < 700;
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       body: Column(
@@ -403,9 +427,12 @@ class _AdminPanelState extends _AdminPanelStateBase
               padding: const EdgeInsets.all(16.0),
               child: Row(
                 children: [
-                  const Text(
-                    'Admin Panel',
-                    style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                  Text(
+                    l10n?.adminPanelTitle ?? 'Admin Panel',
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -418,15 +445,18 @@ class _AdminPanelState extends _AdminPanelStateBase
                 children: [
                   Row(
                     children: [
-                      const Text(
-                        'User Management',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                      Text(
+                        l10n?.adminUserManagement ?? 'User Management',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const Spacer(),
                       IconButton(
                         icon: const Icon(Icons.refresh),
                         onPressed: _loadUsers,
-                        tooltip: 'Refresh',
+                        tooltip: l10n?.commonRefresh ?? 'Refresh',
                       ),
                     ],
                   ),
@@ -438,12 +468,14 @@ class _AdminPanelState extends _AdminPanelStateBase
                         controller: _searchController,
                         onChanged: _onSearchChanged,
                         decoration: InputDecoration(
-                          labelText: 'Search by username or full name',
+                          labelText: l10n?.adminSearchUsers ??
+                              'Search by username or full name',
                           prefixIcon: const Icon(Icons.search),
                           suffixIcon: value.text.isEmpty
                               ? null
                               : IconButton(
-                                  tooltip: 'Clear search',
+                                  tooltip: l10n?.commonClearSearch ??
+                                      'Clear search',
                                   icon: const Icon(Icons.close),
                                   onPressed: _clearSearch,
                                 ),
@@ -465,7 +497,11 @@ class _AdminPanelState extends _AdminPanelStateBase
                     child: _isLoading
                         ? const Center(child: CircularProgressIndicator())
                         : _users.isEmpty
-                            ? const Center(child: Text('No users found'))
+                            ? Center(
+                                child: Text(
+                                  l10n?.adminNoUsers ?? 'No users found',
+                                ),
+                              )
                             : LayoutBuilder(
                                 builder: (context, constraints) {
                                   final isCompact = constraints.maxWidth < 700;
@@ -495,7 +531,7 @@ class _AdminPanelState extends _AdminPanelStateBase
             ),
             child: isMobile
                 ? ExpansionTile(
-                    title: const Text('Add User'),
+                  title: Text(l10n?.adminAddUser ?? 'Add User'),
                     initiallyExpanded: _showAddButtons,
                     onExpansionChanged: (expanded) {
                       setState(() {
@@ -515,12 +551,12 @@ class _AdminPanelState extends _AdminPanelStateBase
                             ElevatedButton.icon(
                               onPressed: () => _showEditUserDialog(null),
                               icon: const Icon(Icons.add, size: 16),
-                              label: const Text('User'),
+                              label: Text(l10n?.adminUser ?? 'User'),
                             ),
                             ElevatedButton.icon(
                               onPressed: _showAddStudentDialog,
                               icon: const Icon(Icons.school, size: 16),
-                              label: const Text('Student'),
+                              label: Text(l10n?.adminStudent ?? 'Student'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.blue,
                                 foregroundColor: Colors.white,
@@ -529,7 +565,7 @@ class _AdminPanelState extends _AdminPanelStateBase
                             ElevatedButton.icon(
                               onPressed: _showAddParentDialog,
                               icon: const Icon(Icons.family_restroom, size: 16),
-                              label: const Text('Parent'),
+                              label: Text(l10n?.adminParent ?? 'Parent'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.green,
                                 foregroundColor: Colors.white,
@@ -538,7 +574,7 @@ class _AdminPanelState extends _AdminPanelStateBase
                             ElevatedButton.icon(
                               onPressed: _showAddTeacherDialog,
                               icon: const Icon(Icons.person, size: 16),
-                              label: const Text('Teacher'),
+                              label: Text(l10n?.adminTeacher ?? 'Teacher'),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: Colors.orange,
                                 foregroundColor: Colors.white,
@@ -556,12 +592,12 @@ class _AdminPanelState extends _AdminPanelStateBase
                       ElevatedButton.icon(
                         onPressed: () => _showEditUserDialog(null),
                         icon: const Icon(Icons.add),
-                        label: const Text('Add User'),
+                        label: Text(l10n?.adminAddUser ?? 'Add User'),
                       ),
                       ElevatedButton.icon(
                         onPressed: _showAddStudentDialog,
                         icon: const Icon(Icons.school),
-                        label: const Text('Add Student'),
+                        label: Text(l10n?.adminAddStudent ?? 'Add Student'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.blue,
                           foregroundColor: Colors.white,
@@ -570,7 +606,7 @@ class _AdminPanelState extends _AdminPanelStateBase
                       ElevatedButton.icon(
                         onPressed: _showAddParentDialog,
                         icon: const Icon(Icons.family_restroom),
-                        label: const Text('Add Parent'),
+                        label: Text(l10n?.adminAddParent ?? 'Add Parent'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green,
                           foregroundColor: Colors.white,
@@ -579,7 +615,7 @@ class _AdminPanelState extends _AdminPanelStateBase
                       ElevatedButton.icon(
                         onPressed: _showAddTeacherDialog,
                         icon: const Icon(Icons.person),
-                        label: const Text('Add Teacher'),
+                        label: Text(l10n?.adminAddTeacher ?? 'Add Teacher'),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.orange,
                           foregroundColor: Colors.white,
