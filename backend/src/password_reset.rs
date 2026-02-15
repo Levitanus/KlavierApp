@@ -4,7 +4,11 @@ use argon2::{
 };
 use chrono::{DateTime, Duration, Utc};
 use rand::{distributions::Alphanumeric, Rng};
-use sqlx::{PgPool, FromRow};
+use sqlx::{FromRow, PgPool};
+use std::sync::Arc;
+
+use actix_web::rt::task::spawn_blocking;
+use log::error;
 
 use crate::email::{EmailError, EmailService};
 use crate::notification_builders::build_password_reset_request_notification;
@@ -101,7 +105,7 @@ pub fn verify_token(token: &str, hash: &str) -> Result<bool, PasswordResetError>
 pub async fn request_password_reset(
     pool: &PgPool,
     username: &str,
-    email_service: &EmailService,
+    email_service: Arc<EmailService>,
 ) -> Result<(), PasswordResetError> {
     // Find user by username
     #[derive(FromRow)]
@@ -136,8 +140,15 @@ pub async fn request_password_reset(
         .execute(pool)
         .await?;
 
-        // Send email
-        email_service.send_password_reset_email(&email, &user.username, &token)?;
+        // Send email in the background to avoid blocking the response.
+        let email_service = email_service.clone();
+        let username = user.username.clone();
+        let token = token.clone();
+        spawn_blocking(move || {
+            if let Err(err) = email_service.send_password_reset_email(&email, &username, &token) {
+                error!("Password reset email failed: {}", err);
+            }
+        });
     } else {
         // User has no email - create a request for admin
         let request_id = sqlx::query_scalar::<_, i32>(

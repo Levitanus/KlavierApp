@@ -299,7 +299,12 @@ async fn forgot_password(
     app_state: web::Data<AppState>,
     req: web::Json<ForgotPasswordRequest>,
 ) -> impl Responder {
-    match password_reset::request_password_reset(&app_state.db, &req.username, &app_state.email_service).await {
+    match password_reset::request_password_reset(
+        &app_state.db,
+        &req.username,
+        app_state.email_service.clone(),
+    )
+    .await {
         Ok(_) => {
             HttpResponse::Ok().json(ForgotPasswordResponse {
                 message: "If your username exists and has an email, you will receive a password reset link. Otherwise, an admin will be notified.".to_string(),
