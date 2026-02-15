@@ -569,22 +569,49 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                     if (_teacherData != null && !_isEditing) ...[
                       const Divider(),
                       const SizedBox(height: 16),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            l10n?.profileManageStudentsTitle ??
-                                'Manage Students',
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          OutlinedButton.icon(
-                            icon: const Icon(Icons.person_add_alt_1),
-                            label: Text(
-                              l10n?.profileActionAddStudent ?? 'Add Student',
-                            ),
-                            onPressed: _showAddStudentsToTeacherDialog,
-                          ),
-                        ],
+                      LayoutBuilder(
+                        builder: (context, constraints) {
+                          final isCompact = constraints.maxWidth < 600;
+                          if (isCompact) {
+                            return Wrap(
+                              spacing: 12,
+                              runSpacing: 8,
+                              crossAxisAlignment: WrapCrossAlignment.center,
+                              children: [
+                                Text(
+                                  l10n?.profileManageStudentsTitle ??
+                                      'Manage Students',
+                                  style: Theme.of(context).textTheme.titleMedium,
+                                ),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.person_add_alt_1),
+                                  label: Text(
+                                    l10n?.profileActionAddStudent ?? 'Add Student',
+                                  ),
+                                  onPressed: _showAddStudentsToTeacherDialog,
+                                ),
+                              ],
+                            );
+                          }
+
+                          return Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                l10n?.profileManageStudentsTitle ??
+                                    'Manage Students',
+                                style: Theme.of(context).textTheme.titleMedium,
+                              ),
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.person_add_alt_1),
+                                label: Text(
+                                  l10n?.profileActionAddStudent ?? 'Add Student',
+                                ),
+                                onPressed: _showAddStudentsToTeacherDialog,
+                              ),
+                            ],
+                          );
+                        },
                       ),
                       const SizedBox(height: 4),
                       Text(

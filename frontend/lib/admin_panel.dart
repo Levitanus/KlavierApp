@@ -199,15 +199,19 @@ class _AdminPanelState extends _AdminPanelStateBase
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 600;
         if (isCompact) {
-          return Wrap(
-            spacing: 12,
-            runSpacing: 8,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              pageLabel,
-              sizeDropdown,
-              navControls,
-            ],
+          return FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                pageLabel,
+                const SizedBox(width: 8),
+                sizeDropdown,
+                const SizedBox(width: 12),
+                navControls,
+              ],
+            ),
           );
         }
 

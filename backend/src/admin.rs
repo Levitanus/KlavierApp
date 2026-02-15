@@ -217,6 +217,89 @@ async fn get_users(
     })
 }
 
+#[get("/api/admin/users/{id}")]
+async fn get_user_by_id(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    user_id: web::Path<i32>,
+) -> impl Responder {
+    if let Err(response) = verify_admin_role(&req, &app_state) {
+        return response;
+    }
+
+    let user_id = user_id.into_inner();
+    let user_result = sqlx::query_as::<_, UserResponse>(
+        "SELECT id, username, full_name, email, phone FROM users WHERE id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(&app_state.db)
+    .await;
+
+    let mut user = match user_result {
+        Ok(Some(user)) => user,
+        Ok(None) => {
+            return HttpResponse::NotFound().json(serde_json::json!({
+                "error": "User not found"
+            }));
+        }
+        Err(e) => {
+            error!("Database error: {}", e);
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to fetch user"
+            }));
+        }
+    };
+
+    let roles_result = sqlx::query_scalar::<_, String>(
+        "SELECT r.name FROM roles r \
+         INNER JOIN user_roles ur ON r.id = ur.role_id \
+         WHERE ur.user_id = $1",
+    )
+    .bind(user.id)
+    .fetch_all(&app_state.db)
+    .await;
+
+    user.roles = roles_result.unwrap_or_default();
+
+    if user.roles.contains(&"student".to_string()) {
+        let status: Option<String> = sqlx::query_scalar(
+            "SELECT status::text FROM students WHERE user_id = $1",
+        )
+        .bind(user.id)
+        .fetch_optional(&app_state.db)
+        .await
+        .unwrap_or(None);
+
+        user.student_status = status;
+    }
+
+    if user.roles.contains(&"parent".to_string()) {
+        let status: Option<String> = sqlx::query_scalar(
+            "SELECT status::text FROM parents WHERE user_id = $1",
+        )
+        .bind(user.id)
+        .fetch_optional(&app_state.db)
+        .await
+        .unwrap_or(None);
+
+        user.parent_status = status;
+    }
+
+    if user.roles.contains(&"teacher".to_string()) {
+        let status: Option<String> = sqlx::query_scalar(
+            "SELECT status::text FROM teachers WHERE user_id = $1",
+        )
+        .bind(user.id)
+        .fetch_optional(&app_state.db)
+        .await
+        .unwrap_or(None);
+
+        user.teacher_status = status;
+    }
+
+    HttpResponse::Ok().json(user)
+}
+
 #[post("/api/admin/users")]
 async fn create_user(
     req: HttpRequest,
@@ -1090,6 +1173,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     debug!("=== ADMIN CONFIGURE CALLED ===");
     cfg.service(test_route)
         .service(get_users)
+        .service(get_user_by_id)
         .service(create_user)
         .service(update_user)
         .service(delete_user)

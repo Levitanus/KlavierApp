@@ -286,38 +286,64 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                           margin: const EdgeInsets.only(bottom: 8),
                           child: Padding(
                             padding: const EdgeInsets.all(12.0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        parent['full_name'] ?? 'Unknown',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                            child: Builder(
+                              builder: (context) {
+                                final isCompact =
+                                    MediaQuery.of(context).size.width < 520;
+                                final infoColumn = Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      parent['full_name'] ?? 'Unknown',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text('@${parent['username'] ?? ''}'),
-                                    ],
-                                  ),
-                                ),
-                                OutlinedButton.icon(
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text('@${parent['username'] ?? ''}'),
+                                  ],
+                                );
+                                final messageButton = OutlinedButton.icon(
                                   icon: const Icon(Icons.message),
                                   label: const Text('Message'),
                                   onPressed: () => _startChatWithUser(
                                     parent['user_id'] as int,
                                     parent['full_name'] as String,
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                OutlinedButton.icon(
+                                );
+                                final profileButton = OutlinedButton.icon(
                                   icon: const Icon(Icons.visibility),
                                   label: const Text('View Profile'),
                                   onPressed: () => _showParentProfileDialog(parent),
-                                ),
-                              ],
+                                );
+
+                                if (isCompact) {
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      infoColumn,
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: [
+                                          messageButton,
+                                          profileButton,
+                                        ],
+                                      ),
+                                    ],
+                                  );
+                                }
+
+                                return Row(
+                                  children: [
+                                    Expanded(child: infoColumn),
+                                    messageButton,
+                                    const SizedBox(width: 8),
+                                    profileButton,
+                                  ],
+                                );
+                              },
                             ),
                           ),
                         );
@@ -739,46 +765,74 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                           margin: const EdgeInsets.only(bottom: 8),
                           child: Padding(
                             padding: const EdgeInsets.all(12.0),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        student['full_name'] ?? 'Unknown',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                            child: Builder(
+                              builder: (context) {
+                                final isCompact =
+                                    MediaQuery.of(context).size.width < 520;
+                                final infoColumn = Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      student['full_name'] ?? 'Unknown',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text('@${student['username'] ?? ''}'),
-                                    ],
-                                  ),
-                                ),
-                                OutlinedButton.icon(
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text('@${student['username'] ?? ''}'),
+                                  ],
+                                );
+                                final messageButton = OutlinedButton.icon(
                                   icon: const Icon(Icons.message),
                                   label: const Text('Message'),
                                   onPressed: () => _startChatWithUser(
                                     student['user_id'] as int,
                                     student['full_name'] as String,
                                   ),
-                                ),
-                                const SizedBox(width: 8),
-                                OutlinedButton.icon(
+                                );
+                                final profileButton = OutlinedButton.icon(
                                   icon: const Icon(Icons.visibility),
                                   label: const Text('View Profile'),
                                   onPressed: () => _showStudentProfileDialog(student),
-                                ),
-                                if (canAssign) ...[
-                                  const SizedBox(width: 8),
-                                  ElevatedButton.icon(
-                                    onPressed: () => _showAssignHometaskDialog(student),
-                                    icon: const Icon(Icons.assignment_add),
-                                    label: const Text('Assign'),
-                                  ),
-                                ],
-                              ],
+                                );
+                                final assignButton = ElevatedButton.icon(
+                                  onPressed: () => _showAssignHometaskDialog(student),
+                                  icon: const Icon(Icons.assignment_add),
+                                  label: const Text('Assign'),
+                                );
+
+                                if (isCompact) {
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      infoColumn,
+                                      const SizedBox(height: 8),
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: [
+                                          messageButton,
+                                          profileButton,
+                                          if (canAssign) assignButton,
+                                        ],
+                                      ),
+                                    ],
+                                  );
+                                }
+
+                                return Row(
+                                  children: [
+                                    Expanded(child: infoColumn),
+                                    messageButton,
+                                    const SizedBox(width: 8),
+                                    profileButton,
+                                    if (canAssign) ...[
+                                      const SizedBox(width: 8),
+                                      assignButton,
+                                    ],
+                                  ],
+                                );
+                              },
                             ),
                           ),
                         );
@@ -1254,34 +1308,55 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            title: Row(
-              children: [
-                _buildChildAvatar(
-                  child['profile_image'],
-                  child['full_name'],
-                  20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            title: Builder(
+              builder: (context) {
+                final isCompact = MediaQuery.of(context).size.width < 420;
+                final nameBlock = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      child['full_name'],
+                      style: const TextStyle(fontSize: 20),
+                    ),
+                    Text(
+                      '@${child['username']}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontWeight: FontWeight.normal,
+                      ),
+                    ),
+                  ],
+                );
+
+                if (isCompact) {
+                  return Wrap(
+                    spacing: 12,
+                    runSpacing: 8,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      Text(
+                      _buildChildAvatar(
+                        child['profile_image'],
                         child['full_name'],
-                        style: const TextStyle(fontSize: 20),
+                        20,
                       ),
-                      Text(
-                        '@${child['username']}',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[600],
-                          fontWeight: FontWeight.normal,
-                        ),
-                      ),
+                      nameBlock,
                     ],
-                  ),
-                ),
-              ],
+                  );
+                }
+
+                return Row(
+                  children: [
+                    _buildChildAvatar(
+                      child['profile_image'],
+                      child['full_name'],
+                      20,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(child: nameBlock),
+                  ],
+                );
+              },
             ),
             content: SizedBox(
               width: 500,
@@ -1356,24 +1431,24 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                   const SizedBox(height: 4),
                                   Text('@${teacher['username'] ?? ''}'),
                                   const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      OutlinedButton.icon(
+                                  Builder(
+                                    builder: (context) {
+                                      final isCompact =
+                                          MediaQuery.of(context).size.width < 520;
+                                      final messageButton = OutlinedButton.icon(
                                         icon: const Icon(Icons.message),
                                         label: const Text('Message'),
                                         onPressed: () => _startChatWithUser(
                                           teacher['user_id'] as int,
                                           teacher['full_name'] as String,
                                         ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      OutlinedButton.icon(
+                                      );
+                                      final profileButton = OutlinedButton.icon(
                                         icon: const Icon(Icons.visibility),
                                         label: const Text('View Profile'),
                                         onPressed: () => _showTeacherProfileDialog(teacher),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      TextButton.icon(
+                                      );
+                                      final leaveButton = TextButton.icon(
                                         icon: const Icon(Icons.logout, color: Colors.red),
                                         label: const Text(
                                           'Leave Teacher',
@@ -1393,8 +1468,30 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                             }
                                           }
                                         },
-                                      ),
-                                    ],
+                                      );
+
+                                      if (isCompact) {
+                                        return Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: [
+                                            messageButton,
+                                            profileButton,
+                                            leaveButton,
+                                          ],
+                                        );
+                                      }
+
+                                      return Row(
+                                        children: [
+                                          messageButton,
+                                          const SizedBox(width: 8),
+                                          profileButton,
+                                          const SizedBox(width: 8),
+                                          leaveButton,
+                                        ],
+                                      );
+                                    },
                                   ),
                                 ],
                               ),
@@ -1420,73 +1517,79 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
               ),
             ),
             actions: [
-              if (isEditing) ...[
-                TextButton(
-                  onPressed: isSaving
-                      ? null
-                      : () {
-                          setState(() {
-                            isEditing = false;
-                            fullNameController.text = child['full_name'];
-                            birthdayController.text = child['birthday'];
-                          });
-                        },
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: isSaving
-                      ? null
-                      : () async {
-                          setState(() {
-                            isSaving = true;
-                          });
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  if (isEditing) ...[
+                    TextButton(
+                      onPressed: isSaving
+                          ? null
+                          : () {
+                              setState(() {
+                                isEditing = false;
+                                fullNameController.text = child['full_name'];
+                                birthdayController.text = child['birthday'];
+                              });
+                            },
+                      child: const Text('Cancel'),
+                    ),
+                    ElevatedButton(
+                      onPressed: isSaving
+                          ? null
+                          : () async {
+                              setState(() {
+                                isSaving = true;
+                              });
 
-                          await _updateChildData(
-                            child['user_id'],
-                            fullNameController.text,
-                            birthdayController.text,
-                          );
+                              await _updateChildData(
+                                child['user_id'],
+                                fullNameController.text,
+                                birthdayController.text,
+                              );
 
-                          setState(() {
-                            isSaving = false;
-                          });
+                              setState(() {
+                                isSaving = false;
+                              });
 
-                          if (context.mounted) {
-                            Navigator.of(context).pop();
-                            _loadProfile();
-                          }
-                        },
-                  child: isSaving
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Save'),
-                ),
-              ] else ...[
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Close'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () => _startChatWithUser(
-                    child['user_id'] as int,
-                    child['full_name'] as String,
-                  ),
-                  icon: const Icon(Icons.message),
-                  label: const Text('Message'),
-                ),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      isEditing = true;
-                    });
-                  },
-                  icon: const Icon(Icons.edit),
-                  label: const Text('Edit'),
-                ),
-              ],
+                              if (context.mounted) {
+                                Navigator.of(context).pop();
+                                _loadProfile();
+                              }
+                            },
+                      child: isSaving
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Save'),
+                    ),
+                  ] else ...[
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Close'),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _startChatWithUser(
+                        child['user_id'] as int,
+                        child['full_name'] as String,
+                      ),
+                      icon: const Icon(Icons.message),
+                      label: const Text('Message'),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          isEditing = true;
+                        });
+                      },
+                      icon: const Icon(Icons.edit),
+                      label: const Text('Edit'),
+                    ),
+                  ],
+                ],
+              ),
             ],
           );
         },

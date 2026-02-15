@@ -28,6 +28,7 @@ pub struct EmailService {
     smtp_username: String,
     smtp_password: String,
     reset_url_base: String,
+    app_name: String,
 }
 
 impl EmailService {
@@ -43,6 +44,7 @@ impl EmailService {
                 .map_err(|_| EmailError::ConfigError("SMTP_PASSWORD not set".to_string()))?,
             reset_url_base: env::var("RESET_URL_BASE")
                 .unwrap_or_else(|_| "http://localhost:8080/reset-password".to_string()),
+            app_name: env::var("APP_NAME").unwrap_or_else(|_| "KlavierApp".to_string()),
         })
     }
 
@@ -56,14 +58,14 @@ impl EmailService {
 
         let body = format!(
             "Hello {},\n\n\
-            You requested a password reset for your KlavierApp account.\n\n\
+            You requested a password reset for your {} account.\n\n\
             Click the link below to reset your password:\n\
             {}\n\n\
             This link will expire in 1 hour.\n\n\
             If you didn't request this, please ignore this email.\n\n\
             Best regards,\n\
-            KlavierApp Team",
-            username, reset_link
+            {} Team",
+            username, self.app_name, reset_link, self.app_name
         );
 
         let email = Message::builder()
@@ -75,7 +77,7 @@ impl EmailService {
             .to(to_email
                 .parse()
                 .map_err(|e| EmailError::BuildError(format!("Invalid to email: {}", e)))?)
-            .subject("Password Reset Request - KlavierApp")
+            .subject(format!("Password Reset Request - {}", self.app_name))
             .header(ContentType::TEXT_PLAIN)
             .body(body)
             .map_err(|e| EmailError::BuildError(e.to_string()))?;
@@ -104,8 +106,8 @@ impl EmailService {
             User '{}' has requested a password reset but has no email address on file.\n\n\
             Please check the admin panel to handle this request.\n\n\
             Best regards,\n\
-            KlavierApp System",
-            username
+            {} System",
+            username, self.app_name
         );
 
         let email = Message::builder()
@@ -117,7 +119,7 @@ impl EmailService {
             .to(to_email
                 .parse()
                 .map_err(|e| EmailError::BuildError(format!("Invalid to email: {}", e)))?)
-            .subject("Password Reset Request Pending - KlavierApp")
+            .subject(format!("Password Reset Request Pending - {}", self.app_name))
             .header(ContentType::TEXT_PLAIN)
             .body(body)
             .map_err(|e| EmailError::BuildError(e.to_string()))?;

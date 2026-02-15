@@ -144,7 +144,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
     try {
       final response = await http.get(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/admin/users'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/admin/users/${widget.userId}',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -160,25 +162,12 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       }
 
       final decoded = jsonDecode(response.body);
-      final List<dynamic> data;
-      if (decoded is List) {
-        data = decoded;
-      } else if (decoded is Map<String, dynamic>) {
-        final users = decoded['users'];
-        if (users is List) {
-          data = users;
-        } else {
-          data = <dynamic>[];
-        }
-      } else {
-        data = <dynamic>[];
-      }
-
       Map<String, dynamic>? userData;
-      for (final entry in data) {
-        if (entry is Map<String, dynamic> && entry['id'] == widget.userId) {
-          userData = entry;
-          break;
+      if (decoded is Map<String, dynamic>) {
+        if (decoded['user'] is Map<String, dynamic>) {
+          userData = decoded['user'] as Map<String, dynamic>;
+        } else {
+          userData = decoded;
         }
       }
 
