@@ -100,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
           titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
           contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
           actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-          title: const Text('Consent (short)'),
+          title: const Text('Consent to Personal Data Processing'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -116,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   });
                 },
                 title: const Text(
-                  'I agree and (if the account is for a child) I am a parent/guardian or authorized.',
+                  'If you register a child, you confirm that you are a parent, legal guardian, or otherwise authorized person.',
                 ),
               ),
             ],

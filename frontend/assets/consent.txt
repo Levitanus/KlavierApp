@@ -1,7 +1,6 @@
-Einwilligung in die Verarbeitung personenbezogener Daten (Kurzfassung)
-Durch die Registrierung und Nutzung der App und der Website stimmen Sie der Verarbeitung Ihrer personenbezogenen Daten unter folgenden Bedingungen zu:
-Die Daten werden ausschließlich zur Bereitstellung von Musiklern-Inhalten und zum Betrieb des Dienstes verwendet.
-Sie können Ihr Profil jederzeit bearbeiten oder löschen.
-Die Datenübertragung ist durch TLS-Verschlüsselung geschützt.
-Es erfolgt keine Weitergabe an Dritte, mit Ausnahme des E-Mail-Versands über den Dienst SendGrid.
-Wenn Sie ein Kind registrieren, bestätigen Sie, dass Sie Elternteil, gesetzlicher Vertreter oder eine anderweitig berechtigte Person sind.
+Consent to Personal Data Processing
+By registering and using the app and website, you consent to the processing of your personal data under the following conditions:
+Data is used solely to provide music learning content and operate the service.
+You may edit or delete your profile at any time.
+Data transmission is protected using TLS encryption.
+Data is not shared with third parties, except for email delivery via SendGrid.

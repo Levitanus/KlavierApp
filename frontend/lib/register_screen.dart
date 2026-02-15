@@ -554,7 +554,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                         });
                                       },
                                 title: const Text(
-                                  'I agree and (if registering a child) I am a parent/guardian or authorized.',
+                                  'If you register a child, you confirm that you are a parent, legal guardian, or otherwise authorized person.',
                                 ),
                               ),
                             ],
