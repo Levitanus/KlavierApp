@@ -50,9 +50,13 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   static String get _baseUrl => AppConfig.instance.baseUrl;
   static const String _consentKey = 'consent_accepted_v1';
+  static bool _consentDialogShownGlobally = false;
   int _selectedTabIndex = 0;
   int? _selectedDrawerIndex;
   Widget? _currentPage;
+  Widget? _previousPageBeforeNotifications;
+  int _previousTabIndexBeforeNotifications = 0;
+  int? _previousDrawerIndexBeforeNotifications;
   bool _profileLoading = false;
   bool _consentDialogShown = false;
   bool _chatRouteHandled = false;
@@ -124,8 +128,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _maybeShowConsentDialog() async {
-    if (_consentDialogShown || !mounted) return;
+    if (_consentDialogShownGlobally || _consentDialogShown || !mounted) return;
     _consentDialogShown = true;
+    _consentDialogShownGlobally = true;
 
     final prefs = await SharedPreferences.getInstance();
     final hasAccepted = prefs.getBool(_consentKey) ?? false;
@@ -433,6 +438,29 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _toggleNotificationsPage() {
+    if (_currentPage is NotificationsScreen) {
+      final fallbackPage = _previousPageBeforeNotifications ??
+          _pageForTab(_previousTabIndexBeforeNotifications);
+      setState(() {
+        _currentPage = fallbackPage;
+        _selectedTabIndex = _previousTabIndexBeforeNotifications;
+        _selectedDrawerIndex = _previousDrawerIndexBeforeNotifications;
+        _previousPageBeforeNotifications = null;
+        _previousDrawerIndexBeforeNotifications = null;
+      });
+      return;
+    }
+
+    setState(() {
+      _previousPageBeforeNotifications = _currentPage;
+      _previousTabIndexBeforeNotifications = _selectedTabIndex;
+      _previousDrawerIndexBeforeNotifications = _selectedDrawerIndex;
+      _currentPage = const NotificationsScreen();
+      _selectedDrawerIndex = null;
+    });
+  }
+
   Future<void> _handleLogout() async {
     final l10n = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
@@ -484,16 +512,19 @@ class _HomeScreenState extends State<HomeScreen> {
     
     return Scaffold(
       appBar: AppBar(
-        title: SvgPicture.asset(
-          logoAsset,
-          height: 28,
+        title: InkWell(
+          onTap: () => _navigateToTab(0),
+          child: SvgPicture.asset(
+            logoAsset,
+            height: 28,
+          ),
         ),
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
             icon: _NotificationNavIcon(active: isNotificationsPage),
             tooltip: l10n?.commonNotifications ?? 'Notifications',
-            onPressed: () => _navigateToPage(const NotificationsScreen()),
+            onPressed: _toggleNotificationsPage,
           ),
           Builder(
             builder: (context) => IconButton(

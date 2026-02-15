@@ -23,9 +23,10 @@ class NotificationBellWidget extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.notifications),
               onPressed: () async {
-                await context
-                    .read<PushNotificationService>()
-                    .requestPermissionAndRegister();
+                final pushService = context.read<PushNotificationService>();
+                if (pushService.isEnabled) {
+                  await pushService.requestPermissionAndRegister();
+                }
                 _showNotificationsDropdown(context, notificationService);
               },
             ),
@@ -106,8 +107,6 @@ class NotificationDropdownContent extends StatefulWidget {
 
 class _NotificationDropdownContentState
     extends State<NotificationDropdownContent> {
-  bool _showUnreadOnly = false;
-
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -130,40 +129,35 @@ class _NotificationDropdownContentState
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                FilterChip(
-                  label: Text(l10n?.notificationsUnread ?? 'Unread'),
-                  selected: _showUnreadOnly,
-                  onSelected: (selected) {
-                    setState(() {
-                      _showUnreadOnly = selected;
-                      widget.notificationService.fetchNotifications(
-                        unreadOnly: selected,
-                      );
-                    });
+                Consumer<PushNotificationService>(
+                  builder: (context, pushService, _) {
+                    final enabled = pushService.isEnabled;
+                    return IconButton(
+                      icon: Icon(
+                        enabled
+                            ? Icons.notifications_active
+                            : Icons.notifications_off,
+                      ),
+                      onPressed: () async {
+                        final ok = await pushService.setEnabled(!enabled);
+                        if (context.mounted && !ok && !enabled) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Notifications are disabled.'),
+                            ),
+                          );
+                        }
+                      },
+                      tooltip: enabled
+                          ? 'Disable notifications'
+                          : 'Enable notifications',
+                    );
                   },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.notifications_active),
-                  onPressed: () async {
-                    final ok = await context
-                        .read<PushNotificationService>()
-                        .requestPermissionAndRegister();
-                    if (context.mounted && !ok) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Notifications are disabled.'),
-                        ),
-                      );
-                    }
-                  },
-                  tooltip: 'Enable notifications',
                 ),
                 IconButton(
                   icon: const Icon(Icons.refresh),
                   onPressed: () {
-                    widget.notificationService.fetchNotifications(
-                      unreadOnly: _showUnreadOnly,
-                    );
+                    widget.notificationService.fetchNotifications();
                   },
                   tooltip: l10n?.commonRefresh ?? 'Refresh',
                 ),

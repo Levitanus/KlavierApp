@@ -367,102 +367,136 @@ class MyApp extends StatelessWidget {
           },
         ),
       ],
-      child: Consumer2<ThemeService, LocaleService>(
-        builder: (context, themeService, localeService, child) => MaterialApp(
-          navigatorKey: _navigatorKey,
-          onGenerateTitle: (context) =>
-              AppLocalizations.of(context)?.appTitle ?? 'Music School App',
-          locale: localeService.locale ?? const Locale('de'),
-          theme: ThemeData(
-            useMaterial3: true,
-            colorScheme: _lightColorScheme,
-            scaffoldBackgroundColor: _lightColorScheme.background,
-            dividerColor: _lightColorScheme.outline,
-            appBarTheme: AppBarTheme(
-              backgroundColor: _lightColorScheme.surface,
-              foregroundColor: _lightColorScheme.onSurface,
-              elevation: 0,
+      child: _StartupPushSubscription(
+        child: Consumer2<ThemeService, LocaleService>(
+          builder: (context, themeService, localeService, child) => MaterialApp(
+            navigatorKey: _navigatorKey,
+            onGenerateTitle: (context) =>
+                AppLocalizations.of(context)?.appTitle ?? 'Music School App',
+            locale: localeService.locale ?? const Locale('de'),
+            theme: ThemeData(
+              useMaterial3: true,
+              colorScheme: _lightColorScheme,
+              scaffoldBackgroundColor: _lightColorScheme.background,
+              dividerColor: _lightColorScheme.outline,
+              appBarTheme: AppBarTheme(
+                backgroundColor: _lightColorScheme.surface,
+                foregroundColor: _lightColorScheme.onSurface,
+                elevation: 0,
+              ),
             ),
-          ),
-          darkTheme: ThemeData(
-            useMaterial3: true,
-            colorScheme: _darkColorScheme,
-            scaffoldBackgroundColor: _darkColorScheme.background,
-            dividerColor: _darkColorScheme.outline,
-            appBarTheme: AppBarTheme(
-              backgroundColor: _darkColorScheme.surface,
-              foregroundColor: _darkColorScheme.onSurface,
-              elevation: 0,
+            darkTheme: ThemeData(
+              useMaterial3: true,
+              colorScheme: _darkColorScheme,
+              scaffoldBackgroundColor: _darkColorScheme.background,
+              dividerColor: _darkColorScheme.outline,
+              appBarTheme: AppBarTheme(
+                backgroundColor: _darkColorScheme.surface,
+                foregroundColor: _darkColorScheme.onSurface,
+                elevation: 0,
+              ),
             ),
-          ),
-          themeMode: themeService.themeMode,
-          localizationsDelegates: [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-            quill.FlutterQuillLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          onGenerateRoute: (settings) {
-            final name = settings.name ?? '/';
-            final uri = Uri.parse(name);
+            themeMode: themeService.themeMode,
+            localizationsDelegates: [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+              quill.FlutterQuillLocalizations.delegate,
+            ],
+            supportedLocales: AppLocalizations.supportedLocales,
+            onGenerateRoute: (settings) {
+              final name = settings.name ?? '/';
+              final uri = Uri.parse(name);
 
-            // Handle /reset-password/{token}
-            if (uri.pathSegments.length == 2 &&
-                uri.pathSegments.first == 'reset-password') {
-              final token = uri.pathSegments[1];
-              return MaterialPageRoute(
-                builder: (context) => ResetPasswordScreen(token: token),
-              );
-            }
-
-            // Handle /register?token=xxx
-            if (uri.path == '/register' &&
-                uri.queryParameters.containsKey('token')) {
-              final token = uri.queryParameters['token']!;
-              return MaterialPageRoute(
-                builder: (context) => RegisterScreen(token: token),
-              );
-            }
-
-            if (uri.path == '/feeds') {
-              final feedId = int.tryParse(uri.queryParameters['feed_id'] ?? '');
-              final postId = int.tryParse(uri.queryParameters['post_id'] ?? '');
-              return MaterialPageRoute(
-                builder: (context) => HomeScreen(
-                  initialFeedId: feedId,
-                  initialPostId: postId,
-                ),
-              );
-            }
-
-            if (uri.path == '/hometasks') {
-              final studentId =
-                  int.tryParse(uri.queryParameters['student_id'] ?? '');
-              return MaterialPageRoute(
-                builder: (context) => HomeScreen(initialStudentId: studentId),
-              );
-            }
-
-            // Handle /chat/{threadId}
-            if (uri.pathSegments.length == 2 && uri.pathSegments.first == 'chat') {
-              final threadId = int.tryParse(uri.pathSegments[1]);
-              if (threadId != null) {
+              // Handle /reset-password/{token}
+              if (uri.pathSegments.length == 2 &&
+                  uri.pathSegments.first == 'reset-password') {
+                final token = uri.pathSegments[1];
                 return MaterialPageRoute(
-                  builder: (context) => HomeScreen(initialChatThreadId: threadId),
+                  builder: (context) => ResetPasswordScreen(token: token),
                 );
               }
-            }
 
-            return MaterialPageRoute(
-              builder: (context) => const AuthWrapper(),
-            );
-          },
-          initialRoute: '/',
+              // Handle /register?token=xxx
+              if (uri.path == '/register' &&
+                  uri.queryParameters.containsKey('token')) {
+                final token = uri.queryParameters['token']!;
+                return MaterialPageRoute(
+                  builder: (context) => RegisterScreen(token: token),
+                );
+              }
+
+              if (uri.path == '/feeds') {
+                final feedId = int.tryParse(uri.queryParameters['feed_id'] ?? '');
+                final postId = int.tryParse(uri.queryParameters['post_id'] ?? '');
+                return MaterialPageRoute(
+                  builder: (context) => HomeScreen(
+                    initialFeedId: feedId,
+                    initialPostId: postId,
+                  ),
+                );
+              }
+
+              if (uri.path == '/hometasks') {
+                final studentId =
+                    int.tryParse(uri.queryParameters['student_id'] ?? '');
+                return MaterialPageRoute(
+                  builder: (context) => HomeScreen(initialStudentId: studentId),
+                );
+              }
+
+              // Handle /chat/{threadId}
+              if (uri.pathSegments.length == 2 &&
+                  uri.pathSegments.first == 'chat') {
+                final threadId = int.tryParse(uri.pathSegments[1]);
+                if (threadId != null) {
+                  return MaterialPageRoute(
+                    builder: (context) =>
+                        HomeScreen(initialChatThreadId: threadId),
+                  );
+                }
+              }
+
+              return MaterialPageRoute(
+                builder: (context) => const AuthWrapper(),
+              );
+            },
+            initialRoute: '/',
+          ),
         ),
       ),
     );
+  }
+}
+
+class _StartupPushSubscription extends StatefulWidget {
+  final Widget child;
+
+  const _StartupPushSubscription({required this.child});
+
+  @override
+  State<_StartupPushSubscription> createState() =>
+      _StartupPushSubscriptionState();
+}
+
+class _StartupPushSubscriptionState extends State<_StartupPushSubscription> {
+  bool _didRun = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_didRun) return;
+    _didRun = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      context.read<PushNotificationService>().trySubscribeOnStartup();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return widget.child;
   }
 }
 

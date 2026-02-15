@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 import '../auth.dart';
 import '../config/app_config.dart';
@@ -10,7 +11,9 @@ class PushNotificationService extends ChangeNotifier {
   PushNotificationService({
     required this.authService,
     String? baseUrl,
-  }) : baseUrl = baseUrl ?? AppConfig.instance.baseUrl;
+  }) : baseUrl = baseUrl ?? AppConfig.instance.baseUrl {
+    _loadPreferences();
+  }
 
   final AuthService authService;
   final String baseUrl;
@@ -18,11 +21,80 @@ class PushNotificationService extends ChangeNotifier {
   StreamSubscription<String>? _tokenRefreshSub;
   bool _initialized = false;
   String? _lastToken;
+  bool _enabled = true;
+  bool _startupAttempted = false;
+
+  static const String _enabledKey = 'push_notifications_enabled_v1';
 
   static const String _webVapidKey =
       'BBfVex9gB0NAnQKNly8kbOvBZ4mnAhPyO78kYgf375WKXoiclmB54RNiXpntHGCgJaNQEmLaXl5sQ5LbRIo56GU';
 
+  bool get isEnabled => _enabled;
+
+  Future<void> _loadPreferences() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getBool(_enabledKey);
+      if (saved != null) {
+        _enabled = saved;
+        notifyListeners();
+      }
+    } catch (_) {
+      // Ignore preference errors and default to enabled.
+    }
+  }
+
+  Future<void> _saveEnabled(bool enabled) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_enabledKey, enabled);
+    } catch (_) {
+      // Ignore preference errors.
+    }
+  }
+
+  Future<bool> setEnabled(bool enabled) async {
+    if (enabled == _enabled) {
+      return true;
+    }
+
+    if (!enabled) {
+      _enabled = false;
+      await _saveEnabled(false);
+      await _disableNotifications();
+      notifyListeners();
+      return true;
+    }
+
+    _enabled = true;
+    await _saveEnabled(true);
+    _initialized = false;
+    final ok = await _initialize();
+    if (!ok) {
+      _enabled = false;
+      await _saveEnabled(false);
+    }
+    notifyListeners();
+    return ok;
+  }
+
+  Future<void> trySubscribeOnStartup() async {
+    if (_startupAttempted) return;
+    _startupAttempted = true;
+    await _loadPreferences();
+    if (!_enabled) return;
+    if (_initialized && _lastToken == null) {
+      _initialized = false;
+    }
+
+    await _initialize();
+  }
+
   Future<void> syncAuth() async {
+    await _loadPreferences();
+    if (!_enabled) {
+      return;
+    }
     if (kDebugMode) {
       print('[PUSH] syncAuth called, authenticated: ${authService.isAuthenticated}');
     }
@@ -34,35 +106,7 @@ class PushNotificationService extends ChangeNotifier {
       return;
     }
 
-    if (_initialized) {
-      if (kDebugMode) {
-        print('[PUSH] Already initialized, returning');
-      }
-      return;
-    }
-
-    if (!_isSupportedPlatform()) {
-      if (kDebugMode) {
-        print('[PUSH] Platform not supported');
-      }
-      return;
-    }
-
-    if (kDebugMode) {
-      print('[PUSH] Starting initialization...');
-    }
-    _initialized = true;
-    await _requestPermissionAndRegister();
-
-    _tokenRefreshSub?.cancel();
-    _tokenRefreshSub = FirebaseMessaging.instance.onTokenRefresh.listen(
-      (token) async {
-        if (kDebugMode) {
-          print('[PUSH] Token refreshed: $token');
-        }
-        return _registerToken(token);
-      },
-    );
+    await _initialize();
   }
 
   @override
@@ -79,10 +123,49 @@ class PushNotificationService extends ChangeNotifier {
   }
 
   Future<bool> requestPermissionAndRegister() async {
-    if (!_isSupportedPlatform()) {
+    if (!_enabled || !_isSupportedPlatform()) {
       return false;
     }
-    return _requestPermissionAndRegister();
+    _initialized = false;
+    return _initialize();
+  }
+
+  Future<bool> _initialize() async {
+    if (_initialized && _lastToken != null) {
+      if (kDebugMode) {
+        print('[PUSH] Already initialized, returning');
+      }
+      return true;
+    }
+
+    if (!_isSupportedPlatform()) {
+      if (kDebugMode) {
+        print('[PUSH] Platform not supported');
+      }
+      return false;
+    }
+
+    if (kDebugMode) {
+      print('[PUSH] Starting initialization...');
+    }
+    _initialized = true;
+    final ok = await _requestPermissionAndRegister();
+    if (!ok) {
+      _initialized = false;
+      return false;
+    }
+
+    _tokenRefreshSub?.cancel();
+    _tokenRefreshSub = FirebaseMessaging.instance.onTokenRefresh.listen(
+      (token) async {
+        if (kDebugMode) {
+          print('[PUSH] Token refreshed: $token');
+        }
+        return _registerToken(token);
+      },
+    );
+
+    return true;
   }
 
   Future<bool> _requestPermissionAndRegister() async {
@@ -202,6 +285,24 @@ class PushNotificationService extends ChangeNotifier {
     } catch (e) {
       if (kDebugMode) {
         print('Failed to revoke push token: $e');
+      }
+    }
+  }
+
+  Future<void> _disableNotifications() async {
+    _tokenRefreshSub?.cancel();
+    _tokenRefreshSub = null;
+    _initialized = false;
+
+    await _revokeTokenIfNeeded();
+
+    if (_isSupportedPlatform()) {
+      try {
+        await FirebaseMessaging.instance.deleteToken();
+      } catch (e) {
+        if (kDebugMode) {
+          print('[PUSH] Failed to delete token: $e');
+        }
       }
     }
   }

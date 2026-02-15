@@ -33,6 +33,7 @@ class QuillEditorComposer extends StatefulWidget {
   final Future<void> Function()? onAttachmentSelected;
   final Future<void> Function(List<int> bytes, String filename)? onVoiceRecorded;
   final Key? controlKey;
+  final FocusNode? focusNode;
 
   const QuillEditorComposer({
     Key? key,
@@ -42,6 +43,7 @@ class QuillEditorComposer extends StatefulWidget {
     this.onAttachmentSelected,
     this.onVoiceRecorded,
     this.controlKey,
+    this.focusNode,
   }) : super(key: key);
 
   @override
@@ -50,18 +52,22 @@ class QuillEditorComposer extends StatefulWidget {
 
 class _QuillEditorComposerState extends State<QuillEditorComposer> {
   late FocusNode _focusNode;
+  late bool _ownsFocusNode;
   bool _isUploadingAttachment = false;
   final VoiceRecorder _voiceRecorder = VoiceRecorder();
 
   @override
   void initState() {
     super.initState();
-    _focusNode = FocusNode();
+    _ownsFocusNode = widget.focusNode == null;
+    _focusNode = widget.focusNode ?? FocusNode();
   }
 
   @override
   void dispose() {
-    _focusNode.dispose();
+    if (_ownsFocusNode) {
+      _focusNode.dispose();
+    }
     super.dispose();
   }
 

@@ -53,6 +53,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Load message history after first build
       _loadMessages();
+      _requestEditorFocus();
     });
   }
 
@@ -90,6 +91,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       _scrollToBottom();
       _markMessagesRead();
     }
+  }
+
+  void _requestEditorFocus() {
+    if (!mounted) return;
+    if (_editorFocusNode.hasFocus) return;
+    _editorFocusNode.requestFocus();
   }
 
   Future<void> _markMessagesRead() async {
@@ -513,6 +520,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             ),
           QuillEditorComposer(
             controller: _editorController,
+            focusNode: _editorFocusNode,
             config: const QuillEditorComposerConfig(
               minHeight: 40,
               maxHeight: 120,
