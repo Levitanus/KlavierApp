@@ -219,7 +219,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     // Logo or App Title
                     SvgPicture.asset(
-                      'assets/branding/icon.svg',
+                      'assets/branding/icon white note.svg',
                       height: 72,
                       width: 72,
                     ),

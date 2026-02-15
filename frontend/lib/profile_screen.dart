@@ -487,9 +487,14 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                       ),
                       const SizedBox(height: 12),
                       ...(_parentData!['children'] as List).map((child) {
+                        final outlineColor = Theme.of(context).colorScheme.outline;
+
                         return Card(
-                          color: Colors.blue.shade50,
                           margin: const EdgeInsets.only(bottom: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: outlineColor),
+                          ),
                           child: InkWell(
                             onTap: () => _showChildDetailsDialog(child),
                             borderRadius: BorderRadius.circular(12),
