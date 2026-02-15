@@ -15,6 +15,7 @@ import 'services/feed_service.dart';
 import 'services/hometask_service.dart';
 import 'services/app_data_cache_service.dart';
 import 'services/media_cache_service.dart';
+import 'services/theme_service.dart';
 import 'feeds_screen.dart';
 import 'chat_screen.dart';
 import 'notifications_screen.dart';
@@ -317,6 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context);
+    final themeService = context.watch<ThemeService>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final logoAsset = isDark
         ? 'assets/branding/logo bright.svg'
@@ -448,6 +450,33 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               const Divider(),
             ],
+            ListTile(
+              leading: const Icon(Icons.brightness_6),
+              title: const Text('Theme'),
+              trailing: DropdownButton<ThemeMode>(
+                value: themeService.themeMode,
+                onChanged: (value) {
+                  if (value != null) {
+                    themeService.setThemeMode(value);
+                  }
+                },
+                items: const [
+                  DropdownMenuItem(
+                    value: ThemeMode.system,
+                    child: Text('System'),
+                  ),
+                  DropdownMenuItem(
+                    value: ThemeMode.light,
+                    child: Text('Light'),
+                  ),
+                  DropdownMenuItem(
+                    value: ThemeMode.dark,
+                    child: Text('Dark'),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(),
             ListTile(
               leading: const Icon(Icons.cached),
               title: const Text('Clear app data cache'),

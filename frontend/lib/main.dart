@@ -11,6 +11,7 @@ import 'services/hometask_service.dart';
 import 'services/feed_service.dart';
 import 'services/chat_service.dart';
 import 'services/websocket_service.dart';
+import 'services/theme_service.dart';
 import 'login_screen.dart';
 import 'home_screen.dart';
 import 'reset_password_screen.dart';
@@ -87,6 +88,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeService()),
         ChangeNotifierProvider(create: (_) => AuthService()),
         ChangeNotifierProxyProvider<AuthService, NotificationService>(
           create: (context) => NotificationService(
@@ -161,66 +163,69 @@ class MyApp extends StatelessWidget {
           },
         ),
       ],
-      child: MaterialApp(
-        onGenerateTitle: (context) =>
-            AppLocalizations.of(context)?.appTitle ?? 'Music School App',
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: _lightColorScheme,
-          scaffoldBackgroundColor: _lightColorScheme.background,
-          dividerColor: _lightColorScheme.outline,
-          appBarTheme: AppBarTheme(
-            backgroundColor: _lightColorScheme.surface,
-            foregroundColor: _lightColorScheme.onSurface,
-            elevation: 0,
+      child: Consumer<ThemeService>(
+        builder: (context, themeService, child) => MaterialApp(
+          onGenerateTitle: (context) =>
+              AppLocalizations.of(context)?.appTitle ?? 'Music School App',
+          theme: ThemeData(
+            useMaterial3: true,
+            colorScheme: _lightColorScheme,
+            scaffoldBackgroundColor: _lightColorScheme.background,
+            dividerColor: _lightColorScheme.outline,
+            appBarTheme: AppBarTheme(
+              backgroundColor: _lightColorScheme.surface,
+              foregroundColor: _lightColorScheme.onSurface,
+              elevation: 0,
+            ),
           ),
-        ),
-        darkTheme: ThemeData(
-          useMaterial3: true,
-          colorScheme: _darkColorScheme,
-          scaffoldBackgroundColor: _darkColorScheme.background,
-          dividerColor: _darkColorScheme.outline,
-          appBarTheme: AppBarTheme(
-            backgroundColor: _darkColorScheme.surface,
-            foregroundColor: _darkColorScheme.onSurface,
-            elevation: 0,
+          darkTheme: ThemeData(
+            useMaterial3: true,
+            colorScheme: _darkColorScheme,
+            scaffoldBackgroundColor: _darkColorScheme.background,
+            dividerColor: _darkColorScheme.outline,
+            appBarTheme: AppBarTheme(
+              backgroundColor: _darkColorScheme.surface,
+              foregroundColor: _darkColorScheme.onSurface,
+              elevation: 0,
+            ),
           ),
+          themeMode: themeService.themeMode,
+          localizationsDelegates: [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+            quill.FlutterQuillLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          onGenerateRoute: (settings) {
+            final name = settings.name ?? '/';
+            final uri = Uri.parse(name);
+
+            // Handle /reset-password/{token}
+            if (uri.pathSegments.length == 2 &&
+                uri.pathSegments.first == 'reset-password') {
+              final token = uri.pathSegments[1];
+              return MaterialPageRoute(
+                builder: (context) => ResetPasswordScreen(token: token),
+              );
+            }
+
+            // Handle /register?token=xxx
+            if (uri.path == '/register' &&
+                uri.queryParameters.containsKey('token')) {
+              final token = uri.queryParameters['token']!;
+              return MaterialPageRoute(
+                builder: (context) => RegisterScreen(token: token),
+              );
+            }
+
+            return MaterialPageRoute(
+              builder: (context) => const AuthWrapper(),
+            );
+          },
+          initialRoute: '/',
         ),
-        themeMode: ThemeMode.system,
-        localizationsDelegates: [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-          quill.FlutterQuillLocalizations.delegate,
-        ],
-        supportedLocales: AppLocalizations.supportedLocales,
-        onGenerateRoute: (settings) {
-          final name = settings.name ?? '/';
-          final uri = Uri.parse(name);
-
-          // Handle /reset-password/{token}
-          if (uri.pathSegments.length == 2 &&
-              uri.pathSegments.first == 'reset-password') {
-            final token = uri.pathSegments[1];
-            return MaterialPageRoute(
-              builder: (context) => ResetPasswordScreen(token: token),
-            );
-          }
-
-          // Handle /register?token=xxx
-          if (uri.path == '/register' && uri.queryParameters.containsKey('token')) {
-            final token = uri.queryParameters['token']!;
-            return MaterialPageRoute(
-              builder: (context) => RegisterScreen(token: token),
-            );
-          }
-
-          return MaterialPageRoute(
-            builder: (context) => const AuthWrapper(),
-          );
-        },
-        initialRoute: '/',
       ),
     );
   }
