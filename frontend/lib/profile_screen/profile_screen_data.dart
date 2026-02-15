@@ -160,7 +160,21 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         return;
       }
 
-      final List<dynamic> data = jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
+      final List<dynamic> data;
+      if (decoded is List) {
+        data = decoded;
+      } else if (decoded is Map<String, dynamic>) {
+        final users = decoded['users'];
+        if (users is List) {
+          data = users;
+        } else {
+          data = <dynamic>[];
+        }
+      } else {
+        data = <dynamic>[];
+      }
+
       Map<String, dynamic>? userData;
       for (final entry in data) {
         if (entry is Map<String, dynamic> && entry['id'] == widget.userId) {
