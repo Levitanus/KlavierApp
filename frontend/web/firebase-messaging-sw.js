@@ -1,9 +1,3 @@
-try {
-  importScripts('flutter_service_worker.js');
-} catch (e) {
-  // Flutter service worker is only available in release builds.
-}
-
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-compat.js');
 
