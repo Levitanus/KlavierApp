@@ -275,6 +275,16 @@ class AppLocalizationsRu extends AppLocalizations {
   String get feedsDeleteFailed => 'Не удалось удалить пост';
 
   @override
+  String get feedsDeleteCommentTitle => 'Удалить комментарий';
+
+  @override
+  String get feedsDeleteCommentMessage =>
+      'Вы уверены, что хотите удалить этот комментарий? Это действие нельзя отменить.';
+
+  @override
+  String get feedsDeleteCommentFailed => 'Не удалось удалить комментарий';
+
+  @override
   String feedsUnsupportedAttachment(Object type) {
     return 'Неподдерживаемое вложение: $type';
   }
@@ -487,6 +497,16 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get chatAdminOpenFailed => 'Не удалось открыть чат с администратором';
+
+  @override
+  String get chatDeleteMessageTitle => 'Удалить сообщение';
+
+  @override
+  String get chatDeleteMessageBody =>
+      'Вы уверены, что хотите удалить это сообщение? Это действие нельзя отменить.';
+
+  @override
+  String get chatDeleteMessageFailed => 'Не удалось удалить сообщение';
 
   @override
   String get chatMessages => 'Сообщения';
@@ -918,6 +938,9 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get dashboardStudentLabel => 'Ученик:';
+
+  @override
+  String get dashboardChildLabel => 'Ребенок:';
 
   @override
   String get dashboardNoActiveHometasks => 'Нет активных домашних заданий.';

@@ -451,16 +451,17 @@ class _FeedTimelineState extends State<FeedTimeline> {
             future: _recentPosts,
             builder: (context, snapshot) {
               final posts = snapshot.data ?? [];
+              final regularPosts = posts.where((post) => !post.isImportant).toList();
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
-              if (posts.isEmpty) {
+              if (regularPosts.isEmpty) {
                 return Text(
                   l10n?.feedsNoPosts ?? 'No posts yet.',
                 );
               }
               return Column(
-                children: posts
+                children: regularPosts
                     .map(
                       (post) => FeedPostCard(
                         post: post,
@@ -676,7 +677,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   }
 
   Future<void> _deletePost() async {
-    final auth = context.read<AuthService>();
+    final auth = context.watch<AuthService>();
     
     // Check permissions: admin, feed owner, or post author
     final canDelete = auth.isAdmin ||
@@ -902,6 +903,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   ) {
     final items = tree[parentId] ?? [];
     final auth = context.read<AuthService>();
+    final l10n = AppLocalizations.of(context);
     return items.expand((comment) {
       final controller = quill.QuillController(
         document: comment.toDocument(),
@@ -966,13 +968,20 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                       TextButton(
                         onPressed: () => _openCommentEditor(comment),
                         child: Text(
-                          AppLocalizations.of(context)?.commonEdit ?? 'Edit',
+                          l10n?.commonEdit ?? 'Edit',
+                        ),
+                      ),
+                    if ((auth.userId ?? -1) == comment.authorUserId)
+                      TextButton(
+                        onPressed: () => _deleteComment(comment),
+                        child: Text(
+                          l10n?.commonDelete ?? 'Delete',
                         ),
                       ),
                     TextButton(
                       onPressed: () => _openCommentComposer(comment.id),
                       child: Text(
-                        AppLocalizations.of(context)?.commonReply ?? 'Reply',
+                        l10n?.commonReply ?? 'Reply',
                       ),
                     ),
                   ],
@@ -1045,6 +1054,51 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
 
     if (updated == true) {
       await _loadComments();
+    }
+  }
+
+  Future<void> _deleteComment(FeedComment comment) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        title: Text(l10n?.feedsDeleteCommentTitle ?? 'Delete comment'),
+        content: Text(
+          l10n?.feedsDeleteCommentMessage ??
+              'Are you sure you want to delete this comment? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text(l10n?.commonCancel ?? 'Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text(l10n?.commonDelete ?? 'Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    final service = context.read<FeedService>();
+    final success = await service.deleteComment(_post.id, comment.id);
+    if (!mounted) return;
+
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n?.feedsDeleteCommentFailed ?? 'Failed to delete comment',
+          ),
+        ),
+      );
     }
   }
 

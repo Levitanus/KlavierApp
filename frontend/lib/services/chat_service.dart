@@ -39,6 +39,7 @@ class ChatService extends ChangeNotifier {
   bool _wsListenersRegistered = false;
   late final WsMessageCallback _chatMessageCallback = _handleNewMessage;
   late final WsMessageCallback _messageUpdatedCallback = _handleMessageUpdated;
+  late final WsMessageCallback _messageDeletedCallback = _handleMessageDeleted;
   late final WsMessageCallback _receiptCallback = _handleReceiptUpdate;
   late final WsMessageCallback _typingCallback = _handleTyping;
   late final WsConnectionCallback _connectionCallback = _handleConnectionChange;
@@ -321,6 +322,7 @@ class ChatService extends ChangeNotifier {
     // Listen for new messages
     wsService.on('chat_message', _chatMessageCallback);
     wsService.on('chat_message_updated', _messageUpdatedCallback);
+    wsService.on('chat_message_deleted', _messageDeletedCallback);
 
     // Listen for receipt updates
     wsService.on('receipt', _receiptCallback);
@@ -457,6 +459,56 @@ class ChatService extends ChangeNotifier {
     } catch (e) {
       print('Error handling message update: $e');
     }
+  }
+
+  void _handleMessageDeleted(WsMessage wsMessage) {
+    final threadId = wsMessage.threadId;
+    if (threadId == null) return;
+
+    final messageId = wsMessage.data['message_id'] as int?;
+    if (messageId == null) return;
+
+    _removeMessageFromThread(threadId, messageId);
+  }
+
+  void _removeMessageFromThread(int threadId, int messageId) {
+    final existing = messagesByThread[threadId];
+    if (existing == null) return;
+
+    final updated = existing.where((message) => message.id != messageId).toList();
+    if (updated.length == existing.length) return;
+
+    messagesByThread[threadId] = updated;
+    _cache.writeJson(
+      _messagesCacheKey(threadId),
+      _currentUserId,
+      updated.map((message) => message.toJson()).toList(),
+    );
+
+    void updateThreadList(List<ChatThread> list) {
+      final index = list.indexWhere((thread) => thread.id == threadId);
+      if (index == -1) return;
+      final thread = list[index];
+      if (thread.lastMessage?.id != messageId) return;
+      final nextMessage = updated.isNotEmpty ? updated.first : null;
+      list[index] = ChatThread(
+        id: thread.id,
+        participantAId: thread.participantAId,
+        participantBId: thread.participantBId,
+        peerUserId: thread.peerUserId,
+        peerName: thread.peerName,
+        isAdminChat: thread.isAdminChat,
+        lastMessage: nextMessage,
+        updatedAt: nextMessage?.createdAt ?? thread.updatedAt,
+        unreadCount: thread.unreadCount,
+      );
+    }
+
+    updateThreadList(threads);
+    updateThreadList(personalThreads);
+    updateThreadList(adminThreads);
+
+    notifyListeners();
   }
 
   void _updateThreadPreview(
@@ -736,6 +788,28 @@ class ChatService extends ChangeNotifier {
     } catch (e) {
       errorMessage = 'Error updating message: $e';
       return null;
+    }
+  }
+
+  Future<bool> deleteMessage(int threadId, int messageId) async {
+    errorMessage = null;
+
+    try {
+      final response = await http.delete(
+        Uri.parse('$_baseUrl/messages/$messageId'),
+        headers: {'Authorization': 'Bearer $_token'},
+      ).timeout(_chatNetworkTimeout);
+
+      if (response.statusCode == 200) {
+        _removeMessageFromThread(threadId, messageId);
+        return true;
+      }
+
+      errorMessage = 'Failed to delete message: ${response.statusCode}';
+      return false;
+    } catch (e) {
+      errorMessage = 'Error deleting message: $e';
+      return false;
     }
   }
 

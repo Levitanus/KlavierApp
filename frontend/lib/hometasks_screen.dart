@@ -73,7 +73,9 @@ class _HometasksScreenState extends State<HometasksScreen> {
 
     List<StudentSummary> students = [];
     StudentSummary? selfSummary;
-    if (_isParent(authService)) {
+    if (_isTeacher(authService)) {
+      students = await hometaskService.fetchStudentsForTeacher();
+    } else if (_isParent(authService)) {
       students = await hometaskService.fetchStudentsForParent();
       selfSummary = await hometaskService.getCurrentStudentSummary();
       if (selfSummary != null) {
@@ -82,8 +84,6 @@ class _HometasksScreenState extends State<HometasksScreen> {
           students = [selfSummary, ...students];
         }
       }
-    } else if (_isTeacher(authService)) {
-      students = await hometaskService.fetchStudentsForTeacher();
     }
 
     if (!mounted) return;
@@ -155,6 +155,10 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final isTeacher = _isTeacher(authService);
     final isParent = _isParent(authService);
     final showStudentSelector = isParent || isTeacher;
+    final showChildLabel = isParent && !isTeacher;
+    final selectorLabel = showChildLabel
+      ? (l10n?.dashboardChildLabel ?? 'Child:')
+      : (l10n?.dashboardStudentLabel ?? 'Student:');
     final canComplete = (isStudent || isParent) && !_showArchive;
     final canToggleItems = (isStudent || isParent || isTeacher) && !_showArchive;
     final listBottomPadding = isTeacher ? 96.0 : 16.0;
@@ -203,7 +207,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
                 else
                   Row(
                     children: [
-                      Text(l10n?.dashboardStudentLabel ?? 'Student:'),
+                      Text(selectorLabel),
                       const SizedBox(width: 12),
                       DropdownButton<int>(
                         value: _selectedStudentId,

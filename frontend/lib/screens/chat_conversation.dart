@@ -16,6 +16,7 @@ import '../utils/media_download.dart';
 import '../widgets/quill_embed_builders.dart';
 import '../widgets/quill_editor_composer.dart';
 import '../widgets/floating_audio_player.dart';
+import '../l10n/app_localizations.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   final ChatThread thread;
@@ -481,6 +482,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               isOwn: isOwn,
               showSenderName: showSenderName,
               onEdit: isOwn ? () => _editMessage(message) : null,
+              onDelete: isOwn ? () => _deleteMessage(message) : null,
             );
           },
         );
@@ -683,6 +685,51 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       );
     }
   }
+
+  Future<void> _deleteMessage(ChatMessage message) async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+        contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+        actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+        title: Text(l10n?.chatDeleteMessageTitle ?? 'Delete message'),
+        content: Text(
+          l10n?.chatDeleteMessageBody ??
+              'Are you sure you want to delete this message? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n?.commonCancel ?? 'Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: Text(l10n?.commonDelete ?? 'Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    final chatService = context.read<ChatService>();
+    final success = await chatService.deleteMessage(widget.thread.id, message.id);
+
+    if (!mounted) return;
+    if (!success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n?.chatDeleteMessageFailed ?? 'Failed to delete message',
+          ),
+        ),
+      );
+    }
+  }
 }
 
 class _PendingAttachment {
@@ -706,12 +753,14 @@ class _MessageBubble extends StatelessWidget {
   final bool isOwn;
   final bool showSenderName;
   final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const _MessageBubble({
     required this.message,
     required this.isOwn,
     required this.showSenderName,
     required this.onEdit,
+    required this.onDelete,
   });
 
   @override
@@ -722,6 +771,7 @@ class _MessageBubble extends StatelessWidget {
         : colorScheme.surfaceContainerHigh;
     final align = isOwn ? CrossAxisAlignment.end : CrossAxisAlignment.start;
     final name = message.senderName;
+    final l10n = AppLocalizations.of(context);
     final controller = _buildReadOnlyController();
     final maxWidth = MediaQuery.of(context).size.width * 0.72;
     final attachments = _visibleAttachments();
@@ -781,6 +831,12 @@ class _MessageBubble extends StatelessWidget {
                             icon: const Icon(Icons.edit, size: 16),
                             tooltip: 'Edit message',
                             onPressed: onEdit,
+                          ),
+                        if (onDelete != null)
+                          IconButton(
+                            icon: const Icon(Icons.delete, size: 16),
+                            tooltip: l10n?.commonDelete ?? 'Delete',
+                            onPressed: onDelete,
                           ),
                       ],
                     ),

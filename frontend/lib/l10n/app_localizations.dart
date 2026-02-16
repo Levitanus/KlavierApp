@@ -604,6 +604,24 @@ abstract class AppLocalizations {
   /// **'Failed to delete post'**
   String get feedsDeleteFailed;
 
+  /// No description provided for @feedsDeleteCommentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete Comment'**
+  String get feedsDeleteCommentTitle;
+
+  /// No description provided for @feedsDeleteCommentMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this comment? This action cannot be undone.'**
+  String get feedsDeleteCommentMessage;
+
+  /// No description provided for @feedsDeleteCommentFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete comment'**
+  String get feedsDeleteCommentFailed;
+
   /// No description provided for @feedsUnsupportedAttachment.
   ///
   /// In en, this message translates to:
@@ -999,6 +1017,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to open admin chat'**
   String get chatAdminOpenFailed;
+
+  /// No description provided for @chatDeleteMessageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete message'**
+  String get chatDeleteMessageTitle;
+
+  /// No description provided for @chatDeleteMessageBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to delete this message? This action cannot be undone.'**
+  String get chatDeleteMessageBody;
+
+  /// No description provided for @chatDeleteMessageFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete message'**
+  String get chatDeleteMessageFailed;
 
   /// No description provided for @chatMessages.
   ///
@@ -1809,6 +1845,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Student:'**
   String get dashboardStudentLabel;
+
+  /// No description provided for @dashboardChildLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Child:'**
+  String get dashboardChildLabel;
 
   /// No description provided for @dashboardNoActiveHometasks.
   ///

@@ -275,6 +275,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedsDeleteFailed => 'Failed to delete post';
 
   @override
+  String get feedsDeleteCommentTitle => 'Delete Comment';
+
+  @override
+  String get feedsDeleteCommentMessage =>
+      'Are you sure you want to delete this comment? This action cannot be undone.';
+
+  @override
+  String get feedsDeleteCommentFailed => 'Failed to delete comment';
+
+  @override
   String feedsUnsupportedAttachment(Object type) {
     return 'Unsupported attachment: $type';
   }
@@ -487,6 +497,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatAdminOpenFailed => 'Failed to open admin chat';
+
+  @override
+  String get chatDeleteMessageTitle => 'Delete message';
+
+  @override
+  String get chatDeleteMessageBody =>
+      'Are you sure you want to delete this message? This action cannot be undone.';
+
+  @override
+  String get chatDeleteMessageFailed => 'Failed to delete message';
 
   @override
   String get chatMessages => 'Messages';
@@ -915,6 +935,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get dashboardStudentLabel => 'Student:';
+
+  @override
+  String get dashboardChildLabel => 'Child:';
 
   @override
   String get dashboardNoActiveHometasks => 'No active hometasks.';

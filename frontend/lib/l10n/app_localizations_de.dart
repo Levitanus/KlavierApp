@@ -277,6 +277,17 @@ class AppLocalizationsDe extends AppLocalizations {
   String get feedsDeleteFailed => 'Beitrag konnte nicht geloescht werden';
 
   @override
+  String get feedsDeleteCommentTitle => 'Kommentar loeschen';
+
+  @override
+  String get feedsDeleteCommentMessage =>
+      'Sind Sie sicher, dass Sie diesen Kommentar loeschen moechten? Diese Aktion kann nicht rueckgaengig gemacht werden.';
+
+  @override
+  String get feedsDeleteCommentFailed =>
+      'Kommentar konnte nicht geloescht werden';
+
+  @override
   String feedsUnsupportedAttachment(Object type) {
     return 'Nicht unterstuetzter Anhang: $type';
   }
@@ -493,6 +504,17 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get chatAdminOpenFailed => 'Admin-Chat konnte nicht geoeffnet werden';
+
+  @override
+  String get chatDeleteMessageTitle => 'Nachricht loeschen';
+
+  @override
+  String get chatDeleteMessageBody =>
+      'Sind Sie sicher, dass Sie diese Nachricht loeschen moechten? Diese Aktion kann nicht rueckgaengig gemacht werden.';
+
+  @override
+  String get chatDeleteMessageFailed =>
+      'Nachricht konnte nicht geloescht werden';
 
   @override
   String get chatMessages => 'Nachrichten';
@@ -926,6 +948,9 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get dashboardStudentLabel => 'Schueler:';
+
+  @override
+  String get dashboardChildLabel => 'Kind:';
 
   @override
   String get dashboardNoActiveHometasks => 'Keine aktiven Hausaufgaben.';

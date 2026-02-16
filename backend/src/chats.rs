@@ -1530,6 +1530,108 @@ async fn update_message(
     Ok(HttpResponse::Ok().json(response))
 }
 
+/// Delete a chat message (author only)
+async fn delete_message(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    message_id: web::Path<i32>,
+) -> Result<HttpResponse> {
+    let user_id = extract_user_id_from_token(&req, &app_state).await?;
+    let message_id = message_id.into_inner();
+
+    let message = sqlx::query_as::<_, ChatMessage>(
+        "SELECT id, thread_id, sender_id, body, created_at, updated_at
+         FROM chat_messages
+         WHERE id = $1",
+    )
+    .bind(message_id)
+    .fetch_optional(&app_state.db)
+    .await
+    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?
+    .ok_or_else(|| actix_web::error::ErrorNotFound("Message not found"))?;
+
+    if message.sender_id != user_id {
+        return Ok(HttpResponse::Forbidden().json(json!({
+            "error": "Not allowed"
+        })));
+    }
+
+    let mut tx = app_state.db.begin().await.map_err(|e| {
+        error!("Failed to start transaction: {}", e);
+        actix_web::error::ErrorInternalServerError("Database error")
+    })?;
+
+    sqlx::query("DELETE FROM message_receipts WHERE message_id = $1")
+        .bind(message_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| {
+            error!("Failed to delete message receipts: {}", e);
+            actix_web::error::ErrorInternalServerError("Failed to delete message")
+        })?;
+
+    sqlx::query("DELETE FROM chat_message_attachments WHERE message_id = $1")
+        .bind(message_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| {
+            error!("Failed to delete message attachments: {}", e);
+            actix_web::error::ErrorInternalServerError("Failed to delete message")
+        })?;
+
+    sqlx::query("DELETE FROM chat_messages WHERE id = $1")
+        .bind(message_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| {
+            error!("Failed to delete message: {}", e);
+            actix_web::error::ErrorInternalServerError("Failed to delete message")
+        })?;
+
+    sqlx::query(
+        "UPDATE chat_threads
+         SET updated_at = COALESCE((
+             SELECT created_at FROM chat_messages
+             WHERE thread_id = $1
+             ORDER BY created_at DESC
+             LIMIT 1
+         ), NOW())
+         WHERE id = $1",
+    )
+    .bind(message.thread_id)
+    .execute(&mut *tx)
+    .await
+    .map_err(|e| {
+        error!("Failed to update thread timestamp: {}", e);
+        actix_web::error::ErrorInternalServerError("Failed to delete message")
+    })?;
+
+    tx.commit().await.map_err(|e| {
+        error!("Failed to commit delete message transaction: {}", e);
+        actix_web::error::ErrorInternalServerError("Failed to delete message")
+    })?;
+
+    let ws_message = websockets::WsMessage {
+        msg_type: "chat_message_deleted".to_string(),
+        user_id: Some(user_id),
+        thread_id: Some(message.thread_id),
+        post_id: None,
+        data: serde_json::json!({
+            "message_id": message_id,
+        }),
+    };
+
+    app_state
+        .ws_server
+        .broadcast_to_thread(message.thread_id, ws_message)
+        .await;
+
+    Ok(HttpResponse::Ok().json(json!({
+        "message_id": message_id,
+        "thread_id": message.thread_id,
+    })))
+}
+
 /// Get related teachers for current user (for toolbar)
 async fn get_related_teachers_handler(
     req: HttpRequest,
@@ -1593,6 +1695,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("/threads/{thread_id}/messages", web::get().to(get_thread_messages))
             .route("/threads/{thread_id}/messages", web::post().to(send_message))
             .route("/messages/{message_id}", web::patch().to(update_message))
+            .route("/messages/{message_id}", web::delete().to(delete_message))
             .route("/messages/{message_id}/receipt", web::patch().to(update_receipt))
             .route("/admin/message", web::post().to(send_admin_message))
             .route("/related-teachers", web::get().to(get_related_teachers_handler))
