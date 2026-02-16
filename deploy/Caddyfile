@@ -5,6 +5,9 @@
 {$APP_HOST} {
   root * /srv/app
   encode zstd gzip
+
+  @sw path /flutter_service_worker.js /flutter_bootstrap.js /firebase-messaging-sw.js
+  header @sw Cache-Control "no-cache, no-store, must-revalidate"
   
   # SPA routing: serve index.html for all non-file requests
   try_files {path} /index.html

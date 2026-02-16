@@ -35,7 +35,16 @@
 <body>
   <script>
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('firebase-messaging-sw.js');
+      const originalRegister = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+      navigator.serviceWorker.register = (scriptURL, options) => {
+        const url = typeof scriptURL === 'string'
+          ? scriptURL
+          : (scriptURL && scriptURL.toString ? scriptURL.toString() : '');
+        if (url.includes('flutter_service_worker.js')) {
+          scriptURL = 'firebase-messaging-sw.js';
+        }
+        return originalRegister(scriptURL, options);
+      };
     }
   </script>
   <script src="flutter_bootstrap.js" async></script>
