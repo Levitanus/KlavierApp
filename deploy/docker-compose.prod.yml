@@ -24,6 +24,7 @@ services:
     volumes:
       - ../uploads:/uploads
       - ./.env:/.env:ro
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
     depends_on:
       - db
 
