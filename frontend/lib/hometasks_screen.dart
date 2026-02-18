@@ -20,6 +20,9 @@ class _HometasksScreenState extends State<HometasksScreen> {
   bool _isLoadingStudents = false;
   String? _studentsError;
   int? _selectedStudentId;
+  String _teacherStudentSearchQuery = '';
+  final TextEditingController _teacherStudentSearchController =
+      TextEditingController();
   List<StudentSummary> _students = [];
   List<Hometask> _orderedHometasks = [];
   String _lastRoleSignature = '';
@@ -30,6 +33,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initScreen();
     });
+  }
+
+  @override
+  void dispose() {
+    _teacherStudentSearchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -91,7 +100,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
     if (students.isEmpty) {
       setState(() {
         _isLoadingStudents = false;
-        _studentsError = AppLocalizations.of(context)?.dashboardNoStudents ??
+        _studentsError =
+            AppLocalizations.of(context)?.dashboardNoStudents ??
             'No students available.';
       });
       return;
@@ -100,7 +110,9 @@ class _HometasksScreenState extends State<HometasksScreen> {
     setState(() {
       _students = students;
       if (widget.initialStudentId != null &&
-          students.any((student) => student.userId == widget.initialStudentId)) {
+          students.any(
+            (student) => student.userId == widget.initialStudentId,
+          )) {
         _selectedStudentId = widget.initialStudentId;
       } else if (_isStudent(authService) && selfSummary != null) {
         _selectedStudentId = selfSummary.userId;
@@ -146,6 +158,54 @@ class _HometasksScreenState extends State<HometasksScreen> {
     });
   }
 
+  bool _matchesStudentSearch(StudentSummary student) {
+    if (_teacherStudentSearchQuery.isEmpty) {
+      return true;
+    }
+
+    final fullName = student.fullName.toLowerCase();
+    final username = student.username.toLowerCase();
+    return fullName.contains(_teacherStudentSearchQuery) ||
+        username.contains(_teacherStudentSearchQuery);
+  }
+
+  Future<void> _onTeacherStudentSearchChanged(String value) async {
+    final query = value.trim().toLowerCase();
+    if (query == _teacherStudentSearchQuery) {
+      return;
+    }
+
+    setState(() {
+      _teacherStudentSearchQuery = query;
+    });
+
+    final authService = context.read<AuthService>();
+    if (!_isTeacher(authService)) {
+      return;
+    }
+
+    final filtered = _students.where(_matchesStudentSearch).toList();
+    if (filtered.isEmpty) {
+      return;
+    }
+
+    final selectedStudentId = _selectedStudentId;
+    if (selectedStudentId != null &&
+        filtered.any((student) => student.userId == selectedStudentId)) {
+      return;
+    }
+
+    setState(() {
+      _selectedStudentId = filtered.first.userId;
+    });
+    await _loadHometasks();
+  }
+
+  void _clearTeacherStudentSearch() {
+    _teacherStudentSearchController.clear();
+    _onTeacherStudentSearchChanged('');
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -155,12 +215,16 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final isTeacher = _isTeacher(authService);
     final isParent = _isParent(authService);
     final showStudentSelector = isParent || isTeacher;
+    final filteredStudents = isTeacher
+        ? _students.where(_matchesStudentSearch).toList()
+        : _students;
     final showChildLabel = isParent && !isTeacher;
     final selectorLabel = showChildLabel
-      ? (l10n?.dashboardChildLabel ?? 'Child:')
-      : (l10n?.dashboardStudentLabel ?? 'Student:');
+        ? (l10n?.dashboardChildLabel ?? 'Child:')
+        : (l10n?.dashboardStudentLabel ?? 'Student:');
     final canComplete = (isStudent || isParent) && !_showArchive;
-    final canToggleItems = (isStudent || isParent || isTeacher) && !_showArchive;
+    final canToggleItems =
+        (isStudent || isParent || isTeacher) && !_showArchive;
     final listBottomPadding = isTeacher ? 96.0 : 16.0;
     StudentSummary? selectedStudent;
     final selectedStudentId = _selectedStudentId;
@@ -197,11 +261,37 @@ class _HometasksScreenState extends State<HometasksScreen> {
               ),
               const SizedBox(height: 8),
               if (showStudentSelector) ...[
+                if (isTeacher) ...[
+                  TextField(
+                    controller: _teacherStudentSearchController,
+                    onChanged: (value) {
+                      _onTeacherStudentSearchChanged(value);
+                    },
+                    decoration: InputDecoration(
+                      labelText: l10n?.adminSearchStudents ?? 'Search students',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _teacherStudentSearchQuery.isNotEmpty
+                          ? IconButton(
+                              tooltip:
+                                  l10n?.commonClearSearch ?? 'Clear search',
+                              onPressed: _clearTeacherStudentSearch,
+                              icon: const Icon(Icons.close),
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (_isLoadingStudents)
                   const LinearProgressIndicator()
                 else if (_studentsError != null)
                   Text(
                     _studentsError!,
+                    style: const TextStyle(color: Colors.redAccent),
+                  )
+                else if (isTeacher && filteredStudents.isEmpty)
+                  Text(
+                    l10n?.dashboardNoStudents ?? 'No students available.',
                     style: const TextStyle(color: Colors.redAccent),
                   )
                 else
@@ -210,8 +300,13 @@ class _HometasksScreenState extends State<HometasksScreen> {
                       Text(selectorLabel),
                       const SizedBox(width: 12),
                       DropdownButton<int>(
-                        value: _selectedStudentId,
-                        items: _students
+                        value:
+                            filteredStudents.any(
+                              (student) => student.userId == _selectedStudentId,
+                            )
+                            ? _selectedStudentId
+                            : null,
+                        items: filteredStudents
                             .map(
                               (student) => DropdownMenuItem(
                                 value: student.userId,
@@ -317,9 +412,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: _loadHometasks,
-              child: Text(
-                AppLocalizations.of(context)?.commonRetry ?? 'Retry',
-              ),
+              child: Text(AppLocalizations.of(context)?.commonRetry ?? 'Retry'),
             ),
           ],
         ),
@@ -333,8 +426,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
     if (hometasks.isEmpty) {
       return Center(
         child: Text(
-          AppLocalizations.of(context)?.hometasksNone ??
-              'No hometasks found.',
+          AppLocalizations.of(context)?.hometasksNone ?? 'No hometasks found.',
         ),
       );
     }
@@ -386,27 +478,29 @@ class _HometasksScreenState extends State<HometasksScreen> {
               onMarkCompleted: canComplete
                   ? () async => _markCompleted(hometask.id)
                   : null,
-              onToggleItem: canToggleItems &&
+              onToggleItem:
+                  canToggleItems &&
                       hometask.hometaskType == HometaskType.checklist
                   ? (index, value) async => _toggleChecklistItem(
-                        hometaskId: hometask.id,
-                        itemIndex: index,
-                        isDone: value,
-                      )
+                      hometaskId: hometask.id,
+                      itemIndex: index,
+                      isDone: value,
+                    )
                   : null,
-              onChangeProgress: canToggleItems &&
+              onChangeProgress:
+                  canToggleItems &&
                       hometask.hometaskType == HometaskType.progress
                   ? (index, progress) async => _changeProgressItem(
-                        hometaskId: hometask.id,
-                        itemIndex: index,
-                        progress: progress,
-                      )
+                      hometaskId: hometask.id,
+                      itemIndex: index,
+                      progress: progress,
+                    )
                   : null,
               onSaveItems: _isTeacher(context.read<AuthService>())
                   ? (items) async => _saveHometaskItems(
-                        hometaskId: hometask.id,
-                        items: items,
-                      )
+                      hometaskId: hometask.id,
+                      items: items,
+                    )
                   : null,
               onMarkAccomplished: canAccomplish
                   ? () async => _markAccomplished(hometask.id)
@@ -425,10 +519,10 @@ class _HometasksScreenState extends State<HometasksScreen> {
       final rawName = task.teacherName?.trim() ?? '';
       final key = rawName.isNotEmpty
           ? rawName
-          : (AppLocalizations.of(context)?.hometasksTeacherFallback(
-                  task.teacherId,
-                ) ??
-              'Teacher #${task.teacherId}');
+          : (AppLocalizations.of(
+                  context,
+                )?.hometasksTeacherFallback(task.teacherId) ??
+                'Teacher #${task.teacherId}');
       grouped.putIfAbsent(key, () => []).add(task);
     }
 
@@ -453,29 +547,30 @@ class _HometasksScreenState extends State<HometasksScreen> {
                           onMarkCompleted: canComplete
                               ? () async => _markCompleted(hometask.id)
                               : null,
-                          onToggleItem: canToggleItems &&
+                          onToggleItem:
+                              canToggleItems &&
                                   hometask.hometaskType ==
                                       HometaskType.checklist
                               ? (index, value) async => _toggleChecklistItem(
-                                    hometaskId: hometask.id,
-                                    itemIndex: index,
-                                    isDone: value,
-                                  )
+                                  hometaskId: hometask.id,
+                                  itemIndex: index,
+                                  isDone: value,
+                                )
                               : null,
-                          onChangeProgress: canToggleItems &&
-                                  hometask.hometaskType ==
-                                      HometaskType.progress
+                          onChangeProgress:
+                              canToggleItems &&
+                                  hometask.hometaskType == HometaskType.progress
                               ? (index, progress) async => _changeProgressItem(
-                                    hometaskId: hometask.id,
-                                    itemIndex: index,
-                                    progress: progress,
-                                  )
+                                  hometaskId: hometask.id,
+                                  itemIndex: index,
+                                  progress: progress,
+                                )
                               : null,
                           onSaveItems: _isTeacher(context.read<AuthService>())
                               ? (items) async => _saveHometaskItems(
-                                    hometaskId: hometask.id,
-                                    items: items,
-                                  )
+                                  hometaskId: hometask.id,
+                                  items: items,
+                                )
                               : null,
                           onMarkAccomplished: canAccomplish
                               ? () async => _markAccomplished(hometask.id)
@@ -515,7 +610,10 @@ class _HometasksScreenState extends State<HometasksScreen> {
               l10n?.hometasksAssignTitle(student.fullName) ??
                   'Assign Hometask to ${student.fullName}',
             ),
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -536,15 +634,16 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         ),
                         validator: (value) =>
                             value == null || value.trim().isEmpty
-                                ? l10n?.hometasksTitleRequired ??
-                                    'Title is required'
-                                : null,
+                            ? l10n?.hometasksTitleRequired ??
+                                  'Title is required'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: descriptionController,
                         decoration: InputDecoration(
-                          labelText: l10n?.hometasksDescriptionLabel ??
+                          labelText:
+                              l10n?.hometasksDescriptionLabel ??
                               'Description (optional)',
                           border: const OutlineInputBorder(),
                         ),
@@ -589,19 +688,27 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         items: [
                           DropdownMenuItem(
                             value: 'none',
-                            child: Text(l10n?.hometasksRepeatNone ?? 'No repeat'),
+                            child: Text(
+                              l10n?.hometasksRepeatNone ?? 'No repeat',
+                            ),
                           ),
                           DropdownMenuItem(
                             value: 'daily',
-                            child: Text(l10n?.hometasksRepeatDaily ?? 'Each day'),
+                            child: Text(
+                              l10n?.hometasksRepeatDaily ?? 'Each day',
+                            ),
                           ),
                           DropdownMenuItem(
                             value: 'weekly',
-                            child: Text(l10n?.hometasksRepeatWeekly ?? 'Each week'),
+                            child: Text(
+                              l10n?.hometasksRepeatWeekly ?? 'Each week',
+                            ),
                           ),
                           DropdownMenuItem(
                             value: 'custom',
-                            child: Text(l10n?.hometasksRepeatCustom ?? 'Custom interval'),
+                            child: Text(
+                              l10n?.hometasksRepeatCustom ?? 'Custom interval',
+                            ),
                           ),
                         ],
                         onChanged: (value) {
@@ -616,7 +723,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         TextFormField(
                           controller: repeatDaysController,
                           decoration: InputDecoration(
-                            labelText: l10n?.hometasksRepeatEveryDays ??
+                            labelText:
+                                l10n?.hometasksRepeatEveryDays ??
                                 'Repeat every (days)',
                             border: const OutlineInputBorder(),
                           ),
@@ -638,7 +746,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
                       DropdownButtonFormField<HometaskType>(
                         initialValue: selectedType,
                         decoration: InputDecoration(
-                          labelText: l10n?.hometasksTypeLabel ?? 'Hometask type',
+                          labelText:
+                              l10n?.hometasksTypeLabel ?? 'Hometask type',
                           border: const OutlineInputBorder(),
                         ),
                         items: [
@@ -648,11 +757,15 @@ class _HometasksScreenState extends State<HometasksScreen> {
                           ),
                           DropdownMenuItem(
                             value: HometaskType.checklist,
-                            child: Text(l10n?.hometasksTypeChecklist ?? 'Checklist'),
+                            child: Text(
+                              l10n?.hometasksTypeChecklist ?? 'Checklist',
+                            ),
                           ),
                           DropdownMenuItem(
                             value: HometaskType.progress,
-                            child: Text(l10n?.hometasksTypeProgress ?? 'Progress'),
+                            child: Text(
+                              l10n?.hometasksTypeProgress ?? 'Progress',
+                            ),
                           ),
                         ],
                         onChanged: (value) {
@@ -667,8 +780,10 @@ class _HometasksScreenState extends State<HometasksScreen> {
                           selectedType == HometaskType.progress) ...[
                         Text(
                           selectedType == HometaskType.checklist
-                                ? (l10n?.hometasksChecklistItems ?? 'Checklist items')
-                                : (l10n?.hometasksProgressItems ?? 'Progress items'),
+                              ? (l10n?.hometasksChecklistItems ??
+                                    'Checklist items')
+                              : (l10n?.hometasksProgressItems ??
+                                    'Progress items'),
                           style: Theme.of(context).textTheme.titleSmall,
                         ),
                         const SizedBox(height: 8),
@@ -681,14 +796,16 @@ class _HometasksScreenState extends State<HometasksScreen> {
                                   child: TextFormField(
                                     controller: itemControllers[index],
                                     decoration: InputDecoration(
-                                      labelText: l10n?.hometasksItemLabel(index + 1) ??
+                                      labelText:
+                                          l10n?.hometasksItemLabel(index + 1) ??
                                           'Item ${index + 1}',
                                       border: const OutlineInputBorder(),
                                     ),
                                     validator: (value) =>
                                         value == null || value.trim().isEmpty
-                                            ? (l10n?.hometasksRequired ?? 'Required')
-                                            : null,
+                                        ? (l10n?.hometasksRequired ??
+                                              'Required')
+                                        : null,
                                   ),
                                 ),
                                 if (itemControllers.length > 1)
@@ -698,7 +815,9 @@ class _HometasksScreenState extends State<HometasksScreen> {
                                         itemControllers.removeAt(index);
                                       });
                                     },
-                                    icon: const Icon(Icons.remove_circle_outline),
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                    ),
                                   ),
                               ],
                             ),
@@ -737,18 +856,20 @@ class _HometasksScreenState extends State<HometasksScreen> {
                           return;
                         }
 
-                        final items = selectedType == HometaskType.checklist ||
+                        final items =
+                            selectedType == HometaskType.checklist ||
                                 selectedType == HometaskType.progress
                             ? itemControllers
-                                .map((controller) => controller.text.trim())
-                                .where((text) => text.isNotEmpty)
-                                .toList()
+                                  .map((controller) => controller.text.trim())
+                                  .where((text) => text.isNotEmpty)
+                                  .toList()
                             : <String>[];
 
                         if ((selectedType == HometaskType.checklist ||
                                 selectedType == HometaskType.progress) &&
                             items.isEmpty) {
-                          final typeLabel = selectedType == HometaskType.checklist
+                          final typeLabel =
+                              selectedType == HometaskType.checklist
                               ? (l10n?.hometasksTypeChecklist ?? 'checklist')
                               : (l10n?.hometasksTypeProgress ?? 'progress');
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -771,9 +892,11 @@ class _HometasksScreenState extends State<HometasksScreen> {
                             repeatEveryDays = 7;
                             break;
                           case 'custom':
-                            repeatEveryDays =
-                                int.tryParse(repeatDaysController.text.trim());
-                            if (repeatEveryDays == null || repeatEveryDays <= 0) {
+                            repeatEveryDays = int.tryParse(
+                              repeatDaysController.text.trim(),
+                            );
+                            if (repeatEveryDays == null ||
+                                repeatEveryDays <= 0) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
