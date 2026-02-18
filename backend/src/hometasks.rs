@@ -1,16 +1,14 @@
 use actix_web::{get, post, put, web, HttpRequest, HttpResponse, Responder};
 use chrono::{DateTime, Utc};
+use log::error;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::{FromRow, PgPool};
-use log::{error};
 
 use crate::models::hometask::{HometaskStatus, HometaskType};
 use crate::notification_builders::{
-    build_hometask_accomplished_notification,
-    build_hometask_assigned_notification,
-    build_hometask_completed_notification,
-    build_hometask_refreshed_notification,
+    build_hometask_accomplished_notification, build_hometask_assigned_notification,
+    build_hometask_completed_notification, build_hometask_refreshed_notification,
     build_hometask_reopened_notification,
 };
 use crate::notifications::NotificationBody;
@@ -62,6 +60,13 @@ struct UpdateChecklistRequest {
     items: Vec<UpdateChecklistItemRequest>,
 }
 
+#[derive(Deserialize)]
+struct UpdateHometaskRequest {
+    title: Option<String>,
+    description: Option<Option<String>>,
+    items: Option<Vec<UpdateChecklistItemRequest>>,
+}
+
 #[derive(Serialize, FromRow)]
 struct HometaskWithChecklist {
     id: i32,
@@ -92,12 +97,7 @@ struct RepeatableHometask {
     next_reset_at: DateTime<Utc>,
 }
 
-async fn insert_notification(
-    db: &PgPool,
-    user_id: i32,
-    body: &NotificationBody,
-    priority: &str,
-) {
+async fn insert_notification(db: &PgPool, user_id: i32, body: &NotificationBody, priority: &str) {
     let notification_id = sqlx::query_scalar::<_, i32>(
         "INSERT INTO notifications (user_id, type, title, body, priority)
          VALUES ($1, $2, $3, $4, $5)
@@ -153,11 +153,7 @@ async fn fetch_parent_ids(db: &PgPool, student_id: i32) -> Vec<i32> {
     .unwrap_or_default()
 }
 
-async fn reset_hometask_items(
-    db: &PgPool,
-    content_id: i32,
-    hometask_type: &HometaskType,
-) {
+async fn reset_hometask_items(db: &PgPool, content_id: i32, hometask_type: &HometaskType) {
     let items = sqlx::query_scalar::<_, serde_json::Value>(
         "SELECT items FROM hometask_checklists WHERE id = $1",
     )
@@ -179,7 +175,7 @@ async fn reset_hometask_items(
                 .and_then(|value| value.as_str())
                 .unwrap_or("")
                 .to_string();
-            
+
             match hometask_type {
                 HometaskType::Checklist => json!({ "text": text, "is_done": false }),
                 HometaskType::Progress => json!({ "text": text, "progress": 0 }),
@@ -188,13 +184,11 @@ async fn reset_hometask_items(
         })
         .collect::<Vec<_>>();
 
-    let _ = sqlx::query(
-        "UPDATE hometask_checklists SET items = $1 WHERE id = $2",
-    )
-    .bind(serde_json::to_value(updated_items).unwrap_or_default())
-    .bind(content_id)
-    .execute(db)
-    .await;
+    let _ = sqlx::query("UPDATE hometask_checklists SET items = $1 WHERE id = $2")
+        .bind(serde_json::to_value(updated_items).unwrap_or_default())
+        .bind(content_id)
+        .execute(db)
+        .await;
 }
 
 async fn refresh_repeatable_hometasks(db: &PgPool, student_id: i32) {
@@ -266,10 +260,10 @@ async fn refresh_repeatable_hometasks(db: &PgPool, student_id: i32) {
 }
 
 pub fn init_routes(cfg: &mut web::ServiceConfig) {
-    cfg
-        .service(create_hometask)
+    cfg.service(create_hometask)
         .service(list_student_hometasks)
         .service(get_hometask)
+        .service(update_hometask)
         .service(update_hometask_checklist)
         .service(update_hometask_status)
         .service(update_hometask_order);
@@ -422,6 +416,47 @@ async fn create_hometask(
 
             content_id = Some(checklist_id);
         }
+        HometaskType::FreeAnswer => {
+            let free_answer_content = payload
+                .items
+                .as_ref()
+                .map(|items| {
+                    items
+                        .iter()
+                        .map(|item| json!({ "text": item.text }))
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+
+            let free_answer_content_value = match serde_json::to_value(free_answer_content) {
+                Ok(value) => value,
+                Err(_) => {
+                    let _ = tx.rollback().await;
+                    return HttpResponse::BadRequest().json(json!({
+                        "error": "Invalid free answer content"
+                    }));
+                }
+            };
+
+            let checklist_id = match sqlx::query_scalar::<_, i32>(
+                "INSERT INTO hometask_checklists (items) VALUES ($1) RETURNING id",
+            )
+            .bind(&free_answer_content_value)
+            .fetch_one(&mut *tx)
+            .await
+            {
+                Ok(id) => id,
+                Err(e) => {
+                    error!("Failed to create free answer content: {}", e);
+                    let _ = tx.rollback().await;
+                    return HttpResponse::InternalServerError().json(json!({
+                        "error": "Failed to create free answer content"
+                    }));
+                }
+            };
+
+            content_id = Some(checklist_id);
+        }
         HometaskType::Simple => {
             content_id = None;
         }
@@ -451,8 +486,8 @@ async fn create_hometask(
     };
 
     let repeat_every_days = payload.repeat_every_days.filter(|value| *value > 0);
-    let next_reset_at = repeat_every_days
-        .map(|value| Utc::now() + chrono::Duration::days(value as i64));
+    let next_reset_at =
+        repeat_every_days.map(|value| Utc::now() + chrono::Duration::days(value as i64));
 
     let hometask_id = match sqlx::query_scalar::<_, i32>(
         "INSERT INTO hometasks (teacher_id, student_id, title, description, due_date, sort_order, hometask_type, content_id, repeat_every_days, next_reset_at)
@@ -560,7 +595,7 @@ async fn list_student_hometasks(
                  COALESCE(u.full_name, u.username) AS teacher_name
          FROM hometasks h
          LEFT JOIN hometask_checklists c
-            ON (h.hometask_type = 'checklist' OR h.hometask_type = 'progress') AND h.content_id = c.id
+                ON (h.hometask_type = 'checklist' OR h.hometask_type = 'progress' OR h.hometask_type = 'free_answer') AND h.content_id = c.id
             LEFT JOIN users u ON h.teacher_id = u.id
             WHERE h.student_id = $1 AND h.status = ANY($2::hometask_status[])
               AND ($3::int IS NULL OR h.teacher_id = $3)
@@ -641,7 +676,7 @@ async fn get_hometask(
                 c.items AS checklist_items
          FROM hometasks h
          LEFT JOIN hometask_checklists c
-            ON (h.hometask_type = 'checklist' OR h.hometask_type = 'progress') AND h.content_id = c.id
+                ON (h.hometask_type = 'checklist' OR h.hometask_type = 'progress' OR h.hometask_type = 'free_answer') AND h.content_id = c.id
          WHERE h.id = $1",
     )
     .bind(hometask_id)
@@ -660,6 +695,235 @@ async fn get_hometask(
             }))
         }
     }
+}
+
+fn build_updated_items(
+    hometask_type: &HometaskType,
+    items: &[UpdateChecklistItemRequest],
+) -> Result<Vec<serde_json::Value>, HttpResponse> {
+    if items.is_empty() {
+        return Err(HttpResponse::BadRequest().json(json!({
+            "error": "Checklist items cannot be empty"
+        })));
+    }
+
+    if *hometask_type == HometaskType::Checklist {
+        let invalid = items.iter().any(|item| item.is_done.is_none());
+        if invalid {
+            return Err(HttpResponse::BadRequest().json(json!({
+                "error": "Checklist items must include is_done"
+            })));
+        }
+
+        return Ok(items
+            .iter()
+            .map(|item| {
+                json!({
+                    "text": item.text,
+                    "is_done": item.is_done.unwrap_or(false)
+                })
+            })
+            .collect::<Vec<_>>());
+    }
+
+    if *hometask_type == HometaskType::Progress {
+        let mut updated = Vec::with_capacity(items.len());
+        for item in items {
+            let progress = match item.progress {
+                Some(value) if (0..=4).contains(&value) => value,
+                _ => {
+                    return Err(HttpResponse::BadRequest().json(json!({
+                        "error": "Progress items must be between 0 and 4"
+                    })));
+                }
+            };
+            updated.push(json!({ "text": item.text, "progress": progress }));
+        }
+        return Ok(updated);
+    }
+
+    if *hometask_type == HometaskType::FreeAnswer {
+        return Ok(items
+            .iter()
+            .map(|item| json!({ "text": item.text }))
+            .collect::<Vec<_>>());
+    }
+
+    Err(HttpResponse::BadRequest().json(json!({
+        "error": "Hometask does not support editable content"
+    })))
+}
+
+#[put("/api/hometasks/{hometask_id}")]
+async fn update_hometask(
+    req: HttpRequest,
+    app_state: web::Data<AppState>,
+    path: web::Path<i32>,
+    payload: web::Json<UpdateHometaskRequest>,
+) -> impl Responder {
+    let hometask_id = path.into_inner();
+
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let current_user_id = match get_current_user_id(&claims, &app_state.db).await {
+        Ok(id) => id,
+        Err(response) => return response,
+    };
+
+    let is_admin = claims.roles.contains(&"admin".to_string());
+    let is_teacher = claims.roles.contains(&"teacher".to_string());
+
+    if !is_admin && !is_teacher {
+        return HttpResponse::Forbidden().json(json!({
+            "error": "Teacher access required"
+        }));
+    }
+
+    let hometask = match sqlx::query_as::<_, (i32, i32, HometaskStatus, HometaskType, Option<i32>)>(
+        "SELECT student_id, teacher_id, status, hometask_type, content_id FROM hometasks WHERE id = $1",
+    )
+    .bind(hometask_id)
+    .fetch_optional(&app_state.db)
+    .await
+    {
+        Ok(Some(row)) => row,
+        Ok(None) => {
+            return HttpResponse::NotFound().json(json!({
+                "error": "Hometask not found"
+            }))
+        }
+        Err(e) => {
+            error!("Failed to fetch hometask: {}", e);
+            return HttpResponse::InternalServerError().json(json!({
+                "error": "Database error"
+            }));
+        }
+    };
+
+    let (student_id, teacher_id, status, hometask_type, content_id) = hometask;
+
+    if !is_admin {
+        let has_relation =
+            match verify_teacher_student_relation(current_user_id, student_id, &app_state.db).await
+            {
+                Ok(result) => result,
+                Err(response) => return response,
+            };
+
+        if !has_relation || current_user_id != teacher_id {
+            return HttpResponse::Forbidden().json(json!({
+                "error": "Not authorized to update this hometask"
+            }));
+        }
+    }
+
+    if status == HometaskStatus::AccomplishedByTeacher {
+        return HttpResponse::BadRequest().json(json!({
+            "error": "Cannot edit archived hometasks"
+        }));
+    }
+
+    let title_to_update = payload
+        .title
+        .as_ref()
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .map(|value| value.to_string());
+
+    let mut tx = match app_state.db.begin().await {
+        Ok(tx) => tx,
+        Err(e) => {
+            error!("Failed to start transaction: {}", e);
+            return HttpResponse::InternalServerError().json(json!({
+                "error": "Database error"
+            }));
+        }
+    };
+
+    if let Some(items) = payload.items.as_ref() {
+        let content_id = match content_id {
+            Some(id) => id,
+            None => {
+                let _ = tx.rollback().await;
+                return HttpResponse::BadRequest().json(json!({
+                    "error": "Hometask content is missing"
+                }));
+            }
+        };
+
+        let updated_items = match build_updated_items(&hometask_type, items) {
+            Ok(value) => value,
+            Err(response) => {
+                let _ = tx.rollback().await;
+                return response;
+            }
+        };
+
+        let updated_value = match serde_json::to_value(updated_items) {
+            Ok(value) => value,
+            Err(_) => {
+                let _ = tx.rollback().await;
+                return HttpResponse::BadRequest().json(json!({
+                    "error": "Invalid hometask content"
+                }));
+            }
+        };
+
+        if let Err(e) = sqlx::query("UPDATE hometask_checklists SET items = $1 WHERE id = $2")
+            .bind(updated_value)
+            .bind(content_id)
+            .execute(&mut *tx)
+            .await
+        {
+            error!("Failed to update hometask content: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(json!({
+                "error": "Failed to update hometask content"
+            }));
+        }
+    }
+
+    if title_to_update.is_some() || payload.description.is_some() {
+        let description_to_update = payload
+            .description
+            .clone()
+            .unwrap_or(None)
+            .map(|value| value.trim().to_string())
+            .and_then(|value| if value.is_empty() { None } else { Some(value) });
+
+        if let Err(e) = sqlx::query(
+            "UPDATE hometasks
+             SET title = COALESCE($1, title),
+                 description = CASE WHEN $2 THEN $3 ELSE description END,
+                 updated_at = NOW()
+             WHERE id = $4",
+        )
+        .bind(title_to_update)
+        .bind(payload.description.is_some())
+        .bind(description_to_update)
+        .bind(hometask_id)
+        .execute(&mut *tx)
+        .await
+        {
+            error!("Failed to update hometask: {}", e);
+            let _ = tx.rollback().await;
+            return HttpResponse::InternalServerError().json(json!({
+                "error": "Failed to update hometask"
+            }));
+        }
+    }
+
+    if let Err(e) = tx.commit().await {
+        error!("Failed to commit hometask update: {}", e);
+        return HttpResponse::InternalServerError().json(json!({
+            "error": "Failed to update hometask"
+        }));
+    }
+
+    HttpResponse::Ok().json(json!({ "status": "updated" }))
 }
 
 #[put("/api/hometasks/{hometask_id}/checklist")]
@@ -706,18 +970,20 @@ async fn update_hometask_checklist(
 
     error!(
         "Checklist update: user_id={}, student_id={}, roles={:?}",
-        current_user_id,
-        student_id,
-        claims.roles
+        current_user_id, student_id, claims.roles
     );
 
-    let is_student = claims.roles.contains(&"student".to_string())
-        && current_user_id == student_id;
+    let is_student = claims.roles.contains(&"student".to_string()) && current_user_id == student_id;
     let is_parent = claims.roles.contains(&"parent".to_string())
-        && verify_can_access_student(&req, &app_state, student_id).await.is_ok();
+        && verify_can_access_student(&req, &app_state, student_id)
+            .await
+            .is_ok();
     let is_teacher = claims.roles.contains(&"teacher".to_string());
 
-    if hometask_type == HometaskType::Progress || hometask_type == HometaskType::Checklist {
+    if hometask_type == HometaskType::Progress
+        || hometask_type == HometaskType::Checklist
+        || hometask_type == HometaskType::FreeAnswer
+    {
         if !is_student && !is_parent && !is_teacher {
             return HttpResponse::Forbidden().json(json!({
                 "error": "Not authorized to update checklist items"
@@ -725,16 +991,13 @@ async fn update_hometask_checklist(
         }
 
         if is_teacher && current_user_id != teacher_id {
-            let has_relation = match verify_teacher_student_relation(
-                current_user_id,
-                student_id,
-                &app_state.db,
-            )
-            .await
-            {
-                Ok(result) => result,
-                Err(response) => return response,
-            };
+            let has_relation =
+                match verify_teacher_student_relation(current_user_id, student_id, &app_state.db)
+                    .await
+                {
+                    Ok(result) => result,
+                    Err(response) => return response,
+                };
 
             if !has_relation {
                 return HttpResponse::Forbidden().json(json!({
@@ -750,9 +1013,12 @@ async fn update_hometask_checklist(
         }));
     }
 
-    if hometask_type != HometaskType::Checklist && hometask_type != HometaskType::Progress {
+    if hometask_type != HometaskType::Checklist
+        && hometask_type != HometaskType::Progress
+        && hometask_type != HometaskType::FreeAnswer
+    {
         return HttpResponse::BadRequest().json(json!({
-            "error": "Hometask is not a checklist or progress task"
+            "error": "Hometask does not support editable content"
         }));
     }
 
@@ -765,44 +1031,9 @@ async fn update_hometask_checklist(
         }
     };
 
-    if payload.items.is_empty() {
-        return HttpResponse::BadRequest().json(json!({
-            "error": "Checklist items cannot be empty"
-        }));
-    }
-
-    let updated_items = if hometask_type == HometaskType::Checklist {
-        let invalid = payload.items.iter().any(|item| item.is_done.is_none());
-        if invalid {
-            return HttpResponse::BadRequest().json(json!({
-                "error": "Checklist items must include is_done"
-            }));
-        }
-
-        payload
-            .items
-            .iter()
-            .map(|item| {
-                json!({
-                    "text": item.text,
-                    "is_done": item.is_done.unwrap_or(false)
-                })
-            })
-            .collect::<Vec<_>>()
-    } else {
-        let mut updated = Vec::with_capacity(payload.items.len());
-        for item in &payload.items {
-            let progress = match item.progress {
-                Some(value) if (0..=4).contains(&value) => value,
-                _ => {
-                    return HttpResponse::BadRequest().json(json!({
-                        "error": "Progress items must be between 0 and 4"
-                    }));
-                }
-            };
-            updated.push(json!({ "text": item.text, "progress": progress }));
-        }
-        updated
+    let updated_items = match build_updated_items(&hometask_type, &payload.items) {
+        Ok(value) => value,
+        Err(response) => return response,
     };
 
     let updated_value = match serde_json::to_value(updated_items) {
@@ -814,13 +1045,11 @@ async fn update_hometask_checklist(
         }
     };
 
-    let result = sqlx::query(
-        "UPDATE hometask_checklists SET items = $1 WHERE id = $2",
-    )
-    .bind(updated_value)
-    .bind(content_id)
-    .execute(&app_state.db)
-    .await;
+    let result = sqlx::query("UPDATE hometask_checklists SET items = $1 WHERE id = $2")
+        .bind(updated_value)
+        .bind(content_id)
+        .execute(&app_state.db)
+        .await;
 
     match result {
         Ok(_) => HttpResponse::Ok().json(json!({ "status": "updated" })),
@@ -852,7 +1081,18 @@ async fn update_hometask_status(
         Err(response) => return response,
     };
 
-    let hometask = match sqlx::query_as::<_, (i32, i32, String, Option<DateTime<Utc>>, HometaskStatus, Option<i32>, Option<DateTime<Utc>>)>(
+    let hometask = match sqlx::query_as::<
+        _,
+        (
+            i32,
+            i32,
+            String,
+            Option<DateTime<Utc>>,
+            HometaskStatus,
+            Option<i32>,
+            Option<DateTime<Utc>>,
+        ),
+    >(
         "SELECT teacher_id, student_id, title, due_date, status, repeat_every_days, next_reset_at
          FROM hometasks WHERE id = $1",
     )
@@ -874,22 +1114,29 @@ async fn update_hometask_status(
         }
     };
 
-    let (teacher_id, student_id, task_title, _due_date, current_status, repeat_every_days, next_reset_at) = hometask;
+    let (
+        teacher_id,
+        student_id,
+        task_title,
+        _due_date,
+        current_status,
+        repeat_every_days,
+        next_reset_at,
+    ) = hometask;
 
     match payload.status {
         HometaskStatus::CompletedByStudent => {
             error!(
                 "Hometask status update: user_id={}, student_id={}, roles={:?}, status={:?}",
-                current_user_id,
-                student_id,
-                claims.roles,
-                payload.status
+                current_user_id, student_id, claims.roles, payload.status
             );
 
-            let is_student = claims.roles.contains(&"student".to_string())
-                && current_user_id == student_id;
+            let is_student =
+                claims.roles.contains(&"student".to_string()) && current_user_id == student_id;
             let is_parent = claims.roles.contains(&"parent".to_string())
-                && verify_can_access_student(&req, &app_state, student_id).await.is_ok();
+                && verify_can_access_student(&req, &app_state, student_id)
+                    .await
+                    .is_ok();
 
             if !is_student && !is_parent {
                 return HttpResponse::Forbidden().json(json!({
@@ -993,22 +1240,18 @@ async fn update_hometask_status(
     }
 
     let result = if let Some(next_reset_at) = next_reset_update {
-        sqlx::query(
-            "UPDATE hometasks SET status = $1, next_reset_at = $2 WHERE id = $3",
-        )
-        .bind(payload.status.clone())
-        .bind(next_reset_at)
-        .bind(hometask_id)
-        .execute(&app_state.db)
-        .await
+        sqlx::query("UPDATE hometasks SET status = $1, next_reset_at = $2 WHERE id = $3")
+            .bind(payload.status.clone())
+            .bind(next_reset_at)
+            .bind(hometask_id)
+            .execute(&app_state.db)
+            .await
     } else {
-        sqlx::query(
-            "UPDATE hometasks SET status = $1 WHERE id = $2",
-        )
-        .bind(payload.status.clone())
-        .bind(hometask_id)
-        .execute(&app_state.db)
-        .await
+        sqlx::query("UPDATE hometasks SET status = $1 WHERE id = $2")
+            .bind(payload.status.clone())
+            .bind(hometask_id)
+            .execute(&app_state.db)
+            .await
     };
 
     match result {
@@ -1032,10 +1275,12 @@ async fn update_hometask_status(
                         &teacher_name,
                         student_id,
                     );
-                    insert_notification(&app_state.db, student_id, &accomplished_body, "normal").await;
+                    insert_notification(&app_state.db, student_id, &accomplished_body, "normal")
+                        .await;
                     let parent_ids = fetch_parent_ids(&app_state.db, student_id).await;
                     for parent_id in parent_ids {
-                        insert_notification(&app_state.db, parent_id, &accomplished_body, "normal").await;
+                        insert_notification(&app_state.db, parent_id, &accomplished_body, "normal")
+                            .await;
                     }
                 }
                 HometaskStatus::Assigned => {
@@ -1049,7 +1294,8 @@ async fn update_hometask_status(
                     insert_notification(&app_state.db, student_id, &reopened_body, "normal").await;
                     let parent_ids = fetch_parent_ids(&app_state.db, student_id).await;
                     for parent_id in parent_ids {
-                        insert_notification(&app_state.db, parent_id, &reopened_body, "normal").await;
+                        insert_notification(&app_state.db, parent_id, &reopened_body, "normal")
+                            .await;
                     }
                 }
             }
@@ -1094,16 +1340,12 @@ async fn update_hometask_order(
     }
 
     if !is_admin {
-        let has_relation = match verify_teacher_student_relation(
-            current_user_id,
-            student_id,
-            &app_state.db,
-        )
-        .await
-        {
-            Ok(result) => result,
-            Err(response) => return response,
-        };
+        let has_relation =
+            match verify_teacher_student_relation(current_user_id, student_id, &app_state.db).await
+            {
+                Ok(result) => result,
+                Err(response) => return response,
+            };
 
         if !has_relation {
             return HttpResponse::Forbidden().json(json!({
@@ -1174,12 +1416,10 @@ async fn update_hometask_order(
             .bind(student_id)
             .bind(current_user_id)
         } else {
-            sqlx::query(
-                "UPDATE hometasks SET sort_order = $1 WHERE id = $2 AND student_id = $3",
-            )
-            .bind(index as i32)
-            .bind(hometask_id)
-            .bind(student_id)
+            sqlx::query("UPDATE hometasks SET sort_order = $1 WHERE id = $2 AND student_id = $3")
+                .bind(index as i32)
+                .bind(hometask_id)
+                .bind(student_id)
         };
 
         if let Err(e) = update_query.execute(&mut *tx).await {
@@ -1202,12 +1442,10 @@ async fn update_hometask_order(
 }
 
 async fn get_current_user_id(claims: &Claims, db: &PgPool) -> Result<i32, HttpResponse> {
-    let user_id = sqlx::query_scalar::<_, i32>(
-        "SELECT id FROM users WHERE username = $1",
-    )
-    .bind(&claims.sub)
-    .fetch_optional(db)
-    .await;
+    let user_id = sqlx::query_scalar::<_, i32>("SELECT id FROM users WHERE username = $1")
+        .bind(&claims.sub)
+        .fetch_optional(db)
+        .await;
 
     match user_id {
         Ok(Some(id)) => Ok(id),

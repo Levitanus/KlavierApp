@@ -19,10 +19,8 @@ class HometaskService extends ChangeNotifier {
   String? _currentFullName;
   String? _lastToken;
 
-  HometaskService({
-    required this.authService,
-    String? baseUrl,
-  }) : baseUrl = baseUrl ?? AppConfig.instance.baseUrl {
+  HometaskService({required this.authService, String? baseUrl})
+    : baseUrl = baseUrl ?? AppConfig.instance.baseUrl {
     _lastToken = authService.token;
   }
 
@@ -90,8 +88,9 @@ class HometaskService extends ChangeNotifier {
     }
 
     try {
-      final uri = Uri.parse('$baseUrl/api/students/$studentId/hometasks')
-          .replace(queryParameters: {'status': status});
+      final uri = Uri.parse(
+        '$baseUrl/api/students/$studentId/hometasks',
+      ).replace(queryParameters: {'status': status});
 
       final response = await http.get(
         uri,
@@ -133,9 +132,7 @@ class HometaskService extends ChangeNotifier {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'status': 'completed_by_student',
-        }),
+        body: jsonEncode({'status': 'completed_by_student'}),
       );
 
       if (response.statusCode == 200) {
@@ -160,9 +157,7 @@ class HometaskService extends ChangeNotifier {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'status': 'accomplished_by_teacher',
-        }),
+        body: jsonEncode({'status': 'accomplished_by_teacher'}),
       );
 
       if (response.statusCode == 200) {
@@ -187,9 +182,7 @@ class HometaskService extends ChangeNotifier {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'status': 'assigned',
-        }),
+        body: jsonEncode({'status': 'assigned'}),
       );
 
       if (response.statusCode == 200) {
@@ -218,17 +211,15 @@ class HometaskService extends ChangeNotifier {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'items': items
-              .map((item) {
-                final itemMap = <String, dynamic>{'text': item.text};
-                if (item.progress != null) {
-                  itemMap['progress'] = item.progress;
-                } else {
-                  itemMap['is_done'] = item.isDone;
-                }
-                return itemMap;
-              })
-              .toList(),
+          'items': items.map((item) {
+            final itemMap = <String, dynamic>{'text': item.text};
+            if (item.progress != null) {
+              itemMap['progress'] = item.progress;
+            } else {
+              itemMap['is_done'] = item.isDone;
+            }
+            return itemMap;
+          }).toList(),
         }),
       );
 
@@ -281,6 +272,46 @@ class HometaskService extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateHometask({
+    required int hometaskId,
+    String? title,
+    String? description,
+    List<ChecklistItem>? items,
+  }) async {
+    if (authService.token == null) return false;
+
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/hometasks/$hometaskId'),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          if (title != null) 'title': title,
+          'description': description,
+          if (items != null)
+            'items': items.map((item) {
+              final itemMap = <String, dynamic>{'text': item.text};
+              if (item.progress != null) {
+                itemMap['progress'] = item.progress;
+              } else {
+                itemMap['is_done'] = item.isDone;
+              }
+              return itemMap;
+            }).toList(),
+        }),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error updating hometask: $e');
+      }
+      return false;
+    }
+  }
+
   String _serializeType(HometaskType type) {
     switch (type) {
       case HometaskType.simple:
@@ -289,6 +320,8 @@ class HometaskService extends ChangeNotifier {
         return 'checklist';
       case HometaskType.progress:
         return 'progress';
+      case HometaskType.freeAnswer:
+        return 'free_answer';
       case HometaskType.dailyRoutine:
         return 'daily_routine';
       case HometaskType.photoSubmission:
@@ -311,9 +344,7 @@ class HometaskService extends ChangeNotifier {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'hometask_ids': orderedIds,
-        }),
+        body: jsonEncode({'hometask_ids': orderedIds}),
       );
 
       return response.statusCode == 200;
