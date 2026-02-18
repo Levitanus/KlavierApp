@@ -1,15 +1,15 @@
-use actix_web::{post, get, web, HttpResponse, Responder, HttpRequest};
 use actix_multipart::Multipart;
-use futures_util::stream::StreamExt as _;
-use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
-use jsonwebtoken::{encode, decode, EncodingKey, DecodingKey, Header, Validation};
-use chrono::{Duration, Utc, NaiveDate};
+use actix_web::{get, post, web, HttpRequest, HttpResponse, Responder};
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
-use log::{error};
+use chrono::{Duration, NaiveDate, Utc};
+use futures_util::stream::StreamExt as _;
+use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use log::error;
+use serde::{Deserialize, Serialize};
+use sqlx::{FromRow, PgPool};
 
-use crate::{AppState, password_reset};
 use crate::storage::{MediaError, MediaService};
+use crate::{password_reset, AppState};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
@@ -29,8 +29,8 @@ pub struct ErrorResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,      // username
-    pub exp: usize,       // expiration time
+    pub sub: String,        // username
+    pub exp: usize,         // expiration time
     pub roles: Vec<String>, // user roles
 }
 
@@ -38,7 +38,7 @@ pub struct Claims {
 /// Returns Claims if valid, or an error HttpResponse
 pub fn verify_token(req: &HttpRequest, app_state: &AppState) -> Result<Claims, HttpResponse> {
     let auth_header = req.headers().get("Authorization");
-    
+
     let token = match auth_header {
         Some(header) => {
             let header_str = header.to_str().unwrap_or("");
@@ -81,6 +81,51 @@ struct User {
     password_hash: String,
 }
 
+async fn load_active_roles(pool: &PgPool, user_id: i32) -> Result<Vec<String>, sqlx::Error> {
+    let roles = sqlx::query_scalar::<_, String>(
+        "SELECT r.name FROM roles r 
+         INNER JOIN user_roles ur ON r.id = ur.role_id 
+         WHERE ur.user_id = $1",
+    )
+    .bind(user_id)
+    .fetch_all(pool)
+    .await?;
+
+    let mut active_roles: Vec<String> = Vec::new();
+
+    for role in roles {
+        let is_active = match role.as_str() {
+            "student" => sqlx::query_scalar::<_, bool>(
+                "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1 AND status = 'active')",
+            )
+            .bind(user_id)
+            .fetch_one(pool)
+            .await?,
+            "parent" => {
+                sqlx::query_scalar::<_, bool>(
+                    "SELECT EXISTS(SELECT 1 FROM parents WHERE user_id = $1 AND status = 'active')",
+                )
+                .bind(user_id)
+                .fetch_one(pool)
+                .await?
+            }
+            "teacher" => sqlx::query_scalar::<_, bool>(
+                "SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1 AND status = 'active')",
+            )
+            .bind(user_id)
+            .fetch_one(pool)
+            .await?,
+            _ => true,
+        };
+
+        if is_active {
+            active_roles.push(role);
+        }
+    }
+
+    Ok(active_roles)
+}
+
 #[post("/login")]
 async fn login(
     app_state: web::Data<AppState>,
@@ -88,7 +133,7 @@ async fn login(
 ) -> impl Responder {
     // Query user from database
     let user_result = sqlx::query_as::<_, User>(
-        "SELECT id, username, password_hash FROM users WHERE username = $1"
+        "SELECT id, username, password_hash FROM users WHERE username = $1",
     )
     .bind(&credentials.username)
     .fetch_optional(&app_state.db)
@@ -130,17 +175,7 @@ async fn login(
         });
     }
 
-    // Fetch user roles
-    let roles_result = sqlx::query_scalar::<_, String>(
-        "SELECT r.name FROM roles r 
-         INNER JOIN user_roles ur ON r.id = ur.role_id 
-         WHERE ur.user_id = $1"
-    )
-    .bind(user.id)
-    .fetch_all(&app_state.db)
-    .await;
-
-    let roles = match roles_result {
+    let roles = match load_active_roles(&app_state.db, user.id).await {
         Ok(roles) => roles,
         Err(e) => {
             error!("Failed to fetch user roles: {}", e);
@@ -150,63 +185,10 @@ async fn login(
         }
     };
 
-    // Check if user has admin role OR at least one active activity role
-    let has_admin = roles.contains(&"admin".to_string());
-    
-    if !has_admin {
-        // Check if user has any active activity roles
-        let mut has_active_role = false;
-        
-        // Check if student role is active
-        if roles.contains(&"student".to_string()) {
-            let is_active: Option<(bool,)> = sqlx::query_as(
-                "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1 AND status = 'active')"
-            )
-            .bind(user.id)
-            .fetch_optional(&app_state.db)
-            .await
-            .unwrap_or(None);
-            
-            if is_active.map(|(exists,)| exists).unwrap_or(false) {
-                has_active_role = true;
-            }
-        }
-        
-        // Check if parent role is active
-        if !has_active_role && roles.contains(&"parent".to_string()) {
-            let is_active: Option<(bool,)> = sqlx::query_as(
-                "SELECT EXISTS(SELECT 1 FROM parents WHERE user_id = $1 AND status = 'active')"
-            )
-            .bind(user.id)
-            .fetch_optional(&app_state.db)
-            .await
-            .unwrap_or(None);
-            
-            if is_active.map(|(exists,)| exists).unwrap_or(false) {
-                has_active_role = true;
-            }
-        }
-        
-        // Check if teacher role is active
-        if !has_active_role && roles.contains(&"teacher".to_string()) {
-            let is_active: Option<(bool,)> = sqlx::query_as(
-                "SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1 AND status = 'active')"
-            )
-            .bind(user.id)
-            .fetch_optional(&app_state.db)
-            .await
-            .unwrap_or(None);
-            
-            if is_active.map(|(exists,)| exists).unwrap_or(false) {
-                has_active_role = true;
-            }
-        }
-        
-        if !has_active_role {
-            return HttpResponse::Unauthorized().json(ErrorResponse {
-                error: "All roles are archived".to_string(),
-            });
-        }
+    if roles.is_empty() {
+        return HttpResponse::Unauthorized().json(ErrorResponse {
+            error: "All roles are archived".to_string(),
+        });
     }
 
     // Generate JWT token
@@ -248,12 +230,10 @@ async fn validate_token_endpoint(
         Err(response) => return response,
     };
 
-    let user_exists = sqlx::query_scalar::<_, i32>(
-        "SELECT id FROM users WHERE username = $1",
-    )
-    .bind(&claims.sub)
-    .fetch_optional(&app_state.db)
-    .await;
+    let user_exists = sqlx::query_scalar::<_, i32>("SELECT id FROM users WHERE username = $1")
+        .bind(&claims.sub)
+        .fetch_optional(&app_state.db)
+        .await;
 
     match user_exists {
         Ok(Some(_)) => HttpResponse::Ok().json(serde_json::json!({
@@ -328,32 +308,27 @@ async fn validate_reset_token(
     match password_reset::verify_reset_token(&app_state.db, &token).await {
         Ok((_token_id, user_id)) => {
             // Fetch username
-            let username = sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
-                .bind(user_id)
-                .fetch_optional(&app_state.db)
-                .await;
-            
+            let username =
+                sqlx::query_scalar::<_, String>("SELECT username FROM users WHERE id = $1")
+                    .bind(user_id)
+                    .fetch_optional(&app_state.db)
+                    .await;
+
             match username {
-                Ok(Some(username)) => {
-                    HttpResponse::Ok().json(ValidateTokenResponse {
-                        valid: true,
-                        username: Some(username),
-                    })
-                }
-                _ => {
-                    HttpResponse::Ok().json(ValidateTokenResponse {
-                        valid: false,
-                        username: None,
-                    })
-                }
+                Ok(Some(username)) => HttpResponse::Ok().json(ValidateTokenResponse {
+                    valid: true,
+                    username: Some(username),
+                }),
+                _ => HttpResponse::Ok().json(ValidateTokenResponse {
+                    valid: false,
+                    username: None,
+                }),
             }
         }
-        Err(_) => {
-            HttpResponse::Ok().json(ValidateTokenResponse {
-                valid: false,
-                username: None,
-            })
-        }
+        Err(_) => HttpResponse::Ok().json(ValidateTokenResponse {
+            valid: false,
+            username: None,
+        }),
     }
 }
 
@@ -364,11 +339,9 @@ async fn reset_password(
     req: web::Json<ResetPasswordRequest>,
 ) -> impl Responder {
     match password_reset::reset_password_with_token(&app_state.db, &token, &req.password).await {
-        Ok(_) => {
-            HttpResponse::Ok().json(serde_json::json!({
-                "message": "Password reset successfully"
-            }))
-        }
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+            "message": "Password reset successfully"
+        })),
         Err(e) => {
             error!("Password reset error: {}", e);
             HttpResponse::BadRequest().json(ErrorResponse {
@@ -450,10 +423,7 @@ pub struct ChangePasswordRequest {
 
 /// Get current user's profile
 #[get("")]
-async fn get_profile(
-    app_state: web::Data<AppState>,
-    req: HttpRequest,
-) -> impl Responder {
+async fn get_profile(app_state: web::Data<AppState>, req: HttpRequest) -> impl Responder {
     let claims = match verify_token(&req, &app_state) {
         Ok(claims) => claims,
         Err(response) => return response,
@@ -481,27 +451,28 @@ async fn get_profile(
     };
 
     // Get user roles
-    profile.roles = sqlx::query_scalar::<_, String>(
-        "SELECT r.name FROM roles r 
-         INNER JOIN user_roles ur ON r.id = ur.role_id 
-         WHERE ur.user_id = $1"
-    )
-    .bind(profile.id)
-    .fetch_all(&app_state.db)
-    .await
-    .unwrap_or_default();
+    profile.roles = match load_active_roles(&app_state.db, profile.id).await {
+        Ok(roles) => roles,
+        Err(e) => {
+            error!("Failed to fetch active profile roles: {}", e);
+            return HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Internal server error".to_string(),
+            });
+        }
+    };
 
     // Get student data if user is a student
     if profile.roles.contains(&"student".to_string()) {
-        if let Ok(Some((full_name, birthday, status))) = sqlx::query_as::<_, (String, NaiveDate, String)>(
-            "SELECT u.full_name, s.birthday, s.status::text
+        if let Ok(Some((full_name, birthday, status))) =
+            sqlx::query_as::<_, (String, NaiveDate, String)>(
+                "SELECT u.full_name, s.birthday, s.status::text
              FROM students s
              INNER JOIN users u ON u.id = s.user_id
-             WHERE s.user_id = $1"
-        )
-        .bind(profile.id)
-        .fetch_optional(&app_state.db)
-        .await
+               WHERE s.user_id = $1 AND s.status = 'active'",
+            )
+            .bind(profile.id)
+            .fetch_optional(&app_state.db)
+            .await
         {
             profile.student_data = Some(StudentData {
                 full_name,
@@ -517,39 +488,48 @@ async fn get_profile(
             "SELECT u.full_name, p.status::text
              FROM parents p
              INNER JOIN users u ON u.id = p.user_id
-             WHERE p.user_id = $1"
+               WHERE p.user_id = $1 AND p.status = 'active'",
         )
         .bind(profile.id)
         .fetch_optional(&app_state.db)
         .await
         {
             // Get children
-              let children: Vec<_> = sqlx::query_as::<_, (i32, String, String, NaiveDate, Option<String>, String)>(
-                  "SELECT u.id, u.username, u.full_name, s.birthday, u.profile_image, s.status::text
+            let children: Vec<_> = sqlx::query_as::<
+                _,
+                (i32, String, String, NaiveDate, Option<String>, String),
+            >(
+                "SELECT u.id, u.username, u.full_name, s.birthday, u.profile_image, s.status::text
                   FROM users u
                   INNER JOIN students s ON u.id = s.user_id
                  INNER JOIN parent_student_relations psr ON s.user_id = psr.student_user_id
-                 WHERE psr.parent_user_id = $1"
+                  WHERE psr.parent_user_id = $1 AND s.status = 'active'",
             )
             .bind(profile.id)
             .fetch_all(&app_state.db)
             .await
             .unwrap_or_default()
             .into_iter()
-              .map(|(user_id, username, full_name, birthday, profile_image, status)| StudentInfo {
-                user_id,
-                username,
-                full_name,
-                birthday,
-                profile_image,
-                status,
-            })
+            .map(
+                |(user_id, username, full_name, birthday, profile_image, status)| StudentInfo {
+                    user_id,
+                    username,
+                    full_name,
+                    birthday,
+                    profile_image,
+                    status,
+                },
+            )
             .collect();
 
             profile.parent_data = Some(ParentData {
                 full_name,
                 status,
-                children: if children.is_empty() { None } else { Some(children) },
+                children: if children.is_empty() {
+                    None
+                } else {
+                    Some(children)
+                },
             });
         }
     }
@@ -560,7 +540,7 @@ async fn get_profile(
             "SELECT u.full_name, t.status::text
              FROM teachers t
              INNER JOIN users u ON u.id = t.user_id
-             WHERE t.user_id = $1"
+               WHERE t.user_id = $1 AND t.status = 'active'",
         )
         .bind(profile.id)
         .fetch_optional(&app_state.db)
@@ -586,12 +566,10 @@ async fn update_profile(
     };
 
     // Get user ID
-    let user_id = match sqlx::query_scalar::<_, i32>(
-        "SELECT id FROM users WHERE username = $1"
-    )
-    .bind(&claims.sub)
-    .fetch_optional(&app_state.db)
-    .await
+    let user_id = match sqlx::query_scalar::<_, i32>("SELECT id FROM users WHERE username = $1")
+        .bind(&claims.sub)
+        .fetch_optional(&app_state.db)
+        .await
     {
         Ok(Some(id)) => id,
         _ => {
@@ -613,14 +591,12 @@ async fn update_profile(
     };
 
     // Update user table
-    if let Err(e) = sqlx::query(
-        "UPDATE users SET email = $1, phone = $2 WHERE id = $3"
-    )
-    .bind(&update_req.email)
-    .bind(&update_req.phone)
-    .bind(user_id)
-    .execute(&mut *tx)
-    .await
+    if let Err(e) = sqlx::query("UPDATE users SET email = $1, phone = $2 WHERE id = $3")
+        .bind(&update_req.email)
+        .bind(&update_req.phone)
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await
     {
         error!("Failed to update user: {}", e);
         let _ = tx.rollback().await;
@@ -648,7 +624,7 @@ async fn update_profile(
     if update_req.birthday.is_some() {
         // Check if user is a student
         let is_student = sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
+            "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)",
         )
         .bind(user_id)
         .fetch_one(&mut *tx)
@@ -658,7 +634,7 @@ async fn update_profile(
         if is_student {
             let mut updates = Vec::new();
             let mut bind_count = 1;
-            
+
             let birthday_date = if let Some(ref birthday_str) = update_req.birthday {
                 match NaiveDate::parse_from_str(birthday_str, "%Y-%m-%d") {
                     Ok(date) => Some(date),
@@ -686,7 +662,7 @@ async fn update_profile(
                 );
 
                 let mut q = sqlx::query(&query);
-                
+
                 if let Some(date) = birthday_date {
                     q = q.bind(date);
                 }
@@ -699,7 +675,6 @@ async fn update_profile(
                         error: "Failed to update student data".to_string(),
                     });
                 }
-
             }
         }
     }
@@ -731,7 +706,7 @@ async fn change_password(
 
     // Verify current password first
     let user_result = sqlx::query_as::<_, User>(
-        "SELECT id, username, password_hash FROM users WHERE username = $1"
+        "SELECT id, username, password_hash FROM users WHERE username = $1",
     )
     .bind(&claims.sub)
     .fetch_optional(&app_state.db)
@@ -780,7 +755,8 @@ async fn change_password(
     };
 
     let salt = SaltString::generate(&mut OsRng);
-    let new_hash = match Argon2::default().hash_password(change_req.new_password.as_bytes(), &salt) {
+    let new_hash = match Argon2::default().hash_password(change_req.new_password.as_bytes(), &salt)
+    {
         Ok(hash) => hash.to_string(),
         Err(e) => {
             error!("Failed to hash password: {}", e);
@@ -791,13 +767,11 @@ async fn change_password(
     };
 
     // Update password
-    let update_result = sqlx::query(
-        "UPDATE users SET password_hash = $1 WHERE username = $2"
-    )
-    .bind(&new_hash)
-    .bind(&claims.sub)
-    .execute(&app_state.db)
-    .await;
+    let update_result = sqlx::query("UPDATE users SET password_hash = $1 WHERE username = $2")
+        .bind(&new_hash)
+        .bind(&claims.sub)
+        .execute(&app_state.db)
+        .await;
 
     match update_result {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
@@ -857,9 +831,7 @@ async fn upload_profile_image(
 
         let media_service = MediaService::new(app_state.storage.clone());
         let stream = field.map(|chunk| {
-            chunk.map_err(|e| {
-                std::io::Error::new(std::io::ErrorKind::Other, e.to_string())
-            })
+            chunk.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))
         });
 
         let stored = match media_service
@@ -887,7 +859,7 @@ async fn upload_profile_image(
 
         // Delete old profile image if exists
         let old_image_result = sqlx::query_scalar::<_, Option<String>>(
-            "SELECT profile_image FROM users WHERE username = $1"
+            "SELECT profile_image FROM users WHERE username = $1",
         )
         .bind(&claims.sub)
         .fetch_optional(&app_state.db)
@@ -904,13 +876,11 @@ async fn upload_profile_image(
         }
 
         // Update database with new filename
-        let update_result = sqlx::query(
-            "UPDATE users SET profile_image = $1 WHERE username = $2"
-        )
-        .bind(&stored.key)
-        .bind(&claims.sub)
-        .execute(&app_state.db)
-        .await;
+        let update_result = sqlx::query("UPDATE users SET profile_image = $1 WHERE username = $2")
+            .bind(&stored.key)
+            .bind(&claims.sub)
+            .execute(&app_state.db)
+            .await;
 
         match update_result {
             Ok(_) => {
@@ -936,10 +906,7 @@ async fn upload_profile_image(
 
 /// Delete profile image
 #[actix_web::delete("/image")]
-async fn delete_profile_image(
-    app_state: web::Data<AppState>,
-    req: HttpRequest,
-) -> impl Responder {
+async fn delete_profile_image(app_state: web::Data<AppState>, req: HttpRequest) -> impl Responder {
     let claims = match verify_token(&req, &app_state) {
         Ok(claims) => claims,
         Err(response) => return response,
@@ -947,7 +914,7 @@ async fn delete_profile_image(
 
     // Get current profile image
     let old_image_result = sqlx::query_scalar::<_, Option<String>>(
-        "SELECT profile_image FROM users WHERE username = $1"
+        "SELECT profile_image FROM users WHERE username = $1",
     )
     .bind(&claims.sub)
     .fetch_optional(&app_state.db)
@@ -965,12 +932,10 @@ async fn delete_profile_image(
     }
 
     // Update database
-    let update_result = sqlx::query(
-        "UPDATE users SET profile_image = NULL WHERE username = $1"
-    )
-    .bind(&claims.sub)
-    .execute(&app_state.db)
-    .await;
+    let update_result = sqlx::query("UPDATE users SET profile_image = NULL WHERE username = $1")
+        .bind(&claims.sub)
+        .execute(&app_state.db)
+        .await;
 
     match update_result {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({
@@ -992,7 +957,7 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(validate_token_endpoint)
             .service(forgot_password)
             .service(validate_reset_token)
-            .service(reset_password)
+            .service(reset_password),
     );
     cfg.service(
         web::scope("/api/profile")
@@ -1000,6 +965,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .service(update_profile)
             .service(change_password)
             .service(upload_profile_image)
-            .service(delete_profile_image)
+            .service(delete_profile_image),
     );
 }

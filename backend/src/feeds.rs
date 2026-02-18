@@ -504,9 +504,12 @@ async fn ensure_feed_access(
             ) OR EXISTS(
                 SELECT 1
                 FROM parent_student_relations psr
+                JOIN parents p ON p.user_id = psr.parent_user_id
                 JOIN teacher_student_relations tsr
                     ON tsr.student_user_id = psr.student_user_id
-                WHERE psr.parent_user_id = $2 AND tsr.teacher_user_id = $1
+                WHERE psr.parent_user_id = $2
+                  AND tsr.teacher_user_id = $1
+                  AND p.status = 'active'
             )
             "#,
         )
@@ -614,9 +617,11 @@ pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Res
             SELECT DISTINCT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.title, f.created_at
             FROM feeds f
             JOIN parent_student_relations psr ON psr.parent_user_id = $1
+            JOIN parents p ON p.user_id = psr.parent_user_id
             JOIN teacher_student_relations tsr ON tsr.student_user_id = psr.student_user_id
                 AND tsr.teacher_user_id = f.owner_user_id
             WHERE f.owner_type = 'teacher'
+              AND p.status = 'active'
             "#
         )
         .bind(user_id)

@@ -28,7 +28,7 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> _resolveUserIdFromProfileIfNeeded() async {
-    if (_token == null || _token!.isEmpty || _userId != null) return;
+    if (_token == null || _token!.isEmpty) return;
 
     try {
       final response = await http.get(
@@ -44,9 +44,26 @@ class AuthService extends ChangeNotifier {
       final data = jsonDecode(response.body);
       if (data is! Map<String, dynamic>) return;
 
+      bool changed = false;
+
+      final profileRolesRaw = data['roles'];
+      if (profileRolesRaw is List) {
+        final profileRoles = profileRolesRaw.whereType<String>().toList(
+          growable: false,
+        );
+        if (!listEquals(profileRoles, _roles)) {
+          _roles = profileRoles;
+          changed = true;
+        }
+      }
+
       final resolved = _parseInt(data['id']);
       if (resolved != null && resolved != _userId) {
         _userId = resolved;
+        changed = true;
+      }
+
+      if (changed) {
         notifyListeners();
       }
     } catch (e) {

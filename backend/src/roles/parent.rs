@@ -1,11 +1,11 @@
 use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
 use chrono::NaiveDate;
-use log::{error};
+use log::error;
 
 use super::helpers::verify_admin_role;
 use super::models::{
-    AddParentStudentRelationRequest, CreateParentRequest, ParentWithUserInfo,
-    StudentWithUserInfo, UpdateParentRequest,
+    AddParentStudentRelationRequest, CreateParentRequest, ParentWithUserInfo, StudentWithUserInfo,
+    UpdateParentRequest,
 };
 use crate::users::verify_token;
 use crate::AppState;
@@ -32,8 +32,8 @@ pub(crate) async fn create_parent(
     }
 
     // Hash password
+    use argon2::password_hash::{rand_core::OsRng, SaltString};
     use argon2::{Argon2, PasswordHasher};
-    use argon2::password_hash::{SaltString, rand_core::OsRng};
 
     let salt = SaltString::generate(&mut OsRng);
     let argon2 = Argon2::default();
@@ -60,7 +60,7 @@ pub(crate) async fn create_parent(
     // Create user
     let user_id = match sqlx::query_scalar::<_, i32>(
         "INSERT INTO users (username, full_name, password_hash, email, phone) 
-         VALUES ($1, $2, $3, $4, $5) RETURNING id"
+         VALUES ($1, $2, $3, $4, $5) RETURNING id",
     )
     .bind(&parent_req.username)
     .bind(&parent_req.full_name)
@@ -80,11 +80,9 @@ pub(crate) async fn create_parent(
     };
 
     // Get parent role ID
-    let role_id = match sqlx::query_scalar::<_, i32>(
-        "SELECT id FROM roles WHERE name = 'parent'"
-    )
-    .fetch_one(&mut *tx)
-    .await
+    let role_id = match sqlx::query_scalar::<_, i32>("SELECT id FROM roles WHERE name = 'parent'")
+        .fetch_one(&mut *tx)
+        .await
     {
         Ok(id) => id,
         Err(e) => {
@@ -97,13 +95,11 @@ pub(crate) async fn create_parent(
     };
 
     // Assign parent role
-    if let Err(e) = sqlx::query(
-        "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)"
-    )
-    .bind(user_id)
-    .bind(role_id)
-    .execute(&mut *tx)
-    .await
+    if let Err(e) = sqlx::query("INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)")
+        .bind(user_id)
+        .bind(role_id)
+        .execute(&mut *tx)
+        .await
     {
         error!("Failed to assign role: {}", e);
         let _ = tx.rollback().await;
@@ -113,12 +109,10 @@ pub(crate) async fn create_parent(
     }
 
     // Create parent entry
-    if let Err(e) = sqlx::query(
-        "INSERT INTO parents (user_id) VALUES ($1)"
-    )
-    .bind(user_id)
-    .execute(&mut *tx)
-    .await
+    if let Err(e) = sqlx::query("INSERT INTO parents (user_id) VALUES ($1)")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await
     {
         error!("Failed to create parent entry: {}", e);
         let _ = tx.rollback().await;
@@ -131,7 +125,7 @@ pub(crate) async fn create_parent(
     for student_id in &parent_req.student_ids {
         // Verify student exists
         let student_exists = sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
+            "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)",
         )
         .bind(student_id)
         .fetch_one(&mut *tx)
@@ -146,7 +140,7 @@ pub(crate) async fn create_parent(
 
         if let Err(e) = sqlx::query(
             "INSERT INTO parent_student_relations (parent_user_id, student_user_id) 
-             VALUES ($1, $2)"
+             VALUES ($1, $2)",
         )
         .bind(user_id)
         .bind(student_id)
@@ -189,42 +183,56 @@ pub(crate) async fn get_parent(
     }
 
     // Get parent with user info
-    let parent = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String)>(
-        "SELECT u.id, u.username, u.email, u.phone, u.full_name, p.status::text
+    let parent =
+        sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, String)>(
+            "SELECT u.id, u.username, u.email, u.phone, u.full_name, p.status::text
          FROM users u
          INNER JOIN parents p ON u.id = p.user_id
-         WHERE u.id = $1"
-    )
-    .bind(user_id)
-    .fetch_optional(&app_state.db)
-    .await;
+         WHERE u.id = $1",
+        )
+        .bind(user_id)
+        .fetch_optional(&app_state.db)
+        .await;
 
     match parent {
         Ok(Some((user_id, username, email, phone, full_name, status))) => {
             // Get children
-            let children = sqlx::query_as::<_, (i32, String, Option<String>, Option<String>, String, NaiveDate, String)>(
+            let children = sqlx::query_as::<
+                _,
+                (
+                    i32,
+                    String,
+                    Option<String>,
+                    Option<String>,
+                    String,
+                    NaiveDate,
+                    String,
+                ),
+            >(
                 "SELECT u.id, u.username, u.email, u.phone, u.full_name, s.birthday, s.status::text
                  FROM users u
                  INNER JOIN students s ON u.id = s.user_id
                  INNER JOIN parent_student_relations psr ON s.user_id = psr.student_user_id
-                 WHERE psr.parent_user_id = $1"
+                 WHERE psr.parent_user_id = $1",
             )
             .bind(user_id)
             .fetch_all(&app_state.db)
             .await
             .unwrap_or_default()
             .into_iter()
-            .map(|(user_id, username, email, phone, full_name, birthday, status)| {
-                StudentWithUserInfo {
-                    user_id,
-                    username,
-                    email,
-                    phone,
-                    full_name,
-                    birthday,
-                    status,
-                }
-            })
+            .map(
+                |(user_id, username, email, phone, full_name, birthday, status)| {
+                    StudentWithUserInfo {
+                        user_id,
+                        username,
+                        email,
+                        phone,
+                        full_name,
+                        birthday,
+                        status,
+                    }
+                },
+            )
             .collect();
 
             HttpResponse::Ok().json(ParentWithUserInfo {
@@ -264,20 +272,19 @@ pub(crate) async fn update_parent(
         Err(response) => return response,
     };
 
-    let current_user_id = match sqlx::query_scalar::<_, i32>(
-        "SELECT id FROM users WHERE username = $1"
-    )
-    .bind(&claims.sub)
-    .fetch_optional(&app_state.db)
-    .await
-    {
-        Ok(Some(id)) => id,
-        _ => {
-            return HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "User not found"
-            }));
-        }
-    };
+    let current_user_id =
+        match sqlx::query_scalar::<_, i32>("SELECT id FROM users WHERE username = $1")
+            .bind(&claims.sub)
+            .fetch_optional(&app_state.db)
+            .await
+        {
+            Ok(Some(id)) => id,
+            _ => {
+                return HttpResponse::Unauthorized().json(serde_json::json!({
+                    "error": "User not found"
+                }));
+            }
+        };
 
     if !claims.roles.contains(&"admin".to_string()) && current_user_id != user_id {
         return HttpResponse::Forbidden().json(serde_json::json!({
@@ -383,7 +390,7 @@ pub(crate) async fn add_parent_student_relation(
 
     // Verify parent exists
     let parent_exists = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM parents WHERE user_id = $1)"
+        "SELECT EXISTS(SELECT 1 FROM parents WHERE user_id = $1 AND status = 'active')",
     )
     .bind(parent_user_id)
     .fetch_one(&app_state.db)
@@ -397,7 +404,7 @@ pub(crate) async fn add_parent_student_relation(
 
     // Verify student exists
     let student_exists = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
+        "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1 AND status = 'active')",
     )
     .bind(relation_req.student_id)
     .fetch_one(&app_state.db)
@@ -412,7 +419,7 @@ pub(crate) async fn add_parent_student_relation(
     // Create relation
     match sqlx::query(
         "INSERT INTO parent_student_relations (parent_user_id, student_user_id) 
-         VALUES ($1, $2)"
+         VALUES ($1, $2)",
     )
     .bind(parent_user_id)
     .bind(relation_req.student_id)
@@ -446,7 +453,7 @@ pub(crate) async fn remove_parent_student_relation(
 
     match sqlx::query(
         "DELETE FROM parent_student_relations 
-         WHERE parent_user_id = $1 AND student_user_id = $2"
+         WHERE parent_user_id = $1 AND student_user_id = $2",
     )
     .bind(parent_user_id)
     .bind(student_user_id)
@@ -495,13 +502,11 @@ pub(crate) async fn archive_parent_role(
     let user_id = user_id.into_inner();
 
     // Get the admin user ID from username
-    let admin_user_id: Option<(i32,)> = sqlx::query_as(
-        "SELECT id FROM users WHERE username = $1"
-    )
-    .bind(&claims.sub)
-    .fetch_optional(&app_state.db)
-    .await
-    .unwrap_or(None);
+    let admin_user_id: Option<(i32,)> = sqlx::query_as("SELECT id FROM users WHERE username = $1")
+        .bind(&claims.sub)
+        .fetch_optional(&app_state.db)
+        .await
+        .unwrap_or(None);
 
     let admin_user_id = match admin_user_id {
         Some((id,)) => id,
