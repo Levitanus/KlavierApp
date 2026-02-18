@@ -940,10 +940,19 @@ class AppLocalizationsRu extends AppLocalizations {
   String get dashboardNoSchoolFeed => 'Пока нет ленты школы.';
 
   @override
+  String get dashboardGroupFeeds => 'Ленты групп';
+
+  @override
+  String get dashboardNoGroupFeeds => 'Пока нет лент групп.';
+
+  @override
   String get dashboardOwnerSchool => 'Школа';
 
   @override
   String get dashboardOwnerTeacher => 'Учитель';
+
+  @override
+  String get dashboardOwnerGroup => 'Группа';
 
   @override
   String get dashboardStudentLabel => 'Ученик:';
@@ -1336,4 +1345,132 @@ class AppLocalizationsRu extends AppLocalizations {
 
   @override
   String get hometasksAssign => 'Назначить задание';
+
+  @override
+  String get hometasksAssignToGroup => 'Назначить группе';
+
+  @override
+  String get hometasksSelectGroupTitle => 'Выберите группу';
+
+  @override
+  String hometasksAssignTitleGroup(Object groupName) {
+    return 'Назначить задание группе $groupName';
+  }
+
+  @override
+  String get hometasksApplyGroupChangesTitle => 'Применить изменения к группе';
+
+  @override
+  String get hometasksApplyGroupChangesMessage =>
+      'Применить эти изменения ко всем ученикам в этом групповом задании?';
+
+  @override
+  String get hometasksApplyOnlyThisStudent => 'Только этому ученику';
+
+  @override
+  String get hometasksApplyToGroup => 'Применить к группе';
+
+  @override
+  String get hometasksArchiveGroupTitle => 'Архивировать групповое задание';
+
+  @override
+  String get hometasksArchiveGroupMessage =>
+      'Архивировать только задание этого ученика или все задания в этом групповом назначении?';
+
+  @override
+  String get hometasksArchiveForGroup => 'Архивировать для группы';
+
+  @override
+  String get hometasksReopenGroupTitle => 'Переоткрыть групповое задание';
+
+  @override
+  String get hometasksReopenGroupMessage =>
+      'Переоткрыть только задание этого ученика или все задания в этом групповом назначении?';
+
+  @override
+  String get hometasksReopenForGroup => 'Переоткрыть для группы';
+
+  @override
+  String get feedsGroupFeeds => 'Ленты групп';
+
+  @override
+  String get feedsOwnerGroup => 'Группа';
+
+  @override
+  String get profileCreateGroup => 'Создать группу';
+
+  @override
+  String get profileGroupsTitle => 'Группы';
+
+  @override
+  String get profileNoGroupsYet => 'Пока нет групп';
+
+  @override
+  String get profileStudentsLabel => 'учеников';
+
+  @override
+  String get profileStatusArchived => 'В архиве';
+
+  @override
+  String get profileStatusActive => 'Активна';
+
+  @override
+  String get profileEditMembers => 'Изменить состав';
+
+  @override
+  String get profileArchiveGroup => 'В архив';
+
+  @override
+  String get profileUnarchiveGroup => 'Из архива';
+
+  @override
+  String get profileDeleteGroupTitle => 'Удалить группу';
+
+  @override
+  String get profileDeleteGroupMessage =>
+      'Удалить эту группу навсегда? Лента и история группы будут удалены.';
+
+  @override
+  String get profileAddStudentsFirstToCreateGroup =>
+      'Сначала добавьте учеников, чтобы создать группу';
+
+  @override
+  String get profileGroupNameLabel => 'Название группы';
+
+  @override
+  String get profileFilterStudentsLabel => 'Фильтр учеников';
+
+  @override
+  String get profileNoStudentsFound => 'Ученики не найдены';
+
+  @override
+  String get profileEnterGroupNameAndStudents =>
+      'Введите название группы и выберите учеников';
+
+  @override
+  String get profileCreateAction => 'Создать';
+
+  @override
+  String get profileEditGroupTitle => 'Редактировать группу';
+
+  @override
+  String get profileArchivedGroupLabel => 'Группа в архиве';
+
+  @override
+  String get profileGroupCreatedSuccess => 'Группа успешно создана';
+
+  @override
+  String get profileGroupUpdatedSuccess => 'Группа успешно обновлена';
+
+  @override
+  String get profileGroupDeletedSuccess => 'Группа успешно удалена';
+
+  @override
+  String get profileGroupCreateFailed => 'Не удалось создать группу';
+
+  @override
+  String get profileGroupUpdateFailed => 'Не удалось обновить группу';
+
+  @override
+  String get profileGroupDeleteFailed => 'Не удалось удалить группу';
 }

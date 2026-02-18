@@ -19,6 +19,7 @@ pub struct Feed {
     pub id: i32,
     pub owner_type: String,
     pub owner_user_id: Option<i32>,
+    pub owner_group_id: Option<i32>,
     pub title: String,
     pub created_at: DateTime<Utc>,
 }
@@ -465,7 +466,7 @@ fn is_admin(claims: &crate::users::Claims) -> bool {
 
 async fn fetch_feed(app_state: &AppState, feed_id: i32) -> Result<Feed> {
     sqlx::query_as::<_, Feed>(
-        "SELECT id, owner_type::text as owner_type, owner_user_id, title, created_at FROM feeds WHERE id = $1"
+        "SELECT id, owner_type::text as owner_type, owner_user_id, owner_group_id, title, created_at FROM feeds WHERE id = $1"
     )
     .bind(feed_id)
     .fetch_optional(&app_state.db)
@@ -527,6 +528,49 @@ async fn ensure_feed_access(
         }
     }
 
+    if feed.owner_type == "group" {
+        let has_access: bool = sqlx::query_scalar(
+            r#"
+            SELECT EXISTS(
+                SELECT 1
+                FROM student_groups sg
+                WHERE sg.id = $1
+                  AND sg.teacher_user_id = $2
+                                    AND sg.status = 'active'
+            ) OR EXISTS(
+                SELECT 1
+                FROM group_student_relations gsr
+                                JOIN student_groups sg ON sg.id = gsr.group_id
+                WHERE gsr.group_id = $1
+                  AND gsr.student_user_id = $2
+                                    AND sg.status = 'active'
+            ) OR EXISTS(
+                SELECT 1
+                FROM group_student_relations gsr
+                                JOIN student_groups sg ON sg.id = gsr.group_id
+                JOIN parent_student_relations psr ON psr.student_user_id = gsr.student_user_id
+                JOIN parents p ON p.user_id = psr.parent_user_id
+                WHERE gsr.group_id = $1
+                  AND psr.parent_user_id = $2
+                                    AND sg.status = 'active'
+                  AND p.status = 'active'
+            )
+            "#,
+        )
+        .bind(feed.owner_group_id)
+        .bind(user_id)
+        .fetch_one(&app_state.db)
+        .await
+        .map_err(|e| {
+            error!("Database error checking group feed access: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Failed to check access")
+        })?;
+
+        if has_access {
+            return Ok(());
+        }
+    }
+
     Err(actix_web::error::ErrorForbidden("Access denied"))
 }
 
@@ -542,6 +586,25 @@ async fn ensure_feed_owner(
 
     if feed.owner_type == "teacher" && feed.owner_user_id == Some(user_id) {
         return Ok(());
+    }
+
+    if feed.owner_type == "group" {
+        let is_group_owner = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(
+                SELECT 1
+                FROM student_groups
+                WHERE id = $1 AND teacher_user_id = $2 AND status = 'active'
+            )",
+        )
+        .bind(feed.owner_group_id)
+        .bind(user_id)
+        .fetch_one(&_app_state.db)
+        .await
+        .unwrap_or(false);
+
+        if is_group_owner {
+            return Ok(());
+        }
     }
 
     Err(actix_web::error::ErrorForbidden("Not allowed"))
@@ -568,7 +631,7 @@ pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Res
     let mut feeds: Vec<Feed> = Vec::new();
 
     let school_feeds = sqlx::query_as::<_, Feed>(
-        "SELECT id, owner_type::text as owner_type, owner_user_id, title, created_at FROM feeds WHERE owner_type = 'school'"
+        "SELECT id, owner_type::text as owner_type, owner_user_id, owner_group_id, title, created_at FROM feeds WHERE owner_type = 'school'"
     )
     .fetch_all(&app_state.db)
     .await
@@ -580,7 +643,7 @@ pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Res
 
     if claims.roles.iter().any(|role| role == "teacher") {
         let teacher_feeds = sqlx::query_as::<_, Feed>(
-            "SELECT id, owner_type::text as owner_type, owner_user_id, title, created_at FROM feeds WHERE owner_type = 'teacher' AND owner_user_id = $1"
+            "SELECT id, owner_type::text as owner_type, owner_user_id, owner_group_id, title, created_at FROM feeds WHERE owner_type = 'teacher' AND owner_user_id = $1"
         )
         .bind(user_id)
         .fetch_all(&app_state.db)
@@ -590,12 +653,27 @@ pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Res
             actix_web::error::ErrorInternalServerError("Failed to fetch feeds")
         })?;
         feeds.extend(teacher_feeds);
+
+        let group_feeds = sqlx::query_as::<_, Feed>(
+            "SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
+             FROM feeds f
+             JOIN student_groups sg ON sg.id = f.owner_group_id
+               WHERE f.owner_type = 'group' AND sg.teacher_user_id = $1 AND sg.status = 'active'",
+        )
+        .bind(user_id)
+        .fetch_all(&app_state.db)
+        .await
+        .map_err(|e| {
+            error!("Database error fetching teacher group feeds: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Failed to fetch feeds")
+        })?;
+        feeds.extend(group_feeds);
     }
 
     if claims.roles.iter().any(|role| role == "student") {
         let student_feeds = sqlx::query_as::<_, Feed>(
             r#"
-            SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.title, f.created_at
+            SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
             FROM feeds f
             JOIN teacher_student_relations tsr ON tsr.teacher_user_id = f.owner_user_id
             WHERE f.owner_type = 'teacher' AND tsr.student_user_id = $1
@@ -609,12 +687,30 @@ pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Res
             actix_web::error::ErrorInternalServerError("Failed to fetch feeds")
         })?;
         feeds.extend(student_feeds);
+
+        let student_group_feeds = sqlx::query_as::<_, Feed>(
+            r#"
+            SELECT DISTINCT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
+            FROM feeds f
+            JOIN group_student_relations gsr ON gsr.group_id = f.owner_group_id
+            JOIN student_groups sg ON sg.id = gsr.group_id
+            WHERE f.owner_type = 'group' AND gsr.student_user_id = $1 AND sg.status = 'active'
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&app_state.db)
+        .await
+        .map_err(|e| {
+            error!("Database error fetching student group feeds: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Failed to fetch feeds")
+        })?;
+        feeds.extend(student_group_feeds);
     }
 
     if claims.roles.iter().any(|role| role == "parent") {
         let parent_feeds = sqlx::query_as::<_, Feed>(
             r#"
-            SELECT DISTINCT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.title, f.created_at
+            SELECT DISTINCT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
             FROM feeds f
             JOIN parent_student_relations psr ON psr.parent_user_id = $1
             JOIN parents p ON p.user_id = psr.parent_user_id
@@ -632,6 +728,29 @@ pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Res
             actix_web::error::ErrorInternalServerError("Failed to fetch feeds")
         })?;
         feeds.extend(parent_feeds);
+
+        let parent_group_feeds = sqlx::query_as::<_, Feed>(
+            r#"
+            SELECT DISTINCT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
+            FROM feeds f
+            JOIN parent_student_relations psr ON psr.parent_user_id = $1
+            JOIN parents p ON p.user_id = psr.parent_user_id
+            JOIN group_student_relations gsr ON gsr.student_user_id = psr.student_user_id
+                        JOIN student_groups sg ON sg.id = gsr.group_id
+            WHERE f.owner_type = 'group'
+              AND f.owner_group_id = gsr.group_id
+                            AND sg.status = 'active'
+              AND p.status = 'active'
+            "#,
+        )
+        .bind(user_id)
+        .fetch_all(&app_state.db)
+        .await
+        .map_err(|e| {
+            error!("Database error fetching parent group feeds: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Failed to fetch feeds")
+        })?;
+        feeds.extend(parent_group_feeds);
     }
 
     let mut seen = HashSet::new();
@@ -907,7 +1026,7 @@ pub async fn mark_post_read(
 
     let feed = sqlx::query_as::<_, Feed>(
         r#"
-        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.title, f.created_at
+        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
         FROM feeds f
         JOIN feed_posts p ON p.feed_id = f.id
         WHERE p.id = $1
@@ -1008,8 +1127,24 @@ pub async fn create_post(
     })?;
 
     let is_teacher_owner = feed.owner_type == "teacher" && feed.owner_user_id == Some(user_id);
+    let is_group_owner = if feed.owner_type == "group" {
+        sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(
+                SELECT 1 FROM student_groups
+                WHERE id = $1 AND teacher_user_id = $2 AND status = 'active'
+            )",
+        )
+        .bind(feed.owner_group_id)
+        .bind(user_id)
+        .fetch_one(&app_state.db)
+        .await
+        .unwrap_or(false)
+    } else {
+        false
+    };
     let can_post = is_admin(&claims)
         || is_teacher_owner
+        || is_group_owner
         || (settings.allow_student_posts && claims.roles.iter().any(|role| role == "student"));
 
     if !can_post {
@@ -1160,7 +1295,7 @@ pub async fn list_comments(
 
     let feed = sqlx::query_as::<_, Feed>(
         r#"
-        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.title, f.created_at
+        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
         FROM feeds f
         JOIN feed_posts p ON p.feed_id = f.id
         WHERE p.id = $1
@@ -1519,7 +1654,7 @@ pub async fn update_comment(
 
     let feed = sqlx::query_as::<_, Feed>(
         r#"
-        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.title, f.created_at
+        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
         FROM feeds f
         JOIN feed_posts p ON p.feed_id = f.id
         WHERE p.id = $1
@@ -1636,7 +1771,7 @@ pub async fn update_post_subscription(
 
     let feed = sqlx::query_as::<_, Feed>(
         r#"
-        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.title, f.created_at
+        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
         FROM feeds f
         JOIN feed_posts p ON p.feed_id = f.id
         WHERE p.id = $1
@@ -1687,7 +1822,7 @@ pub async fn get_post_subscription(
 
     let feed = sqlx::query_as::<_, Feed>(
         r#"
-        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.title, f.created_at
+        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
         FROM feeds f
         JOIN feed_posts p ON p.feed_id = f.id
         WHERE p.id = $1
@@ -1733,7 +1868,7 @@ pub async fn delete_post_subscription(
 
     let feed = sqlx::query_as::<_, Feed>(
         r#"
-        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.title, f.created_at
+        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
         FROM feeds f
         JOIN feed_posts p ON p.feed_id = f.id
         WHERE p.id = $1
@@ -1797,7 +1932,7 @@ pub async fn delete_comment(
 
     let feed = sqlx::query_as::<_, Feed>(
         r#"
-        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.title, f.created_at
+        SELECT f.id, f.owner_type::text as owner_type, f.owner_user_id, f.owner_group_id, f.title, f.created_at
         FROM feeds f
         JOIN feed_posts p ON p.feed_id = f.id
         WHERE p.id = $1

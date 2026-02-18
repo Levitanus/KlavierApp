@@ -19,6 +19,7 @@ class Feed {
   final int id;
   final String ownerType;
   final int? ownerUserId;
+  final int? ownerGroupId;
   final String title;
   final DateTime createdAt;
 
@@ -26,6 +27,7 @@ class Feed {
     required this.id,
     required this.ownerType,
     required this.ownerUserId,
+    required this.ownerGroupId,
     required this.title,
     required this.createdAt,
   });
@@ -35,6 +37,7 @@ class Feed {
       id: json['id'] as int,
       ownerType: json['owner_type'] as String,
       ownerUserId: json['owner_user_id'] as int?,
+      ownerGroupId: json['owner_group_id'] as int?,
       title: json['title'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
@@ -48,6 +51,7 @@ class Feed {
           id == other.id &&
           ownerType == other.ownerType &&
           ownerUserId == other.ownerUserId &&
+          ownerGroupId == other.ownerGroupId &&
           title == other.title &&
           createdAt == other.createdAt;
 
@@ -56,6 +60,7 @@ class Feed {
       id.hashCode ^
       ownerType.hashCode ^
       ownerUserId.hashCode ^
+      ownerGroupId.hashCode ^
       title.hashCode ^
       createdAt.hashCode;
 }

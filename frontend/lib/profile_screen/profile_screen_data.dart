@@ -146,6 +146,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     _profileImage = null;
     _createdAt = null;
     _teacherStudents = [];
+    _teacherGroups = [];
     _studentTeachers = [];
 
     try {
@@ -841,6 +842,38 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         });
       }
     } catch (_) {}
+
+    await _loadTeacherGroups();
+  }
+
+  Future<void> _loadTeacherGroups() async {
+    if (_userId == null) return;
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final token = authService.token;
+    if (token == null) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/groups?include_archived=true',
+        ),
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        if (!mounted) return;
+        setState(() {
+          _teacherGroups = data
+              .whereType<Map<String, dynamic>>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+        });
+      }
+    } catch (_) {}
   }
 
   Future<List<Map<String, dynamic>>> _fetchTeacherStudents(
@@ -974,6 +1007,167 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Students added successfully')),
         );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _createTeacherGroup(String name, List<int> studentIds) async {
+    if (_userId == null || name.trim().isEmpty || studentIds.isEmpty) return;
+
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final l10n = AppLocalizations.of(context);
+
+    try {
+      final response = await http.post(
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/groups',
+        ),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'name': name.trim(), 'student_ids': studentIds}),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        await _loadTeacherGroups();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                l10n?.profileGroupCreatedSuccess ??
+                    'Group created successfully',
+              ),
+            ),
+          );
+        }
+      } else if (mounted) {
+        final error =
+            jsonDecode(response.body)['error'] ??
+            l10n?.profileGroupCreateFailed ??
+            'Failed to create group';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _updateTeacherGroup({
+    required int groupId,
+    String? name,
+    List<int>? studentIds,
+    bool? archived,
+  }) async {
+    if (_userId == null) return;
+
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final l10n = AppLocalizations.of(context);
+
+    final body = <String, dynamic>{};
+    if (name != null) {
+      body['name'] = name.trim();
+    }
+    if (studentIds != null) {
+      body['student_ids'] = studentIds;
+    }
+    if (archived != null) {
+      body['archived'] = archived;
+    }
+
+    if (body.isEmpty) return;
+
+    try {
+      final response = await http.put(
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/groups/$groupId',
+        ),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode(body),
+      );
+
+      if (response.statusCode == 200) {
+        await _loadTeacherGroups();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                l10n?.profileGroupUpdatedSuccess ??
+                    'Group updated successfully',
+              ),
+            ),
+          );
+        }
+      } else if (mounted) {
+        final error =
+            jsonDecode(response.body)['error'] ??
+            l10n?.profileGroupUpdateFailed ??
+            'Failed to update group';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
+  }
+
+  Future<void> _deleteTeacherGroup(int groupId) async {
+    if (_userId == null) return;
+
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final l10n = AppLocalizations.of(context);
+
+    try {
+      final response = await http.delete(
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/groups/$groupId',
+        ),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        await _loadTeacherGroups();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                l10n?.profileGroupDeletedSuccess ??
+                    'Group deleted successfully',
+              ),
+            ),
+          );
+        }
+      } else if (mounted) {
+        final error =
+            jsonDecode(response.body)['error'] ??
+            l10n?.profileGroupDeleteFailed ??
+            'Failed to delete group';
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
       }
     } catch (e) {
       if (mounted) {

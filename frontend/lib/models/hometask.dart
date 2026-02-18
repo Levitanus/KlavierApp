@@ -40,6 +40,7 @@ class Hometask {
   final int sortOrder;
   final HometaskType hometaskType;
   final List<ChecklistItem> checklistItems;
+  final int? groupAssignmentId;
 
   Hometask({
     required this.id,
@@ -55,6 +56,7 @@ class Hometask {
     required this.sortOrder,
     required this.hometaskType,
     required this.checklistItems,
+    required this.groupAssignmentId,
   });
 
   factory Hometask.fromJson(Map<String, dynamic> json) {
@@ -76,6 +78,7 @@ class Hometask {
       hometaskType: _parseType(json['hometask_type']),
       checklistItems:
           itemsJson?.map((item) => ChecklistItem.fromJson(item)).toList() ?? [],
+      groupAssignmentId: json['group_assignment_id'] as int?,
     );
   }
 
@@ -97,6 +100,7 @@ class Hometask {
       sortOrder: sortOrder,
       hometaskType: hometaskType,
       checklistItems: checklistItems ?? this.checklistItems,
+      groupAssignmentId: groupAssignmentId,
     );
   }
 

@@ -290,8 +290,11 @@
   "dashboardNoTeacherFeeds": "No teacher feeds yet.",
   "dashboardSchoolFeed": "School feed",
   "dashboardNoSchoolFeed": "No school feed yet.",
+  "dashboardGroupFeeds": "Group feeds",
+  "dashboardNoGroupFeeds": "No group feeds yet.",
   "dashboardOwnerSchool": "School",
   "dashboardOwnerTeacher": "Teacher",
+  "dashboardOwnerGroup": "Group",
   "dashboardStudentLabel": "Student:",
   "dashboardChildLabel": "Child:",
   "dashboardNoActiveHometasks": "No active hometasks.",
@@ -413,6 +416,46 @@
   "hometasksActive": "Active",
   "hometasksArchive": "Archive",
   "hometasksAssign": "Assign Hometask",
+  "hometasksAssignToGroup": "Assign to Group",
+  "hometasksSelectGroupTitle": "Select Group",
+  "hometasksAssignTitleGroup": "Assign Hometask to group {groupName}",
+  "hometasksApplyGroupChangesTitle": "Apply group changes",
+  "hometasksApplyGroupChangesMessage": "Apply these edits to all students in this group hometask?",
+  "hometasksApplyOnlyThisStudent": "Only this student",
+  "hometasksApplyToGroup": "Apply to group",
+  "hometasksArchiveGroupTitle": "Archive group hometask",
+  "hometasksArchiveGroupMessage": "Archive only this student task, or all tasks in this group assignment?",
+  "hometasksArchiveForGroup": "Archive for group",
+  "hometasksReopenGroupTitle": "Reopen group hometask",
+  "hometasksReopenGroupMessage": "Reopen only this student task, or all tasks in this group assignment?",
+  "hometasksReopenForGroup": "Reopen for group",
+  "feedsGroupFeeds": "Group feeds",
+  "feedsOwnerGroup": "Group",
+  "profileCreateGroup": "Create Group",
+  "profileGroupsTitle": "Groups",
+  "profileNoGroupsYet": "No groups yet",
+  "profileStudentsLabel": "students",
+  "profileStatusArchived": "Archived",
+  "profileStatusActive": "Active",
+  "profileEditMembers": "Edit members",
+  "profileArchiveGroup": "Archive",
+  "profileUnarchiveGroup": "Unarchive",
+  "profileDeleteGroupTitle": "Delete group",
+  "profileDeleteGroupMessage": "Delete this group permanently? Feed and group history will be removed.",
+  "profileAddStudentsFirstToCreateGroup": "Add students first to create a group",
+  "profileGroupNameLabel": "Group name",
+  "profileFilterStudentsLabel": "Filter students",
+  "profileNoStudentsFound": "No students found",
+  "profileEnterGroupNameAndStudents": "Enter group name and select students",
+  "profileCreateAction": "Create",
+  "profileEditGroupTitle": "Edit Group",
+  "profileArchivedGroupLabel": "Archived group",
+  "profileGroupCreatedSuccess": "Group created successfully",
+  "profileGroupUpdatedSuccess": "Group updated successfully",
+  "profileGroupDeletedSuccess": "Group deleted successfully",
+  "profileGroupCreateFailed": "Failed to create group",
+  "profileGroupUpdateFailed": "Failed to update group",
+  "profileGroupDeleteFailed": "Failed to delete group",
   "@commonSavedToPath": {
     "placeholders": {
       "path": {}
@@ -563,6 +606,11 @@
   "@hometasksAssignTitle": {
     "placeholders": {
       "studentName": {}
+    }
+  },
+  "@hometasksAssignTitleGroup": {
+    "placeholders": {
+      "groupName": {}
     }
   },
   "@hometasksItemLabel": {

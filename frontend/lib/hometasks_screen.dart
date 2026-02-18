@@ -30,6 +30,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
   final TextEditingController _teacherStudentSearchController =
       TextEditingController();
   List<StudentSummary> _students = [];
+  List<StudentGroupSummary> _groups = [];
   List<Hometask> _orderedHometasks = [];
   String _lastRoleSignature = '';
 
@@ -80,6 +81,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
       _isLoadingStudents = true;
       _studentsError = null;
       _students = [];
+      _groups = [];
       _selectedStudentId = null;
     });
 
@@ -90,6 +92,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
     StudentSummary? selfSummary;
     if (_isTeacher(authService)) {
       students = await hometaskService.fetchStudentsForTeacher();
+      _groups = await hometaskService.fetchGroupsForTeacher();
     } else if (_isParent(authService)) {
       students = await hometaskService.fetchStudentsForParent();
       selfSummary = await hometaskService.getCurrentStudentSummary();
@@ -383,12 +386,49 @@ class _HometasksScreenState extends State<HometasksScreen> {
             child: FloatingActionButton.extended(
               onPressed: selectedStudent == null
                   ? null
-                  : () => _showAssignHometaskDialog(selectedStudent!),
+                  : () => _showAssignHometaskDialog(student: selectedStudent),
               icon: const Icon(Icons.assignment_add),
               label: Text(l10n?.hometasksAssign ?? 'Assign Hometask'),
             ),
           ),
+        if (isTeacher && _groups.isNotEmpty)
+          Positioned(
+            right: 16,
+            bottom: 84,
+            child: FloatingActionButton.extended(
+              onPressed: () async {
+                final group = await _selectGroupForAssignment();
+                if (!mounted || group == null) return;
+                await _showAssignHometaskDialog(group: group);
+              },
+              icon: const Icon(Icons.groups_2_outlined),
+              label: Text(l10n?.hometasksAssignToGroup ?? 'Assign to Group'),
+            ),
+          ),
       ],
+    );
+  }
+
+  Future<StudentGroupSummary?> _selectGroupForAssignment() async {
+    if (_groups.isEmpty) {
+      return null;
+    }
+
+    final l10n = AppLocalizations.of(context);
+
+    return showDialog<StudentGroupSummary>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(l10n?.hometasksSelectGroupTitle ?? 'Select Group'),
+        children: _groups
+            .map(
+              (group) => SimpleDialogOption(
+                onPressed: () => Navigator.of(context).pop(group),
+                child: Text('${group.name} (${group.students.length})'),
+              ),
+            )
+            .toList(),
+      ),
     );
   }
 
@@ -611,7 +651,15 @@ class _HometasksScreenState extends State<HometasksScreen> {
     );
   }
 
-  Future<void> _showAssignHometaskDialog(StudentSummary student) async {
+  Future<void> _showAssignHometaskDialog({
+    StudentSummary? student,
+    StudentGroupSummary? group,
+  }) async {
+    if ((student == null && group == null) ||
+        (student != null && group != null)) {
+      return;
+    }
+
     final l10n = AppLocalizations.of(context);
     final titleController = TextEditingController();
     final descriptionController = quill.QuillController(
@@ -632,8 +680,14 @@ class _HometasksScreenState extends State<HometasksScreen> {
         builder: (context, setDialogState) {
           return AlertDialog(
             title: Text(
-              l10n?.hometasksAssignTitle(student.fullName) ??
-                  'Assign Hometask to ${student.fullName}',
+              student != null
+                  ? (l10n?.hometasksAssignTitle(student.fullName) ??
+                        'Assign Hometask to ${student.fullName}')
+                  : () {
+                      final groupName = group!.name;
+                      return l10n?.hometasksAssignTitleGroup(groupName) ??
+                          'Assign Hometask to group $groupName';
+                    }(),
             ),
             insetPadding: const EdgeInsets.symmetric(
               horizontal: 8,
@@ -956,7 +1010,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
 
                         final hometaskService = context.read<HometaskService>();
                         final success = await hometaskService.createHometask(
-                          studentId: student.userId,
+                          studentId: student?.userId,
+                          groupId: group?.id,
                           title: titleController.text.trim(),
                           description:
                               _isQuillDocumentEmpty(
@@ -1232,6 +1287,49 @@ class _HometasksScreenState extends State<HometasksScreen> {
                           isSubmitting = true;
                         });
 
+                        bool applyToGroup = false;
+                        if (hometask.groupAssignmentId != null) {
+                          final decision = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: Text(
+                                l10n?.hometasksApplyGroupChangesTitle ??
+                                    'Apply group changes',
+                              ),
+                              content: Text(
+                                l10n?.hometasksApplyGroupChangesMessage ??
+                                    'Apply these edits to all students in this group hometask?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(false),
+                                  child: Text(
+                                    l10n?.hometasksApplyOnlyThisStudent ??
+                                        'Only this student',
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
+                                  child: Text(
+                                    l10n?.hometasksApplyToGroup ??
+                                        'Apply to group',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (decision == null) {
+                            setDialogState(() {
+                              isSubmitting = false;
+                            });
+                            return;
+                          }
+                          applyToGroup = decision;
+                        }
+
                         final hometaskService = context.read<HometaskService>();
                         final success = await hometaskService.updateHometask(
                           hometaskId: hometask.id,
@@ -1245,6 +1343,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
                                   descriptionController.document,
                                 ),
                           items: updatedItems,
+                          applyToGroup: applyToGroup,
                         );
 
                         if (success && context.mounted) {
@@ -1718,8 +1817,52 @@ class _HometasksScreenState extends State<HometasksScreen> {
   }
 
   Future<void> _markAccomplished(int hometaskId) async {
+    final l10n = AppLocalizations.of(context);
     final hometaskService = context.read<HometaskService>();
-    final success = await hometaskService.markAccomplished(hometaskId);
+    final allTasks = _orderedHometasks.isNotEmpty
+        ? _orderedHometasks
+        : hometaskService.hometasks;
+    final task = allTasks.cast<Hometask?>().firstWhere(
+      (item) => item?.id == hometaskId,
+      orElse: () => null,
+    );
+
+    bool applyToGroup = false;
+    if (task?.groupAssignmentId != null) {
+      final decision = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            l10n?.hometasksArchiveGroupTitle ?? 'Archive group hometask',
+          ),
+          content: Text(
+            l10n?.hometasksArchiveGroupMessage ??
+                'Archive only this student task, or all tasks in this group assignment?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                l10n?.hometasksApplyOnlyThisStudent ?? 'Only this student',
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(
+                l10n?.hometasksArchiveForGroup ?? 'Archive for group',
+              ),
+            ),
+          ],
+        ),
+      );
+      if (decision == null) return;
+      applyToGroup = decision;
+    }
+
+    final success = await hometaskService.markAccomplishedWithOptions(
+      hometaskId: hometaskId,
+      applyToGroup: applyToGroup,
+    );
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1736,8 +1879,50 @@ class _HometasksScreenState extends State<HometasksScreen> {
   }
 
   Future<void> _markReopened(int hometaskId) async {
+    final l10n = AppLocalizations.of(context);
     final hometaskService = context.read<HometaskService>();
-    final success = await hometaskService.markReopened(hometaskId);
+    final allTasks = _orderedHometasks.isNotEmpty
+        ? _orderedHometasks
+        : hometaskService.hometasks;
+    final task = allTasks.cast<Hometask?>().firstWhere(
+      (item) => item?.id == hometaskId,
+      orElse: () => null,
+    );
+
+    bool applyToGroup = false;
+    if (task?.groupAssignmentId != null) {
+      final decision = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            l10n?.hometasksReopenGroupTitle ?? 'Reopen group hometask',
+          ),
+          content: Text(
+            l10n?.hometasksReopenGroupMessage ??
+                'Reopen only this student task, or all tasks in this group assignment?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                l10n?.hometasksApplyOnlyThisStudent ?? 'Only this student',
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(l10n?.hometasksReopenForGroup ?? 'Reopen for group'),
+            ),
+          ],
+        ),
+      );
+      if (decision == null) return;
+      applyToGroup = decision;
+    }
+
+    final success = await hometaskService.markReopenedWithOptions(
+      hometaskId: hometaskId,
+      applyToGroup: applyToGroup,
+    );
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

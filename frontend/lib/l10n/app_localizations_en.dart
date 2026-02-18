@@ -937,10 +937,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get dashboardNoSchoolFeed => 'No school feed yet.';
 
   @override
+  String get dashboardGroupFeeds => 'Group feeds';
+
+  @override
+  String get dashboardNoGroupFeeds => 'No group feeds yet.';
+
+  @override
   String get dashboardOwnerSchool => 'School';
 
   @override
   String get dashboardOwnerTeacher => 'Teacher';
+
+  @override
+  String get dashboardOwnerGroup => 'Group';
 
   @override
   String get dashboardStudentLabel => 'Student:';
@@ -1332,4 +1341,132 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get hometasksAssign => 'Assign Hometask';
+
+  @override
+  String get hometasksAssignToGroup => 'Assign to Group';
+
+  @override
+  String get hometasksSelectGroupTitle => 'Select Group';
+
+  @override
+  String hometasksAssignTitleGroup(Object groupName) {
+    return 'Assign Hometask to group $groupName';
+  }
+
+  @override
+  String get hometasksApplyGroupChangesTitle => 'Apply group changes';
+
+  @override
+  String get hometasksApplyGroupChangesMessage =>
+      'Apply these edits to all students in this group hometask?';
+
+  @override
+  String get hometasksApplyOnlyThisStudent => 'Only this student';
+
+  @override
+  String get hometasksApplyToGroup => 'Apply to group';
+
+  @override
+  String get hometasksArchiveGroupTitle => 'Archive group hometask';
+
+  @override
+  String get hometasksArchiveGroupMessage =>
+      'Archive only this student task, or all tasks in this group assignment?';
+
+  @override
+  String get hometasksArchiveForGroup => 'Archive for group';
+
+  @override
+  String get hometasksReopenGroupTitle => 'Reopen group hometask';
+
+  @override
+  String get hometasksReopenGroupMessage =>
+      'Reopen only this student task, or all tasks in this group assignment?';
+
+  @override
+  String get hometasksReopenForGroup => 'Reopen for group';
+
+  @override
+  String get feedsGroupFeeds => 'Group feeds';
+
+  @override
+  String get feedsOwnerGroup => 'Group';
+
+  @override
+  String get profileCreateGroup => 'Create Group';
+
+  @override
+  String get profileGroupsTitle => 'Groups';
+
+  @override
+  String get profileNoGroupsYet => 'No groups yet';
+
+  @override
+  String get profileStudentsLabel => 'students';
+
+  @override
+  String get profileStatusArchived => 'Archived';
+
+  @override
+  String get profileStatusActive => 'Active';
+
+  @override
+  String get profileEditMembers => 'Edit members';
+
+  @override
+  String get profileArchiveGroup => 'Archive';
+
+  @override
+  String get profileUnarchiveGroup => 'Unarchive';
+
+  @override
+  String get profileDeleteGroupTitle => 'Delete group';
+
+  @override
+  String get profileDeleteGroupMessage =>
+      'Delete this group permanently? Feed and group history will be removed.';
+
+  @override
+  String get profileAddStudentsFirstToCreateGroup =>
+      'Add students first to create a group';
+
+  @override
+  String get profileGroupNameLabel => 'Group name';
+
+  @override
+  String get profileFilterStudentsLabel => 'Filter students';
+
+  @override
+  String get profileNoStudentsFound => 'No students found';
+
+  @override
+  String get profileEnterGroupNameAndStudents =>
+      'Enter group name and select students';
+
+  @override
+  String get profileCreateAction => 'Create';
+
+  @override
+  String get profileEditGroupTitle => 'Edit Group';
+
+  @override
+  String get profileArchivedGroupLabel => 'Archived group';
+
+  @override
+  String get profileGroupCreatedSuccess => 'Group created successfully';
+
+  @override
+  String get profileGroupUpdatedSuccess => 'Group updated successfully';
+
+  @override
+  String get profileGroupDeletedSuccess => 'Group deleted successfully';
+
+  @override
+  String get profileGroupCreateFailed => 'Failed to create group';
+
+  @override
+  String get profileGroupUpdateFailed => 'Failed to update group';
+
+  @override
+  String get profileGroupDeleteFailed => 'Failed to delete group';
 }

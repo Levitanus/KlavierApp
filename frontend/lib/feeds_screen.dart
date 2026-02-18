@@ -52,6 +52,9 @@ class _FeedsScreenState extends State<FeedsScreen> {
     if (ownerType == 'teacher') {
       return AppLocalizations.of(context)?.feedsOwnerTeacher ?? 'Teacher';
     }
+    if (ownerType == 'group') {
+      return AppLocalizations.of(context)?.feedsOwnerGroup ?? 'Group';
+    }
     return feed.ownerType;
   }
 
@@ -67,6 +70,9 @@ class _FeedsScreenState extends State<FeedsScreen> {
             .toList();
         final teacherFeeds = feeds
             .where((feed) => feed.ownerType.toLowerCase() == 'teacher')
+            .toList();
+        final groupFeeds = feeds
+            .where((feed) => feed.ownerType.toLowerCase() == 'group')
             .toList();
 
         if (!_openedInitialFeed &&
@@ -144,6 +150,28 @@ class _FeedsScreenState extends State<FeedsScreen> {
               ),
               const SizedBox(height: 8),
               ...teacherFeeds.map(
+                (feed) => FeedPreviewCard(
+                  feed: feed,
+                  title: _formatFeedTitle(feed),
+                  ownerLabel: _ownerLabel(context, feed),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => FeedDetailScreen(feed: feed),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+            if (groupFeeds.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text(
+                l10n?.feedsGroupFeeds ?? 'Group feeds',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              ...groupFeeds.map(
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),

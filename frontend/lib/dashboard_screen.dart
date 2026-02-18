@@ -79,7 +79,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (students.isEmpty) {
       setState(() {
         _loadingStudents = false;
-        _studentsError = AppLocalizations.of(context)?.dashboardNoStudents ??
+        _studentsError =
+            AppLocalizations.of(context)?.dashboardNoStudents ??
             'No students available.';
       });
       return;
@@ -89,7 +90,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (_isStudent(authService) && selfSummary != null) {
       selected = selfSummary.userId;
     }
-    if (selected == null || !students.any((student) => student.userId == selected)) {
+    if (selected == null ||
+        !students.any((student) => student.userId == selected)) {
       selected = students.first.userId;
     }
 
@@ -105,9 +107,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  bool _isStudent(AuthService authService) => authService.roles.contains('student');
-  bool _isTeacher(AuthService authService) => authService.roles.contains('teacher');
-  bool _isParent(AuthService authService) => authService.roles.contains('parent');
+  bool _isStudent(AuthService authService) =>
+      authService.roles.contains('student');
+  bool _isTeacher(AuthService authService) =>
+      authService.roles.contains('teacher');
+  bool _isParent(AuthService authService) =>
+      authService.roles.contains('parent');
 
   List<Hometask> _sortedHometasks(List<Hometask> hometasks) {
     final items = List<Hometask>.from(hometasks);
@@ -131,6 +136,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         final feeds = feedService.feeds;
         final teacherFeeds = feeds
             .where((feed) => feed.ownerType.toLowerCase() == 'teacher')
+            .toList();
+        final groupFeeds = feeds
+            .where((feed) => feed.ownerType.toLowerCase() == 'group')
             .toList();
         final schoolFeeds = feeds
             .where((feed) => feed.ownerType.toLowerCase() == 'school')
@@ -163,6 +171,34 @@ class _DashboardScreenState extends State<DashboardScreen> {
               )
             else
               ...teacherFeeds.map(
+                (feed) => FeedPreviewCard(
+                  feed: feed,
+                  title: _formatFeedTitle(feed),
+                  ownerLabel: _ownerLabel(feed, l10n),
+                  importantLimit: 2,
+                  recentLimit: 2,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => FeedDetailScreen(feed: feed),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            const SizedBox(height: 20),
+            Text(
+              l10n?.dashboardGroupFeeds ?? 'Group feeds',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            if (groupFeeds.isEmpty)
+              Text(
+                l10n?.dashboardNoGroupFeeds ?? 'No group feeds yet.',
+                style: Theme.of(context).textTheme.bodySmall,
+              )
+            else
+              ...groupFeeds.map(
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),
@@ -219,11 +255,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     List<Hometask> hometasks,
   ) {
     final l10n = AppLocalizations.of(context);
-    final showStudentSelector = _isParent(authService) || _isTeacher(authService);
+    final showStudentSelector =
+        _isParent(authService) || _isTeacher(authService);
     final showChildLabel = _isParent(authService) && !_isTeacher(authService);
     final selectorLabel = showChildLabel
-      ? (l10n?.dashboardChildLabel ?? 'Child:')
-      : (l10n?.dashboardStudentLabel ?? 'Student:');
+        ? (l10n?.dashboardChildLabel ?? 'Child:')
+        : (l10n?.dashboardStudentLabel ?? 'Student:');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -288,7 +325,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
             style: Theme.of(context).textTheme.bodySmall,
           )
         else
-          ...hometasks.take(5).map(
+          ...hometasks
+              .take(5)
+              .map(
                 (task) => Card(
                   margin: const EdgeInsets.only(bottom: 8),
                   child: InkWell(
@@ -296,9 +335,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     onTap: () {
                       Navigator.of(context).pushReplacement(
                         MaterialPageRoute(
-                          builder: (_) => HomeScreen(
-                            initialStudentId: task.studentId,
-                          ),
+                          builder: (_) =>
+                              HomeScreen(initialStudentId: task.studentId),
                         ),
                       );
                     },
@@ -350,6 +388,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
     }
     if (ownerType == 'teacher') {
       return l10n?.dashboardOwnerTeacher ?? 'Teacher';
+    }
+    if (ownerType == 'group') {
+      return l10n?.dashboardOwnerGroup ?? 'Group';
     }
     return feed.ownerType;
   }

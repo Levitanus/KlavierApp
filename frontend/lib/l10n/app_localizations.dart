@@ -1846,6 +1846,18 @@ abstract class AppLocalizations {
   /// **'No school feed yet.'**
   String get dashboardNoSchoolFeed;
 
+  /// No description provided for @dashboardGroupFeeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Group feeds'**
+  String get dashboardGroupFeeds;
+
+  /// No description provided for @dashboardNoGroupFeeds.
+  ///
+  /// In en, this message translates to:
+  /// **'No group feeds yet.'**
+  String get dashboardNoGroupFeeds;
+
   /// No description provided for @dashboardOwnerSchool.
   ///
   /// In en, this message translates to:
@@ -1857,6 +1869,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Teacher'**
   String get dashboardOwnerTeacher;
+
+  /// No description provided for @dashboardOwnerGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get dashboardOwnerGroup;
 
   /// No description provided for @dashboardStudentLabel.
   ///
@@ -2583,6 +2601,246 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Assign Hometask'**
   String get hometasksAssign;
+
+  /// No description provided for @hometasksAssignToGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign to Group'**
+  String get hometasksAssignToGroup;
+
+  /// No description provided for @hometasksSelectGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select Group'**
+  String get hometasksSelectGroupTitle;
+
+  /// No description provided for @hometasksAssignTitleGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign Hometask to group {groupName}'**
+  String hometasksAssignTitleGroup(Object groupName);
+
+  /// No description provided for @hometasksApplyGroupChangesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply group changes'**
+  String get hometasksApplyGroupChangesTitle;
+
+  /// No description provided for @hometasksApplyGroupChangesMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply these edits to all students in this group hometask?'**
+  String get hometasksApplyGroupChangesMessage;
+
+  /// No description provided for @hometasksApplyOnlyThisStudent.
+  ///
+  /// In en, this message translates to:
+  /// **'Only this student'**
+  String get hometasksApplyOnlyThisStudent;
+
+  /// No description provided for @hometasksApplyToGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to group'**
+  String get hometasksApplyToGroup;
+
+  /// No description provided for @hometasksArchiveGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive group hometask'**
+  String get hometasksArchiveGroupTitle;
+
+  /// No description provided for @hometasksArchiveGroupMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive only this student task, or all tasks in this group assignment?'**
+  String get hometasksArchiveGroupMessage;
+
+  /// No description provided for @hometasksArchiveForGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive for group'**
+  String get hometasksArchiveForGroup;
+
+  /// No description provided for @hometasksReopenGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen group hometask'**
+  String get hometasksReopenGroupTitle;
+
+  /// No description provided for @hometasksReopenGroupMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen only this student task, or all tasks in this group assignment?'**
+  String get hometasksReopenGroupMessage;
+
+  /// No description provided for @hometasksReopenForGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen for group'**
+  String get hometasksReopenForGroup;
+
+  /// No description provided for @feedsGroupFeeds.
+  ///
+  /// In en, this message translates to:
+  /// **'Group feeds'**
+  String get feedsGroupFeeds;
+
+  /// No description provided for @feedsOwnerGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Group'**
+  String get feedsOwnerGroup;
+
+  /// No description provided for @profileCreateGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Create Group'**
+  String get profileCreateGroup;
+
+  /// No description provided for @profileGroupsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Groups'**
+  String get profileGroupsTitle;
+
+  /// No description provided for @profileNoGroupsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No groups yet'**
+  String get profileNoGroupsYet;
+
+  /// No description provided for @profileStudentsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'students'**
+  String get profileStudentsLabel;
+
+  /// No description provided for @profileStatusArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get profileStatusArchived;
+
+  /// No description provided for @profileStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get profileStatusActive;
+
+  /// No description provided for @profileEditMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit members'**
+  String get profileEditMembers;
+
+  /// No description provided for @profileArchiveGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Archive'**
+  String get profileArchiveGroup;
+
+  /// No description provided for @profileUnarchiveGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Unarchive'**
+  String get profileUnarchiveGroup;
+
+  /// No description provided for @profileDeleteGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete group'**
+  String get profileDeleteGroupTitle;
+
+  /// No description provided for @profileDeleteGroupMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this group permanently? Feed and group history will be removed.'**
+  String get profileDeleteGroupMessage;
+
+  /// No description provided for @profileAddStudentsFirstToCreateGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Add students first to create a group'**
+  String get profileAddStudentsFirstToCreateGroup;
+
+  /// No description provided for @profileGroupNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Group name'**
+  String get profileGroupNameLabel;
+
+  /// No description provided for @profileFilterStudentsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Filter students'**
+  String get profileFilterStudentsLabel;
+
+  /// No description provided for @profileNoStudentsFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No students found'**
+  String get profileNoStudentsFound;
+
+  /// No description provided for @profileEnterGroupNameAndStudents.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter group name and select students'**
+  String get profileEnterGroupNameAndStudents;
+
+  /// No description provided for @profileCreateAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get profileCreateAction;
+
+  /// No description provided for @profileEditGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Group'**
+  String get profileEditGroupTitle;
+
+  /// No description provided for @profileArchivedGroupLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived group'**
+  String get profileArchivedGroupLabel;
+
+  /// No description provided for @profileGroupCreatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Group created successfully'**
+  String get profileGroupCreatedSuccess;
+
+  /// No description provided for @profileGroupUpdatedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Group updated successfully'**
+  String get profileGroupUpdatedSuccess;
+
+  /// No description provided for @profileGroupDeletedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Group deleted successfully'**
+  String get profileGroupDeletedSuccess;
+
+  /// No description provided for @profileGroupCreateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to create group'**
+  String get profileGroupCreateFailed;
+
+  /// No description provided for @profileGroupUpdateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to update group'**
+  String get profileGroupUpdateFailed;
+
+  /// No description provided for @profileGroupDeleteFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to delete group'**
+  String get profileGroupDeleteFailed;
 }
 
 class _AppLocalizationsDelegate

@@ -3,17 +3,18 @@ part of '../profile_screen.dart';
 mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
   Future<void> _startChatWithUser(int userId, String userName) async {
     final chatService = Provider.of<ChatService>(context, listen: false);
-    
+
     try {
       final success = await chatService.startThread(userId);
       if (success && mounted) {
         final thread = chatService.threads.firstWhere(
-          (t) => (t.participantBId != null &&
-                  ((t.participantAId == _userId && t.participantBId == userId) ||
-                   (t.participantAId == userId && t.participantBId == _userId))),
+          (t) =>
+              (t.participantBId != null &&
+              ((t.participantAId == _userId && t.participantBId == userId) ||
+                  (t.participantAId == userId && t.participantBId == _userId))),
           orElse: () => throw Exception('Thread not found'),
         );
-        
+
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => ChatConversationScreen(thread: thread),
@@ -21,14 +22,16 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
         );
       } else if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to start chat: ${chatService.errorMessage}')),
+          SnackBar(
+            content: Text('Failed to start chat: ${chatService.errorMessage}'),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error starting chat: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error starting chat: $e')));
       }
     }
   }
@@ -60,7 +63,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           });
 
           return AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -122,17 +128,22 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           final filteredStudents = studentFilter.isEmpty
               ? availableStudents
               : availableStudents
-                  .where((s) =>
-                      s.fullName
-                          .toLowerCase()
-                          .contains(studentFilter.toLowerCase()) ||
-                      s.username
-                          .toLowerCase()
-                          .contains(studentFilter.toLowerCase()))
-                  .toList();
+                    .where(
+                      (s) =>
+                          s.fullName.toLowerCase().contains(
+                            studentFilter.toLowerCase(),
+                          ) ||
+                          s.username.toLowerCase().contains(
+                            studentFilter.toLowerCase(),
+                          ),
+                    )
+                    .toList();
 
           return AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -179,7 +190,9 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                               return CheckboxListTile(
                                 title: Text(student.fullName),
                                 subtitle: Text(student.username),
-                                value: selectedStudents.contains(student.userId),
+                                value: selectedStudents.contains(
+                                  student.userId,
+                                ),
                                 onChanged: (checked) {
                                   setDialogState(() {
                                     if (checked == true) {
@@ -226,6 +239,363 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     );
   }
 
+  void _showCreateGroupDialog() async {
+    if (_userId == null) return;
+    final l10n = AppLocalizations.of(context);
+
+    final allStudents = await _fetchTeacherStudents(_userId!);
+    if (!mounted) return;
+
+    if (allStudents.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n?.profileAddStudentsFirstToCreateGroup ??
+                'Add students first to create a group',
+          ),
+        ),
+      );
+      return;
+    }
+
+    final groupNameController = TextEditingController();
+    final filterController = TextEditingController();
+    final selectedStudents = <int>{};
+    String filter = '';
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final filteredStudents = allStudents.where((student) {
+            if (filter.isEmpty) return true;
+            final fullName = (student['full_name']?.toString() ?? '')
+                .toLowerCase();
+            final username = (student['username']?.toString() ?? '')
+                .toLowerCase();
+            return fullName.contains(filter) || username.contains(filter);
+          }).toList();
+
+          return AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            title: Text(l10n?.profileCreateGroup ?? 'Create Group'),
+            content: SizedBox(
+              width: 560,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: groupNameController,
+                    decoration: InputDecoration(
+                      labelText: l10n?.profileGroupNameLabel ?? 'Group name',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: filterController,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        filter = value.trim().toLowerCase();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      labelText:
+                          l10n?.profileFilterStudentsLabel ?? 'Filter students',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: filterController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () {
+                                filterController.clear();
+                                setDialogState(() {
+                                  filter = '';
+                                });
+                              },
+                              icon: const Icon(Icons.close),
+                            ),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 340),
+                    child: filteredStudents.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                l10n?.profileNoStudentsFound ??
+                                    'No students found',
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredStudents.length,
+                            itemBuilder: (context, index) {
+                              final student = filteredStudents[index];
+                              final studentId = student['user_id'] as int?;
+                              if (studentId == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return CheckboxListTile(
+                                dense: true,
+                                value: selectedStudents.contains(studentId),
+                                title: Text(
+                                  student['full_name']?.toString() ?? 'Unknown',
+                                ),
+                                subtitle: Text('@${student['username'] ?? ''}'),
+                                onChanged: (checked) {
+                                  setDialogState(() {
+                                    if (checked == true) {
+                                      selectedStudents.add(studentId);
+                                    } else {
+                                      selectedStudents.remove(studentId);
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(l10n?.commonCancel ?? 'Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final name = groupNameController.text.trim();
+                  if (name.isEmpty || selectedStudents.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          l10n?.profileEnterGroupNameAndStudents ??
+                              'Enter group name and select students',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  Navigator.of(context).pop();
+                  await _createTeacherGroup(name, selectedStudents.toList());
+                },
+                child: Text(l10n?.profileCreateAction ?? 'Create'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showEditGroupDialog(Map<String, dynamic> group) async {
+    if (_userId == null) return;
+    final groupId = group['id'] as int?;
+    if (groupId == null) return;
+    final l10n = AppLocalizations.of(context);
+
+    final allStudents = await _fetchTeacherStudents(_userId!);
+    if (!mounted) return;
+
+    final existingMembers = (group['students'] as List<dynamic>? ?? [])
+        .whereType<Map<String, dynamic>>()
+        .toList();
+
+    final selectedStudents = existingMembers
+        .map((student) => student['user_id'])
+        .whereType<int>()
+        .toSet();
+
+    final groupNameController = TextEditingController(
+      text: group['name']?.toString() ?? '',
+    );
+    final filterController = TextEditingController();
+    bool archived = (group['status']?.toString().toLowerCase() == 'archived');
+    String filter = '';
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final filteredStudents = allStudents.where((student) {
+            if (filter.isEmpty) return true;
+            final fullName = (student['full_name']?.toString() ?? '')
+                .toLowerCase();
+            final username = (student['username']?.toString() ?? '')
+                .toLowerCase();
+            return fullName.contains(filter) || username.contains(filter);
+          }).toList();
+
+          return AlertDialog(
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            title: Text(l10n?.profileEditGroupTitle ?? 'Edit Group'),
+            content: SizedBox(
+              width: 560,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: groupNameController,
+                    decoration: InputDecoration(
+                      labelText: l10n?.profileGroupNameLabel ?? 'Group name',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      l10n?.profileArchivedGroupLabel ?? 'Archived group',
+                    ),
+                    value: archived,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        archived = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: filterController,
+                    onChanged: (value) {
+                      setDialogState(() {
+                        filter = value.trim().toLowerCase();
+                      });
+                    },
+                    decoration: InputDecoration(
+                      labelText:
+                          l10n?.profileFilterStudentsLabel ?? 'Filter students',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: filterController.text.isEmpty
+                          ? null
+                          : IconButton(
+                              onPressed: () {
+                                filterController.clear();
+                                setDialogState(() {
+                                  filter = '';
+                                });
+                              },
+                              icon: const Icon(Icons.close),
+                            ),
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    constraints: const BoxConstraints(maxHeight: 320),
+                    child: filteredStudents.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Text(
+                                l10n?.profileNoStudentsFound ??
+                                    'No students found',
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            itemCount: filteredStudents.length,
+                            itemBuilder: (context, index) {
+                              final student = filteredStudents[index];
+                              final studentId = student['user_id'] as int?;
+                              if (studentId == null) {
+                                return const SizedBox.shrink();
+                              }
+                              return CheckboxListTile(
+                                dense: true,
+                                value: selectedStudents.contains(studentId),
+                                title: Text(
+                                  student['full_name']?.toString() ?? 'Unknown',
+                                ),
+                                subtitle: Text('@${student['username'] ?? ''}'),
+                                onChanged: (checked) {
+                                  setDialogState(() {
+                                    if (checked == true) {
+                                      selectedStudents.add(studentId);
+                                    } else {
+                                      selectedStudents.remove(studentId);
+                                    }
+                                  });
+                                },
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(l10n?.commonCancel ?? 'Cancel'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  final confirmDelete = await _showLockedConfirmationDialog(
+                    title: l10n?.profileDeleteGroupTitle ?? 'Delete group',
+                    content:
+                        l10n?.profileDeleteGroupMessage ??
+                        'Delete this group permanently? Feed and group history will be removed.',
+                    confirmLabel: l10n?.commonDelete ?? 'Delete',
+                  );
+                  if (!confirmDelete || !context.mounted) return;
+                  Navigator.of(context).pop();
+                  await _deleteTeacherGroup(groupId);
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.red),
+                child: Text(l10n?.commonDelete ?? 'Delete'),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final name = groupNameController.text.trim();
+                  if (name.isEmpty || selectedStudents.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          l10n?.profileEnterGroupNameAndStudents ??
+                              'Enter group name and select students',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  Navigator.of(context).pop();
+                  await _updateTeacherGroup(
+                    groupId: groupId,
+                    name: name,
+                    studentIds: selectedStudents.toList(),
+                    archived: archived,
+                  );
+                },
+                child: Text(l10n?.commonSave ?? 'Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   void _showStudentProfileDialog(Map<String, dynamic> student) {
     List<Map<String, dynamic>> studentParents = [];
     bool isLoadingParents = true;
@@ -249,7 +619,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           }
 
           return AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -314,12 +687,14 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                 final profileButton = OutlinedButton.icon(
                                   icon: const Icon(Icons.visibility),
                                   label: const Text('View Profile'),
-                                  onPressed: () => _showParentProfileDialog(parent),
+                                  onPressed: () =>
+                                      _showParentProfileDialog(parent),
                                 );
 
                                 if (isCompact) {
                                   return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       infoColumn,
                                       const SizedBox(height: 8),
@@ -384,11 +759,16 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-            title: Text('Assign Hometask to ${student['full_name'] ?? 'Student'}'),
+            title: Text(
+              'Assign Hometask to ${student['full_name'] ?? 'Student'}',
+            ),
             content: SizedBox(
               width: 520,
               child: Form(
@@ -406,8 +786,8 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                         ),
                         validator: (value) =>
                             value == null || value.trim().isEmpty
-                                ? 'Title is required'
-                                : null,
+                            ? 'Title is required'
+                            : null,
                       ),
                       const SizedBox(height: 12),
                       TextFormField(
@@ -552,8 +932,8 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                     ),
                                     validator: (value) =>
                                         value == null || value.trim().isEmpty
-                                            ? 'Required'
-                                            : null,
+                                        ? 'Required'
+                                        : null,
                                   ),
                                 ),
                                 if (itemControllers.length > 1)
@@ -563,7 +943,9 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                         itemControllers.removeAt(index);
                                       });
                                     },
-                                    icon: const Icon(Icons.remove_circle_outline),
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                    ),
                                   ),
                               ],
                             ),
@@ -602,12 +984,13 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                           return;
                         }
 
-                        final items = selectedType == HometaskType.checklist ||
+                        final items =
+                            selectedType == HometaskType.checklist ||
                                 selectedType == HometaskType.progress
                             ? itemControllers
-                                .map((controller) => controller.text.trim())
-                                .where((text) => text.isNotEmpty)
-                                .toList()
+                                  .map((controller) => controller.text.trim())
+                                  .where((text) => text.isNotEmpty)
+                                  .toList()
                             : <String>[];
 
                         if ((selectedType == HometaskType.checklist ||
@@ -632,12 +1015,16 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                             repeatEveryDays = 7;
                             break;
                           case 'custom':
-                            repeatEveryDays =
-                                int.tryParse(repeatDaysController.text.trim());
-                            if (repeatEveryDays == null || repeatEveryDays <= 0) {
+                            repeatEveryDays = int.tryParse(
+                              repeatDaysController.text.trim(),
+                            );
+                            if (repeatEveryDays == null ||
+                                repeatEveryDays <= 0) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
-                                  content: Text('Enter a valid repeat interval.'),
+                                  content: Text(
+                                    'Enter a valid repeat interval.',
+                                  ),
                                 ),
                               );
                               return;
@@ -652,8 +1039,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                           isSubmitting = true;
                         });
 
-                        final hometaskService =
-                            context.read<HometaskService>();
+                        final hometaskService = context.read<HometaskService>();
                         final success = await hometaskService.createHometask(
                           studentId: studentId,
                           title: titleController.text.trim(),
@@ -669,9 +1055,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                         if (success && context.mounted) {
                           Navigator.of(context).pop();
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Hometask assigned.'),
-                            ),
+                            const SnackBar(content: Text('Hometask assigned.')),
                           );
                         } else if (context.mounted) {
                           setDialogState(() {
@@ -719,7 +1103,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           final canAssign = authService.roles.contains('teacher');
 
           return AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -793,17 +1180,20 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                 final profileButton = OutlinedButton.icon(
                                   icon: const Icon(Icons.visibility),
                                   label: const Text('View Profile'),
-                                  onPressed: () => _showStudentProfileDialog(student),
+                                  onPressed: () =>
+                                      _showStudentProfileDialog(student),
                                 );
                                 final assignButton = ElevatedButton.icon(
-                                  onPressed: () => _showAssignHometaskDialog(student),
+                                  onPressed: () =>
+                                      _showAssignHometaskDialog(student),
                                   icon: const Icon(Icons.assignment_add),
                                   label: const Text('Assign'),
                                 );
 
                                 if (isCompact) {
                                   return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       infoColumn,
                                       const SizedBox(height: 8),
@@ -968,9 +1358,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
             onPressed: () async {
               if (formKey.currentState!.validate()) {
                 Navigator.of(context).pop();
-                await _makeUserStudent(
-                  birthdayController.text,
-                );
+                await _makeUserStudent(birthdayController.text);
               }
             },
             child: const Text('Convert'),
@@ -1002,14 +1390,16 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
             final filteredStudents = studentFilter.isEmpty
                 ? students
                 : students
-                    .where((s) =>
-                        s.fullName
-                            .toLowerCase()
-                            .contains(studentFilter.toLowerCase()) ||
-                        s.username
-                            .toLowerCase()
-                            .contains(studentFilter.toLowerCase()))
-                    .toList();
+                      .where(
+                        (s) =>
+                            s.fullName.toLowerCase().contains(
+                              studentFilter.toLowerCase(),
+                            ) ||
+                            s.username.toLowerCase().contains(
+                              studentFilter.toLowerCase(),
+                            ),
+                      )
+                      .toList();
 
             return Form(
               key: formKey,
@@ -1060,8 +1450,9 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                 return CheckboxListTile(
                                   title: Text(student.fullName),
                                   subtitle: Text(student.username),
-                                  value: selectedStudents
-                                      .contains(student.userId),
+                                  value: selectedStudents.contains(
+                                    student.userId,
+                                  ),
                                   onChanged: (checked) {
                                     setDialogState(() {
                                       if (checked == true) {
@@ -1100,9 +1491,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
               if (formKey.currentState!.validate() &&
                   selectedStudents.isNotEmpty) {
                 Navigator.of(context).pop();
-                await _makeUserParent(
-                  selectedStudents.toList(),
-                );
+                await _makeUserParent(selectedStudents.toList());
               }
             },
             child: const Text('Convert'),
@@ -1172,17 +1561,22 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           final filteredStudents = studentFilter.isEmpty
               ? availableStudents
               : availableStudents
-                  .where((s) =>
-                      s.fullName
-                          .toLowerCase()
-                          .contains(studentFilter.toLowerCase()) ||
-                      s.username
-                          .toLowerCase()
-                          .contains(studentFilter.toLowerCase()))
-                  .toList();
+                    .where(
+                      (s) =>
+                          s.fullName.toLowerCase().contains(
+                            studentFilter.toLowerCase(),
+                          ) ||
+                          s.username.toLowerCase().contains(
+                            studentFilter.toLowerCase(),
+                          ),
+                    )
+                    .toList();
 
           return AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -1229,8 +1623,9 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                               return CheckboxListTile(
                                 title: Text(student.fullName),
                                 subtitle: Text(student.username),
-                                value: selectedStudents
-                                    .contains(student.userId),
+                                value: selectedStudents.contains(
+                                  student.userId,
+                                ),
                                 onChanged: (checked) {
                                   setDialogState(() {
                                     if (checked == true) {
@@ -1304,7 +1699,10 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
           }
 
           return AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -1434,7 +1832,8 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                   Builder(
                                     builder: (context) {
                                       final isCompact =
-                                          MediaQuery.of(context).size.width < 520;
+                                          MediaQuery.of(context).size.width <
+                                          520;
                                       final messageButton = OutlinedButton.icon(
                                         icon: const Icon(Icons.message),
                                         label: const Text('Message'),
@@ -1446,10 +1845,14 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                       final profileButton = OutlinedButton.icon(
                                         icon: const Icon(Icons.visibility),
                                         label: const Text('View Profile'),
-                                        onPressed: () => _showTeacherProfileDialog(teacher),
+                                        onPressed: () =>
+                                            _showTeacherProfileDialog(teacher),
                                       );
                                       final leaveButton = TextButton.icon(
-                                        icon: const Icon(Icons.logout, color: Colors.red),
+                                        icon: const Icon(
+                                          Icons.logout,
+                                          color: Colors.red,
+                                        ),
                                         label: const Text(
                                           'Leave Teacher',
                                           style: TextStyle(color: Colors.red),
@@ -1457,10 +1860,16 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                                         onPressed: () async {
                                           final teacherId = teacher['user_id'];
                                           final studentId = child['user_id'];
-                                          if (teacherId is int && studentId is int) {
-                                            await _removeTeacherFromStudent(studentId, teacherId);
+                                          if (teacherId is int &&
+                                              studentId is int) {
+                                            await _removeTeacherFromStudent(
+                                              studentId,
+                                              teacherId,
+                                            );
                                             final updatedTeachers =
-                                                await _fetchStudentTeachers(studentId);
+                                                await _fetchStudentTeachers(
+                                                  studentId,
+                                                );
                                             if (context.mounted) {
                                               setState(() {
                                                 childTeachers = updatedTeachers;

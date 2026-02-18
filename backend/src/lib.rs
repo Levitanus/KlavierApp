@@ -1,29 +1,30 @@
-use log::{debug};
-pub mod users;
+use log::debug;
 pub mod admin;
-pub mod email;
-pub mod password_reset;
-pub mod notifications;
-pub mod notification_builders;
-pub mod roles;
-pub mod registration_tokens;
-pub mod hometasks;
-pub mod models;
-pub mod storage;
-pub mod feeds;
-pub mod media;
 pub mod chats;
-pub mod websockets;
+pub mod email;
+pub mod feeds;
+pub mod groups;
+pub mod hometasks;
+pub mod media;
+pub mod models;
+pub mod notification_builders;
+pub mod notifications;
+pub mod password_reset;
 pub mod push;
+pub mod registration_tokens;
+pub mod roles;
+pub mod storage;
+pub mod users;
+pub mod websockets;
 
-use actix_web::{middleware, web, App};
-use actix_files as fs;
 use actix_cors::Cors;
+use actix_files as fs;
+use actix_web::{middleware, web, App};
 use actix_web_actors::ws;
 use serde::Deserialize;
 use sqlx::postgres::PgPool;
-use std::sync::Arc;
 use std::path::PathBuf;
+use std::sync::Arc;
 use storage::StorageProvider;
 
 #[derive(Clone)]
@@ -69,20 +70,16 @@ async fn ws_endpoint(
         // Verify token and get user_id
         use jsonwebtoken::{decode, DecodingKey, Validation};
         let decoding_key = DecodingKey::from_secret(app_state.jwt_secret.as_bytes());
-        
-        if let Ok(token_data) = decode::<users::Claims>(
-            &token,
-            &decoding_key,
-            &Validation::default(),
-        ) {
+
+        if let Ok(token_data) =
+            decode::<users::Claims>(&token, &decoding_key, &Validation::default())
+        {
             // Query database to get user_id from username
             let username = &token_data.claims.sub;
-            match sqlx::query_scalar::<_, i32>(
-                "SELECT id FROM users WHERE username = $1"
-            )
-            .bind(username)
-            .fetch_optional(&app_state.db)
-            .await
+            match sqlx::query_scalar::<_, i32>("SELECT id FROM users WHERE username = $1")
+                .bind(username)
+                .fetch_optional(&app_state.db)
+                .await
             {
                 Ok(Some(user_id)) => {
                     debug!("[ws] authenticated user {}", user_id);
@@ -90,7 +87,7 @@ async fn ws_endpoint(
                         user_id,
                         server: app_state.ws_server.clone(),
                     };
-                    
+
                     return ws::start(ws_session, &req, stream);
                 }
                 _ => {
@@ -100,12 +97,16 @@ async fn ws_endpoint(
             }
         }
     }
-    
+
     debug!("[ws] missing or invalid token");
-    Err(actix_web::error::ErrorUnauthorized("Missing or invalid token"))
+    Err(actix_web::error::ErrorUnauthorized(
+        "Missing or invalid token",
+    ))
 }
 
-pub fn create_app(app_state: web::Data<AppState>) -> App<
+pub fn create_app(
+    app_state: web::Data<AppState>,
+) -> App<
     impl actix_web::dev::ServiceFactory<
         actix_web::dev::ServiceRequest,
         Config = (),
@@ -116,9 +117,9 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
 > {
     let profile_images_dir = app_state.profile_images_dir.clone();
     let media_dir = app_state.media_dir.clone();
-    
+
     debug!("=== Creating App ===");
-    
+
     App::new()
         .app_data(app_state)
         .app_data(web::PayloadConfig::new(10 * 1024 * 1024)) // 10MB max payload
@@ -127,7 +128,7 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
                 .allow_any_origin()
                 .allow_any_method()
                 .allow_any_header()
-                .max_age(3600)
+                .max_age(3600),
         )
         .wrap(middleware::Logger::new("%a %{User-Agent}i %r %s %b %Dms"))
         .configure(users::configure)
@@ -140,6 +141,7 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
         .configure(media::configure)
         .configure(chats::configure)
         .configure(push::configure)
+        .configure(groups::configure)
         .route("/ws", web::get().to(ws_endpoint))
         .service(fs::Files::new("/uploads/profile_images", profile_images_dir).show_files_listing())
         .service(fs::Files::new("/uploads/media", media_dir).show_files_listing())
@@ -147,11 +149,9 @@ pub fn create_app(app_state: web::Data<AppState>) -> App<
 
 pub async fn init_db(database_url: &str) -> Result<PgPool, sqlx::Error> {
     let pool = PgPool::connect(database_url).await?;
-    
+
     // Run migrations
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await?;
-    
+    sqlx::migrate!("./migrations").run(&pool).await?;
+
     Ok(pool)
 }

@@ -290,8 +290,11 @@
   "dashboardNoTeacherFeeds": "Noch keine Lehrer-Feeds.",
   "dashboardSchoolFeed": "Schul-Feed",
   "dashboardNoSchoolFeed": "Noch kein Schul-Feed.",
+  "dashboardGroupFeeds": "Gruppen-Feeds",
+  "dashboardNoGroupFeeds": "Noch keine Gruppen-Feeds.",
   "dashboardOwnerSchool": "Schule",
   "dashboardOwnerTeacher": "Lehrer",
+  "dashboardOwnerGroup": "Gruppe",
   "dashboardStudentLabel": "Schueler:",
   "dashboardChildLabel": "Kind:",
   "dashboardNoActiveHometasks": "Keine aktiven Hausaufgaben.",
@@ -413,6 +416,46 @@
   "hometasksActive": "Aktiv",
   "hometasksArchive": "Archiv",
   "hometasksAssign": "Hausaufgabe zuweisen",
+  "hometasksAssignToGroup": "An Gruppe zuweisen",
+  "hometasksSelectGroupTitle": "Gruppe auswaehlen",
+  "hometasksAssignTitleGroup": "Hausaufgabe an Gruppe {groupName} zuweisen",
+  "hometasksApplyGroupChangesTitle": "Gruppenaenderungen anwenden",
+  "hometasksApplyGroupChangesMessage": "Diese Aenderungen auf alle Schueler dieser Gruppen-Hausaufgabe anwenden?",
+  "hometasksApplyOnlyThisStudent": "Nur dieser Schueler",
+  "hometasksApplyToGroup": "Auf Gruppe anwenden",
+  "hometasksArchiveGroupTitle": "Gruppen-Hausaufgabe archivieren",
+  "hometasksArchiveGroupMessage": "Nur diese Schueleraufgabe archivieren oder alle Aufgaben in dieser Gruppenzuweisung?",
+  "hometasksArchiveForGroup": "Fuer Gruppe archivieren",
+  "hometasksReopenGroupTitle": "Gruppen-Hausaufgabe wiedereroeffnen",
+  "hometasksReopenGroupMessage": "Nur diese Schueleraufgabe wiedereroeffnen oder alle Aufgaben in dieser Gruppenzuweisung?",
+  "hometasksReopenForGroup": "Fuer Gruppe wiedereroeffnen",
+  "feedsGroupFeeds": "Gruppen-Feeds",
+  "feedsOwnerGroup": "Gruppe",
+  "profileCreateGroup": "Gruppe erstellen",
+  "profileGroupsTitle": "Gruppen",
+  "profileNoGroupsYet": "Noch keine Gruppen",
+  "profileStudentsLabel": "Schueler",
+  "profileStatusArchived": "Archiviert",
+  "profileStatusActive": "Aktiv",
+  "profileEditMembers": "Mitglieder bearbeiten",
+  "profileArchiveGroup": "Archivieren",
+  "profileUnarchiveGroup": "Wiederherstellen",
+  "profileDeleteGroupTitle": "Gruppe loeschen",
+  "profileDeleteGroupMessage": "Diese Gruppe dauerhaft loeschen? Feed- und Gruppenverlauf werden entfernt.",
+  "profileAddStudentsFirstToCreateGroup": "Fuegen Sie zuerst Schueler hinzu, um eine Gruppe zu erstellen",
+  "profileGroupNameLabel": "Gruppenname",
+  "profileFilterStudentsLabel": "Schueler filtern",
+  "profileNoStudentsFound": "Keine Schueler gefunden",
+  "profileEnterGroupNameAndStudents": "Gruppennamen eingeben und Schueler auswaehlen",
+  "profileCreateAction": "Erstellen",
+  "profileEditGroupTitle": "Gruppe bearbeiten",
+  "profileArchivedGroupLabel": "Gruppe archiviert",
+  "profileGroupCreatedSuccess": "Gruppe erfolgreich erstellt",
+  "profileGroupUpdatedSuccess": "Gruppe erfolgreich aktualisiert",
+  "profileGroupDeletedSuccess": "Gruppe erfolgreich geloescht",
+  "profileGroupCreateFailed": "Gruppe konnte nicht erstellt werden",
+  "profileGroupUpdateFailed": "Gruppe konnte nicht aktualisiert werden",
+  "profileGroupDeleteFailed": "Gruppe konnte nicht geloescht werden",
   "@commonSavedToPath": {
     "placeholders": {
       "path": {}
@@ -563,6 +606,11 @@
   "@hometasksAssignTitle": {
     "placeholders": {
       "studentName": {}
+    }
+  },
+  "@hometasksAssignTitleGroup": {
+    "placeholders": {
+      "groupName": {}
     }
   },
   "@hometasksItemLabel": {

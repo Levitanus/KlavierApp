@@ -75,6 +75,8 @@ abstract class _ProfileScreenStateBase extends State<ProfileScreen> {
   String? _teacherStatus;
   bool _adminRoleSelected = false;
   List<Map<String, dynamic>> _teacherStudents = [];
+  List<Map<String, dynamic>> _teacherGroups = [];
+  bool _showArchivedGroups = false;
   List<Map<String, dynamic>> _studentTeachers = [];
   int _teacherStudentsCurrentPage = 1;
   int _teacherStudentsPageSize = 30;
@@ -95,6 +97,14 @@ abstract class _ProfileScreenStateBase extends State<ProfileScreen> {
   Future<void> _pickImage();
   Future<void> _removeImage();
   Future<void> _addStudentsToTeacher(List<int> studentIds);
+  Future<void> _createTeacherGroup(String name, List<int> studentIds);
+  Future<void> _updateTeacherGroup({
+    required int groupId,
+    String? name,
+    List<int>? studentIds,
+    bool? archived,
+  });
+  Future<void> _deleteTeacherGroup(int groupId);
   Future<void> _removeTeacherFromStudent(int studentId, int teacherId);
   Future<void> _updateAdminRole();
   Future<void> _toggleRoleArchive(String role);
@@ -219,6 +229,11 @@ class _ProfileScreenState extends _ProfileScreenStateBase
             teacherStudentsEndIndex,
           )
         : <Map<String, dynamic>>[];
+    final visibleTeacherGroups = _teacherGroups.where((group) {
+      final status = (group['status']?.toString() ?? 'active').toLowerCase();
+      final isArchived = status == 'archived';
+      return _showArchivedGroups ? isArchived : !isArchived;
+    }).toList();
 
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -681,6 +696,13 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                   ),
                                   onPressed: _showAddStudentsToTeacherDialog,
                                 ),
+                                OutlinedButton.icon(
+                                  icon: const Icon(Icons.groups_2_outlined),
+                                  label: Text(
+                                    l10n?.profileCreateGroup ?? 'Create Group',
+                                  ),
+                                  onPressed: _showCreateGroupDialog,
+                                ),
                               ],
                             );
                           }
@@ -700,6 +722,14 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                                       'Add Student',
                                 ),
                                 onPressed: _showAddStudentsToTeacherDialog,
+                              ),
+                              const SizedBox(width: 8),
+                              OutlinedButton.icon(
+                                icon: const Icon(Icons.groups_2_outlined),
+                                label: Text(
+                                  l10n?.profileCreateGroup ?? 'Create Group',
+                                ),
+                                onPressed: _showCreateGroupDialog,
                               ),
                             ],
                           );
@@ -1041,6 +1071,156 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                           },
                         ),
                       ],
+                      const SizedBox(height: 12),
+                      Text(
+                        l10n?.profileGroupsTitle ?? 'Groups',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          ChoiceChip(
+                            label: Text(l10n?.hometasksActive ?? 'Active'),
+                            selected: !_showArchivedGroups,
+                            onSelected: (selected) {
+                              if (!selected) return;
+                              setState(() {
+                                _showArchivedGroups = false;
+                              });
+                            },
+                          ),
+                          const SizedBox(width: 8),
+                          ChoiceChip(
+                            label: Text(l10n?.hometasksArchive ?? 'Archive'),
+                            selected: _showArchivedGroups,
+                            onSelected: (selected) {
+                              if (!selected) return;
+                              setState(() {
+                                _showArchivedGroups = true;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      if (visibleTeacherGroups.isEmpty)
+                        Text(
+                          l10n?.profileNoGroupsYet ?? 'No groups yet',
+                          style: TextStyle(color: Colors.grey[600]),
+                        )
+                      else
+                        ...visibleTeacherGroups.map((group) {
+                          final groupId = group['id'] as int?;
+                          final groupName =
+                              group['name']?.toString() ?? 'Group';
+                          final status =
+                              (group['status']?.toString() ?? 'active')
+                                  .toLowerCase();
+                          final isArchived = status == 'archived';
+                          final members =
+                              (group['students'] as List<dynamic>? ?? [])
+                                  .whereType<Map<String, dynamic>>()
+                                  .toList();
+                          return Card(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            child: ExpansionTile(
+                              title: Text(groupName),
+                              subtitle: Text(
+                                '${members.length} ${l10n?.profileStudentsLabel ?? 'students'} • ${isArchived ? (l10n?.profileStatusArchived ?? 'Archived') : (l10n?.profileStatusActive ?? 'Active')}',
+                              ),
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    12,
+                                    0,
+                                    12,
+                                    8,
+                                  ),
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      OutlinedButton.icon(
+                                        onPressed: () =>
+                                            _showEditGroupDialog(group),
+                                        icon: const Icon(Icons.edit),
+                                        label: Text(
+                                          l10n?.profileEditMembers ??
+                                              'Edit members',
+                                        ),
+                                      ),
+                                      OutlinedButton.icon(
+                                        onPressed: groupId == null
+                                            ? null
+                                            : () => _updateTeacherGroup(
+                                                groupId: groupId,
+                                                archived: !isArchived,
+                                              ),
+                                        icon: Icon(
+                                          isArchived
+                                              ? Icons.unarchive_outlined
+                                              : Icons.archive_outlined,
+                                        ),
+                                        label: Text(
+                                          isArchived
+                                              ? (l10n?.profileUnarchiveGroup ??
+                                                    'Unarchive')
+                                              : (l10n?.profileArchiveGroup ??
+                                                    'Archive'),
+                                        ),
+                                      ),
+                                      OutlinedButton.icon(
+                                        onPressed: groupId == null
+                                            ? null
+                                            : () async {
+                                                final confirmDelete =
+                                                    await _showLockedConfirmationDialog(
+                                                      title:
+                                                          l10n?.profileDeleteGroupTitle ??
+                                                          'Delete group',
+                                                      content:
+                                                          l10n?.profileDeleteGroupMessage ??
+                                                          'Delete this group permanently? Feed and group history will be removed.',
+                                                      confirmLabel:
+                                                          l10n?.commonDelete ??
+                                                          'Delete',
+                                                    );
+                                                if (!confirmDelete ||
+                                                    !mounted) {
+                                                  return;
+                                                }
+                                                await _deleteTeacherGroup(
+                                                  groupId,
+                                                );
+                                              },
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: Colors.red,
+                                        ),
+                                        icon: const Icon(Icons.delete_outline),
+                                        label: Text(
+                                          l10n?.commonDelete ?? 'Delete',
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                ...members.map(
+                                  (member) => ListTile(
+                                    dense: true,
+                                    title: Text(
+                                      member['full_name']?.toString() ??
+                                          member['username']?.toString() ??
+                                          'Unknown',
+                                    ),
+                                    subtitle: Text(
+                                      '@${member['username'] ?? ''}',
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
                       const SizedBox(height: 16),
                       OutlinedButton.icon(
                         onPressed: _generateStudentRegistrationLinkForTeacher,
