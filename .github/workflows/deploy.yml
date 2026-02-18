@@ -99,10 +99,18 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           port: ${{ secrets.SSH_PORT || 22 }}
+          command_timeout: 30m
+          debug: true
           script: |
-            set -e
+            set -euxo pipefail
             cd ${{ secrets.DEPLOY_PATH }}
-            git checkout -- deploy/Caddyfile
-            git fetch --all
-            git pull --ff-only
-            docker compose -f deploy/docker-compose.prod.yml up -d --build
+            echo "PWD=$(pwd)"
+            echo "Before deploy commit: $(git rev-parse --short HEAD)"
+            git status --porcelain || true
+            git reset --hard
+            git clean -fd -e .env -e deploy/.env
+            git fetch origin master
+            git reset --hard origin/master
+            echo "After deploy commit: $(git rev-parse --short HEAD)"
+            docker compose -f deploy/docker-compose.prod.yml up -d --build --remove-orphans
+            docker compose -f deploy/docker-compose.prod.yml ps
