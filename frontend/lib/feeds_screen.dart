@@ -18,16 +18,13 @@ import 'widgets/quill_editor_composer.dart';
 import 'widgets/feed_preview_card.dart';
 import 'widgets/floating_audio_player.dart';
 import 'l10n/app_localizations.dart';
+import 'widgets/app_body_container.dart';
 
 class FeedsScreen extends StatefulWidget {
   final int? initialFeedId;
   final int? initialPostId;
 
-  const FeedsScreen({
-    super.key,
-    this.initialFeedId,
-    this.initialPostId,
-  });
+  const FeedsScreen({super.key, this.initialFeedId, this.initialPostId});
 
   @override
   State<FeedsScreen> createState() => _FeedsScreenState();
@@ -72,7 +69,9 @@ class _FeedsScreenState extends State<FeedsScreen> {
             .where((feed) => feed.ownerType.toLowerCase() == 'teacher')
             .toList();
 
-        if (!_openedInitialFeed && widget.initialFeedId != null && feeds.isNotEmpty) {
+        if (!_openedInitialFeed &&
+            widget.initialFeedId != null &&
+            feeds.isNotEmpty) {
           final target = feeds.firstWhere(
             (feed) => feed.id == widget.initialFeedId,
             orElse: () => feeds.first,
@@ -111,11 +110,9 @@ class _FeedsScreenState extends State<FeedsScreen> {
             ),
             if (isLoading) const LinearProgressIndicator(),
             if (!isLoading && feeds.isEmpty)
-                Padding(
+              Padding(
                 padding: EdgeInsets.symmetric(vertical: 24),
-                  child: Text(
-                    l10n?.feedsNone ?? 'No feeds available',
-                  ),
+                child: Text(l10n?.feedsNone ?? 'No feeds available'),
               ),
             if (schoolFeeds.isNotEmpty) ...[
               const SizedBox(height: 16),
@@ -172,11 +169,7 @@ class FeedDetailScreen extends StatefulWidget {
   final Feed feed;
   final int? initialPostId;
 
-  const FeedDetailScreen({
-    super.key,
-    required this.feed,
-    this.initialPostId,
-  });
+  const FeedDetailScreen({super.key, required this.feed, this.initialPostId});
 
   @override
   State<FeedDetailScreen> createState() => _FeedDetailScreenState();
@@ -208,10 +201,7 @@ class _FeedDetailScreenState extends State<FeedDetailScreen> {
 
       await Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => FeedPostDetailScreen(
-            post: post,
-            feed: widget.feed,
-          ),
+          builder: (_) => FeedPostDetailScreen(post: post, feed: widget.feed),
         ),
       );
       if (mounted) {
@@ -258,9 +248,7 @@ class _FeedDetailScreenState extends State<FeedDetailScreen> {
 
   Future<void> _openComposer(BuildContext context) async {
     final result = await Navigator.of(context).push<bool>(
-      MaterialPageRoute(
-        builder: (_) => FeedPostComposer(feed: widget.feed),
-      ),
+      MaterialPageRoute(builder: (_) => FeedPostComposer(feed: widget.feed)),
     );
 
     if (result == true && mounted) {
@@ -323,17 +311,14 @@ class _FeedDetailScreenState extends State<FeedDetailScreen> {
                 itemBuilder: (context) => [
                   PopupMenuItem(
                     value: 'mark_all_read',
-                    child: Text(
-                      l10n?.feedsMarkAllRead ?? 'Mark all as read',
-                    ),
+                    child: Text(l10n?.feedsMarkAllRead ?? 'Mark all as read'),
                   ),
                 ],
               ),
             ],
           ),
-          body: FeedTimeline(
-            key: _timelineKey,
-            feed: widget.feed,
+          body: AppBodyContainer(
+            child: FeedTimeline(key: _timelineKey, feed: widget.feed),
           ),
         );
       },
@@ -344,10 +329,7 @@ class _FeedDetailScreenState extends State<FeedDetailScreen> {
 class FeedTimeline extends StatefulWidget {
   final Feed feed;
 
-  const FeedTimeline({
-    super.key,
-    required this.feed,
-  });
+  const FeedTimeline({super.key, required this.feed});
 
   @override
   State<FeedTimeline> createState() => _FeedTimelineState();
@@ -451,14 +433,14 @@ class _FeedTimelineState extends State<FeedTimeline> {
             future: _recentPosts,
             builder: (context, snapshot) {
               final posts = snapshot.data ?? [];
-              final regularPosts = posts.where((post) => !post.isImportant).toList();
+              final regularPosts = posts
+                  .where((post) => !post.isImportant)
+                  .toList();
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
               if (regularPosts.isEmpty) {
-                return Text(
-                  l10n?.feedsNoPosts ?? 'No posts yet.',
-                );
+                return Text(l10n?.feedsNoPosts ?? 'No posts yet.');
               }
               return Column(
                 children: regularPosts
@@ -525,9 +507,9 @@ class FeedPostCard extends StatelessWidget {
                 style: post.isRead
                     ? Theme.of(context).textTheme.titleMedium
                     : Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
+                        fontWeight: FontWeight.w700,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
               ),
               const SizedBox(height: 8),
             ],
@@ -678,11 +660,10 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
 
   Future<void> _deletePost() async {
     final auth = context.watch<AuthService>();
-    
+
     // Check permissions: admin, feed owner, or post author
-    final canDelete = auth.isAdmin ||
-              auth.userId == _post.authorUserId;
-    
+    final canDelete = auth.isAdmin || auth.userId == _post.authorUserId;
+
     if (!canDelete) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -766,7 +747,9 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   ) {
     if (attachments.isEmpty) return [];
     final body = jsonEncode(content);
-    return attachments.where((attachment) => !body.contains(attachment.url)).toList();
+    return attachments
+        .where((attachment) => !body.contains(attachment.url))
+        .toList();
   }
 
   Widget _buildAttachmentWidget(ChatAttachment attachment) {
@@ -794,7 +777,8 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
       case 'voice':
         content = ChatAudioPlayer(
           url: url,
-          label: AppLocalizations.of(context)?.commonVoiceMessage ??
+          label:
+              AppLocalizations.of(context)?.commonVoiceMessage ??
               'Voice message',
         );
         break;
@@ -815,9 +799,9 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
         break;
       default:
         content = Text(
-          AppLocalizations.of(context)?.feedsUnsupportedAttachment(
-                attachment.attachmentType,
-              ) ??
+          AppLocalizations.of(
+                context,
+              )?.feedsUnsupportedAttachment(attachment.attachmentType) ??
               'Unsupported attachment: ${attachment.attachmentType}',
         );
     }
@@ -835,12 +819,10 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     return Stack(
       alignment: Alignment.topRight,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(right: 32),
-          child: child,
-        ),
+        Padding(padding: const EdgeInsets.only(right: 32), child: child),
         PopupMenuButton<String>(
-          tooltip: AppLocalizations.of(context)?.feedsAttachmentActions ??
+          tooltip:
+              AppLocalizations.of(context)?.feedsAttachmentActions ??
               'Attachment actions',
           onSelected: (value) {
             if (value == 'download') {
@@ -874,19 +856,19 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
 
     final message = result.success
         ? (result.filePath != null
-        ? (AppLocalizations.of(context)?.commonSavedToPath(
-            result.filePath!,
-          ) ??
-          'Saved to ${result.filePath}')
-        : (AppLocalizations.of(context)?.commonDownloadStarted ??
-          'Download started'))
-      : (result.errorMessage ??
-        AppLocalizations.of(context)?.commonDownloadFailed ??
-        'Download failed');
+              ? (AppLocalizations.of(
+                      context,
+                    )?.commonSavedToPath(result.filePath!) ??
+                    'Saved to ${result.filePath}')
+              : (AppLocalizations.of(context)?.commonDownloadStarted ??
+                    'Download started'))
+        : (result.errorMessage ??
+              AppLocalizations.of(context)?.commonDownloadFailed ??
+              'Download failed');
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String? _fileNameFromUrl(String url) {
@@ -928,20 +910,20 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-            quill.QuillEditor.basic(
-              controller: controller,
-              config: quill.QuillEditorConfig(
-                showCursor: false,
-                embedBuilders: [
-                  ImageEmbedBuilder(),
-                  VideoEmbedBuilder(),
-                  AudioEmbedBuilder(),
-                  VoiceEmbedBuilder(),
-                  FileEmbedBuilder(),
-                ],
-                unknownEmbedBuilder: UnknownEmbedBuilder(),
+              quill.QuillEditor.basic(
+                controller: controller,
+                config: quill.QuillEditorConfig(
+                  showCursor: false,
+                  embedBuilders: [
+                    ImageEmbedBuilder(),
+                    VideoEmbedBuilder(),
+                    AudioEmbedBuilder(),
+                    VoiceEmbedBuilder(),
+                    FileEmbedBuilder(),
+                  ],
+                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+                ),
               ),
-            ),
               if (commentAttachments.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 for (final attachment in commentAttachments)
@@ -952,11 +934,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
               ],
               const SizedBox(height: 8),
               Text(
-                _formatTimestamp(
-                  context,
-                  comment.createdAt,
-                  comment.updatedAt,
-                ),
+                _formatTimestamp(context, comment.createdAt, comment.updatedAt),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               Align(
@@ -967,22 +945,16 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                     if ((auth.userId ?? -1) == comment.authorUserId)
                       TextButton(
                         onPressed: () => _openCommentEditor(comment),
-                        child: Text(
-                          l10n?.commonEdit ?? 'Edit',
-                        ),
+                        child: Text(l10n?.commonEdit ?? 'Edit'),
                       ),
                     if ((auth.userId ?? -1) == comment.authorUserId)
                       TextButton(
                         onPressed: () => _deleteComment(comment),
-                        child: Text(
-                          l10n?.commonDelete ?? 'Delete',
-                        ),
+                        child: Text(l10n?.commonDelete ?? 'Delete'),
                       ),
                     TextButton(
                       onPressed: () => _openCommentComposer(comment.id),
-                      child: Text(
-                        l10n?.commonReply ?? 'Reply',
-                      ),
+                      child: Text(l10n?.commonReply ?? 'Reply'),
                     ),
                   ],
                 ),
@@ -1046,10 +1018,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   Future<void> _openCommentEditor(FeedComment comment) async {
     final updated = await showDialog<bool>(
       context: context,
-      builder: (_) => FeedCommentEditor(
-        postId: _post.id,
-        comment: comment,
-      ),
+      builder: (_) => FeedCommentEditor(postId: _post.id, comment: comment),
     );
 
     if (updated == true) {
@@ -1121,12 +1090,8 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     // For personal/teacher feeds, admins or the post author can edit/delete
     final isSchoolFeed = widget.feed.ownerType.toLowerCase() == 'school';
     final isAuthor = (auth.userId ?? -1) == _post.authorUserId;
-    final canEdit = isSchoolFeed
-      ? (auth.isAdmin || isAuthor)
-      : isAuthor;
-    final canDelete = isSchoolFeed
-      ? (auth.isAdmin || isAuthor)
-      : isAuthor;
+    final canEdit = isSchoolFeed ? (auth.isAdmin || isAuthor) : isAuthor;
+    final canDelete = isSchoolFeed ? (auth.isAdmin || isAuthor) : isAuthor;
 
     final listBottomPadding = _post.allowComments ? 96.0 : 16.0;
 
@@ -1137,10 +1102,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           title: Text(AppLocalizations.of(context)?.feedsPostTitle ?? 'Post'),
           actions: [
             if (canEdit)
-              IconButton(
-                icon: const Icon(Icons.edit),
-                onPressed: _editPost,
-              ),
+              IconButton(icon: const Icon(Icons.edit), onPressed: _editPost),
             if (canDelete)
               IconButton(
                 icon: const Icon(Icons.delete),
@@ -1148,98 +1110,114 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
               ),
           ],
         ),
-        body: _isDeleting
-            ? const Center(child: CircularProgressIndicator())
+        body: AppBodyContainer(
+          child: _isDeleting
+              ? const Center(child: CircularProgressIndicator())
               : Column(
-                children: [
-                  const FloatingAudioPlayer(),
-                  Expanded(
-                    child: ListView(
-                      padding: EdgeInsets.fromLTRB(16, 16, 16, listBottomPadding),
-                      children: [
-                        if (_post.title != null && _post.title!.isNotEmpty) ...[
+                  children: [
+                    const FloatingAudioPlayer(),
+                    Expanded(
+                      child: ListView(
+                        padding: EdgeInsets.fromLTRB(
+                          16,
+                          16,
+                          16,
+                          listBottomPadding,
+                        ),
+                        children: [
+                          if (_post.title != null &&
+                              _post.title!.isNotEmpty) ...[
+                            Text(
+                              _post.title!,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                          quill.QuillEditor.basic(
+                            controller: postController,
+                            config: quill.QuillEditorConfig(
+                              showCursor: false,
+                              embedBuilders: [
+                                ImageEmbedBuilder(),
+                                VideoEmbedBuilder(),
+                                AudioEmbedBuilder(),
+                                VoiceEmbedBuilder(),
+                                FileEmbedBuilder(),
+                              ],
+                              unknownEmbedBuilder: UnknownEmbedBuilder(),
+                            ),
+                          ),
+                          if (postAttachments.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            for (final attachment in postAttachments)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 6),
+                                child: _buildAttachmentWidget(attachment),
+                              ),
+                          ],
+                          const SizedBox(height: 8),
                           Text(
-                            _post.title!,
-                            style: Theme.of(context).textTheme.titleLarge,
+                            _formatTimestamp(
+                              context,
+                              _post.createdAt,
+                              _post.updatedAt,
+                            ),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 16),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: _loadingSubscription
+                                  ? null
+                                  : _toggleSubscription,
+                              icon: Icon(
+                                _isSubscribed
+                                    ? Icons.notifications_active
+                                    : Icons.notifications_none,
+                              ),
+                              label: Text(
+                                _isSubscribed
+                                    ? (AppLocalizations.of(
+                                            context,
+                                          )?.feedsUnsubscribeComments ??
+                                          'Unsubscribe from comments')
+                                    : (AppLocalizations.of(
+                                            context,
+                                          )?.feedsSubscribeComments ??
+                                          'Subscribe to comments'),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            AppLocalizations.of(context)?.feedsComments ??
+                                'Comments',
+                            style: Theme.of(context).textTheme.titleMedium,
                           ),
                           const SizedBox(height: 12),
+                          if (_loading)
+                            const Center(child: CircularProgressIndicator())
+                          else if (_comments.isEmpty)
+                            Text(
+                              AppLocalizations.of(context)?.feedsNoComments ??
+                                  'No comments yet.',
+                            )
+                          else
+                            ..._buildCommentWidgets(tree, null, 0),
                         ],
-                        quill.QuillEditor.basic(
-                          controller: postController,
-                          config: quill.QuillEditorConfig(
-                            showCursor: false,
-                            embedBuilders: [
-                              ImageEmbedBuilder(),
-                              VideoEmbedBuilder(),
-                              AudioEmbedBuilder(),
-                              VoiceEmbedBuilder(),
-                              FileEmbedBuilder(),
-                            ],
-                            unknownEmbedBuilder: UnknownEmbedBuilder(),
-                          ),
-                        ),
-                        if (postAttachments.isNotEmpty) ...[
-                          const SizedBox(height: 8),
-                          for (final attachment in postAttachments)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 6),
-                              child: _buildAttachmentWidget(attachment),
-                            ),
-                        ],
-                        const SizedBox(height: 8),
-                        Text(
-                          _formatTimestamp(
-                            context,
-                            _post.createdAt,
-                            _post.updatedAt,
-                          ),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        const SizedBox(height: 16),
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton.icon(
-                    onPressed: _loadingSubscription ? null : _toggleSubscription,
-                    icon: Icon(
-                      _isSubscribed
-                          ? Icons.notifications_active
-                          : Icons.notifications_none,
+                      ),
                     ),
-                    label: Text(
-                      _isSubscribed
-                          ? (AppLocalizations.of(context)?.feedsUnsubscribeComments ??
-                              'Unsubscribe from comments')
-                          : (AppLocalizations.of(context)?.feedsSubscribeComments ??
-                              'Subscribe to comments'),
-                    ),
-                  ),
+                  ],
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  AppLocalizations.of(context)?.feedsComments ?? 'Comments',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 12),
-                if (_loading)
-                  const Center(child: CircularProgressIndicator())
-                else if (_comments.isEmpty)
-                  Text(
-                    AppLocalizations.of(context)?.feedsNoComments ??
-                        'No comments yet.',
-                  )
-                        else
-                          ..._buildCommentWidgets(tree, null, 0),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+        ),
         floatingActionButton: _post.allowComments
             ? FloatingActionButton.extended(
                 onPressed: () => _openCommentComposer(null),
                 icon: const Icon(Icons.add_comment),
                 label: Text(
-                  AppLocalizations.of(context)?.feedsAddComment ?? 'Add Comment',
+                  AppLocalizations.of(context)?.feedsAddComment ??
+                      'Add Comment',
                 ),
               )
             : null,
@@ -1291,7 +1269,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
 
   void _insertEmbed(String type, String url) {
     final selection = _controller.selection;
-    final index = selection.baseOffset < 0 ? _controller.document.length : selection.baseOffset;
+    final index = selection.baseOffset < 0
+        ? _controller.document.length
+        : selection.baseOffset;
 
     quill.BlockEmbed embed;
     switch (type) {
@@ -1304,14 +1284,10 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
       case 'audio':
       case 'voice':
       case 'file':
-        embed = quill.BlockEmbed.custom(
-          quill.CustomBlockEmbed(type, url),
-        );
+        embed = quill.BlockEmbed.custom(quill.CustomBlockEmbed(type, url));
         break;
       default:
-        embed = quill.BlockEmbed.custom(
-          quill.CustomBlockEmbed('file', url),
-        );
+        embed = quill.BlockEmbed.custom(quill.CustomBlockEmbed('file', url));
     }
 
     _controller.document.insert(index, embed);
@@ -1321,9 +1297,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     );
   }
 
-  Future<void> _pickEditorAttachment({
-    required String attachmentType,
-  }) async {
+  Future<void> _pickEditorAttachment({required String attachmentType}) async {
     if (_isUploadingAttachment) return;
 
     final allowed = <String, List<String>>{
@@ -1336,7 +1310,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     final type = attachmentType == 'file' ? FileType.any : FileType.custom;
     final result = await FilePicker.platform.pickFiles(
       type: type,
-      allowedExtensions: type == FileType.custom ? allowed[attachmentType] : null,
+      allowedExtensions: type == FileType.custom
+          ? allowed[attachmentType]
+          : null,
       withData: true,
     );
 
@@ -1420,9 +1396,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
               ),
               ListTile(
                 leading: const Icon(Icons.insert_drive_file),
-                title: Text(
-                  AppLocalizations.of(context)?.commonFile ?? 'File',
-                ),
+                title: Text(AppLocalizations.of(context)?.commonFile ?? 'File'),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickEditorAttachment(attachmentType: 'file');
@@ -1446,12 +1420,10 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     });
   }
 
-  Widget _fontFamilyIconButton(
-    dynamic options,
-    dynamic extraOptions,
-  ) {
+  Widget _fontFamilyIconButton(dynamic options, dynamic extraOptions) {
     final typedOptions = options as quill.QuillToolbarFontFamilyButtonOptions;
-    final typedExtra = extraOptions as quill.QuillToolbarFontFamilyButtonExtraOptions;
+    final typedExtra =
+        extraOptions as quill.QuillToolbarFontFamilyButtonExtraOptions;
     return quill.QuillToolbarIconButton(
       tooltip: typedOptions.tooltip,
       isSelected: false,
@@ -1461,12 +1433,10 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     );
   }
 
-  Widget _fontSizeIconButton(
-    dynamic options,
-    dynamic extraOptions,
-  ) {
+  Widget _fontSizeIconButton(dynamic options, dynamic extraOptions) {
     final typedOptions = options as quill.QuillToolbarFontSizeButtonOptions;
-    final typedExtra = extraOptions as quill.QuillToolbarFontSizeButtonExtraOptions;
+    final typedExtra =
+        extraOptions as quill.QuillToolbarFontSizeButtonExtraOptions;
     return quill.QuillToolbarIconButton(
       tooltip: typedOptions.tooltip,
       isSelected: false,
@@ -1476,15 +1446,15 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     );
   }
 
-  Widget _headerStyleIconButton(
-    dynamic options,
-    dynamic extraOptions,
-  ) {
-    final typedOptions = options as quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions;
+  Widget _headerStyleIconButton(dynamic options, dynamic extraOptions) {
+    final typedOptions =
+        options as quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions;
     final typedExtra =
-        extraOptions as quill.QuillToolbarSelectHeaderStyleDropdownButtonExtraOptions;
+        extraOptions
+            as quill.QuillToolbarSelectHeaderStyleDropdownButtonExtraOptions;
     return quill.QuillToolbarIconButton(
-      tooltip: typedOptions.tooltip ??
+      tooltip:
+          typedOptions.tooltip ??
           (AppLocalizations.of(context)?.feedsParagraphType ??
               'Paragraph type'),
       isSelected: false,
@@ -1514,9 +1484,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
         ),
         selectHeaderStyleDropdownButton:
             quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions(
-          childBuilder: _headerStyleIconButton,
-          tooltip: l10n?.feedsParagraphType ?? 'Paragraph type',
-        ),
+              childBuilder: _headerStyleIconButton,
+              tooltip: l10n?.feedsParagraphType ?? 'Paragraph type',
+            ),
       ),
       showFontFamily: isText,
       showFontSize: isText,
@@ -1554,7 +1524,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
                       : Icons.attach_file,
                 ),
                 tooltip: l10n?.feedsAttach ?? 'Attach',
-                onPressed: _isUploadingAttachment ? null : _showEditorAttachmentMenu,
+                onPressed: _isUploadingAttachment
+                    ? null
+                    : _showEditorAttachmentMenu,
               ),
             ]
           : const [],
@@ -1575,7 +1547,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     final l10n = AppLocalizations.of(context);
     final controller = editorState.controller;
     final selection = controller.selection;
-    
+
     // Get button items with error handling for layout issues
     List<ContextMenuButtonItem> buttonItems;
     try {
@@ -1719,195 +1691,222 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     final mediaQuery = MediaQuery.of(context);
     final isPhone = mediaQuery.size.width < 600;
     final spacing = isPhone ? 8.0 : 12.0;
-    final toolbarIconColor = Theme.of(context).iconTheme.color ??
-      Theme.of(context).colorScheme.onSurfaceVariant;
+    final toolbarIconColor =
+        Theme.of(context).iconTheme.color ??
+        Theme.of(context).colorScheme.onSurfaceVariant;
     final toolbarActiveColor = Theme.of(context).colorScheme.primary;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)?.feedsEditPost ?? 'Edit post'),
       ),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            return SingleChildScrollView(
-              padding: EdgeInsets.symmetric(
-                horizontal: isPhone ? 12 : 24,
-                vertical: isPhone ? 12 : 16,
-              ),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: _titleController,
-                      decoration: InputDecoration(
-                        labelText: AppLocalizations.of(context)?.commonTitle ??
-                            'Title',
+      body: AppBodyContainer(
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return SingleChildScrollView(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isPhone ? 12 : 24,
+                  vertical: isPhone ? 12 : 16,
+                ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      TextField(
+                        controller: _titleController,
+                        decoration: InputDecoration(
+                          labelText:
+                              AppLocalizations.of(context)?.commonTitle ??
+                              'Title',
+                        ),
                       ),
-                    ),
-                    SizedBox(height: spacing),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: IconButton(
-                            tooltip: AppLocalizations.of(context)?.feedsTextTools ??
-                                'Text tools',
-                            onPressed: () => _toggleToolbarTab(0),
-                            icon: Icon(
-                              Icons.text_fields,
-                              color: _activeToolbarTab == 0 && _showToolbar
-                                  ? toolbarActiveColor
-                                  : toolbarIconColor,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: IconButton(
-                            tooltip: AppLocalizations.of(context)?.feedsTextFormatting ??
-                                'Text formatting',
-                            onPressed: () => _toggleToolbarTab(1),
-                            icon: Icon(
-                              Icons.format_bold,
-                              color: _activeToolbarTab == 1 && _showToolbar
-                                  ? toolbarActiveColor
-                                  : toolbarIconColor,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: IconButton(
-                            tooltip: AppLocalizations.of(context)?.feedsJustificationTools ??
-                                'Justification tools',
-                            onPressed: () => _toggleToolbarTab(2),
-                            icon: Icon(
-                              Icons.format_align_left,
-                              color: _activeToolbarTab == 2 && _showToolbar
-                                  ? toolbarActiveColor
-                                  : toolbarIconColor,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: IconButton(
-                            tooltip: AppLocalizations.of(context)?.feedsListsPaddingTools ??
-                                'Lists and padding tools',
-                            onPressed: () => _toggleToolbarTab(3),
-                            icon: Icon(
-                              Icons.format_list_bulleted,
-                              color: _activeToolbarTab == 3 && _showToolbar
-                                  ? toolbarActiveColor
-                                  : toolbarIconColor,
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: IconButton(
-                            tooltip: AppLocalizations.of(context)?.feedsAttachments ??
-                                'Attachments',
-                            onPressed: () => _toggleToolbarTab(4),
-                            icon: Icon(
-                              Icons.attach_file,
-                              color: _activeToolbarTab == 4 && _showToolbar
-                                  ? toolbarActiveColor
-                                  : toolbarIconColor,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (_showToolbar) ...[
                       SizedBox(height: spacing),
-                      quill.QuillSimpleToolbar(
-                        controller: _controller,
-                        config: _toolbarConfigForTab(_activeToolbarTab),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: IconButton(
+                              tooltip:
+                                  AppLocalizations.of(
+                                    context,
+                                  )?.feedsTextTools ??
+                                  'Text tools',
+                              onPressed: () => _toggleToolbarTab(0),
+                              icon: Icon(
+                                Icons.text_fields,
+                                color: _activeToolbarTab == 0 && _showToolbar
+                                    ? toolbarActiveColor
+                                    : toolbarIconColor,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: IconButton(
+                              tooltip:
+                                  AppLocalizations.of(
+                                    context,
+                                  )?.feedsTextFormatting ??
+                                  'Text formatting',
+                              onPressed: () => _toggleToolbarTab(1),
+                              icon: Icon(
+                                Icons.format_bold,
+                                color: _activeToolbarTab == 1 && _showToolbar
+                                    ? toolbarActiveColor
+                                    : toolbarIconColor,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: IconButton(
+                              tooltip:
+                                  AppLocalizations.of(
+                                    context,
+                                  )?.feedsJustificationTools ??
+                                  'Justification tools',
+                              onPressed: () => _toggleToolbarTab(2),
+                              icon: Icon(
+                                Icons.format_align_left,
+                                color: _activeToolbarTab == 2 && _showToolbar
+                                    ? toolbarActiveColor
+                                    : toolbarIconColor,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: IconButton(
+                              tooltip:
+                                  AppLocalizations.of(
+                                    context,
+                                  )?.feedsListsPaddingTools ??
+                                  'Lists and padding tools',
+                              onPressed: () => _toggleToolbarTab(3),
+                              icon: Icon(
+                                Icons.format_list_bulleted,
+                                color: _activeToolbarTab == 3 && _showToolbar
+                                    ? toolbarActiveColor
+                                    : toolbarIconColor,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: IconButton(
+                              tooltip:
+                                  AppLocalizations.of(
+                                    context,
+                                  )?.feedsAttachments ??
+                                  'Attachments',
+                              onPressed: () => _toggleToolbarTab(4),
+                              icon: Icon(
+                                Icons.attach_file,
+                                color: _activeToolbarTab == 4 && _showToolbar
+                                    ? toolbarActiveColor
+                                    : toolbarIconColor,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                    SizedBox(height: spacing),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: isPhone ? 200 : 240,
-                      ),
-                      child: quill.QuillEditor.basic(
-                        controller: _controller,
-                        config: quill.QuillEditorConfig(
-                          contextMenuBuilder: _buildEditorContextMenu,
-                          embedBuilders: [
-                            ImageEmbedBuilder(),
-                            VideoEmbedBuilder(),
-                            AudioEmbedBuilder(),
-                            VoiceEmbedBuilder(),
-                            FileEmbedBuilder(),
-                          ],
-                          unknownEmbedBuilder: UnknownEmbedBuilder(),
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: spacing),
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: _allowComments,
-                          onChanged: (value) {
-                            setState(() {
-                              _allowComments = value ?? true;
-                            });
-                          },
-                        ),
-                        Text(
-                          AppLocalizations.of(context)?.feedsAllowComments ??
-                              'Allow comments',
+                      if (_showToolbar) ...[
+                        SizedBox(height: spacing),
+                        quill.QuillSimpleToolbar(
+                          controller: _controller,
+                          config: _toolbarConfigForTab(_activeToolbarTab),
                         ),
                       ],
-                    ),
-                    if (authService.isAdmin || authService.roles.contains('teacher'))
+                      SizedBox(height: spacing),
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: isPhone ? 200 : 240,
+                        ),
+                        child: quill.QuillEditor.basic(
+                          controller: _controller,
+                          config: quill.QuillEditorConfig(
+                            contextMenuBuilder: _buildEditorContextMenu,
+                            embedBuilders: [
+                              ImageEmbedBuilder(),
+                              VideoEmbedBuilder(),
+                              AudioEmbedBuilder(),
+                              VoiceEmbedBuilder(),
+                              FileEmbedBuilder(),
+                            ],
+                            unknownEmbedBuilder: UnknownEmbedBuilder(),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: spacing),
                       Row(
                         children: [
                           Checkbox(
-                            value: _isImportant,
+                            value: _allowComments,
                             onChanged: (value) {
                               setState(() {
-                                _isImportant = value ?? false;
+                                _allowComments = value ?? true;
                               });
                             },
                           ),
                           Text(
-                            AppLocalizations.of(context)?.feedsMarkImportant ??
-                                'Mark as important',
+                            AppLocalizations.of(context)?.feedsAllowComments ??
+                                'Allow comments',
                           ),
                         ],
                       ),
-                    SizedBox(height: spacing),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed:
-                              _isSubmitting ? null : () => Navigator.of(context).pop(),
-                          child: Text(
-                            AppLocalizations.of(context)?.commonCancel ?? 'Cancel',
+                      if (authService.isAdmin ||
+                          authService.roles.contains('teacher'))
+                        Row(
+                          children: [
+                            Checkbox(
+                              value: _isImportant,
+                              onChanged: (value) {
+                                setState(() {
+                                  _isImportant = value ?? false;
+                                });
+                              },
+                            ),
+                            Text(
+                              AppLocalizations.of(
+                                    context,
+                                  )?.feedsMarkImportant ??
+                                  'Mark as important',
+                            ),
+                          ],
+                        ),
+                      SizedBox(height: spacing),
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: _isSubmitting
+                                ? null
+                                : () => Navigator.of(context).pop(),
+                            child: Text(
+                              AppLocalizations.of(context)?.commonCancel ??
+                                  'Cancel',
+                            ),
                           ),
-                        ),
-                        const Spacer(),
-                        ElevatedButton(
-                          onPressed: _isSubmitting ? null : _submit,
-                          child: _isSubmitting
-                              ? const SizedBox(
-                                  height: 16,
-                                  width: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : Text(
-                                  AppLocalizations.of(context)?.commonSave ?? 'Save',
-                                ),
-                        ),
-                      ],
-                    ),
-                  ],
+                          const Spacer(),
+                          ElevatedButton(
+                            onPressed: _isSubmitting ? null : _submit,
+                            child: _isSubmitting
+                                ? const SizedBox(
+                                    height: 16,
+                                    width: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(
+                                    AppLocalizations.of(context)?.commonSave ??
+                                        'Save',
+                                  ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -1934,7 +1933,9 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
 
   void _insertEmbed(String type, String url) {
     final selection = _controller.selection;
-    final index = selection.baseOffset < 0 ? _controller.document.length : selection.baseOffset;
+    final index = selection.baseOffset < 0
+        ? _controller.document.length
+        : selection.baseOffset;
 
     quill.BlockEmbed embed;
     switch (type) {
@@ -1947,14 +1948,10 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
       case 'audio':
       case 'voice':
       case 'file':
-        embed = quill.BlockEmbed.custom(
-          quill.CustomBlockEmbed(type, url),
-        );
+        embed = quill.BlockEmbed.custom(quill.CustomBlockEmbed(type, url));
         break;
       default:
-        embed = quill.BlockEmbed.custom(
-          quill.CustomBlockEmbed('file', url),
-        );
+        embed = quill.BlockEmbed.custom(quill.CustomBlockEmbed('file', url));
     }
 
     _controller.document.insert(index, embed);
@@ -1980,7 +1977,9 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     final type = attachmentType == 'file' ? FileType.any : FileType.custom;
     final result = await FilePicker.platform.pickFiles(
       type: type,
-      allowedExtensions: type == FileType.custom ? allowed[attachmentType] : null,
+      allowedExtensions: type == FileType.custom
+          ? allowed[attachmentType]
+          : null,
       withData: true,
     );
 
@@ -2077,9 +2076,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
               ),
               ListTile(
                 leading: const Icon(Icons.insert_drive_file),
-                title: Text(
-                  AppLocalizations.of(context)?.commonFile ?? 'File',
-                ),
+                title: Text(AppLocalizations.of(context)?.commonFile ?? 'File'),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickAttachment(attachmentType: 'file', inline: false);
@@ -2103,12 +2100,10 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     });
   }
 
-  Widget _fontFamilyIconButton(
-    dynamic options,
-    dynamic extraOptions,
-  ) {
+  Widget _fontFamilyIconButton(dynamic options, dynamic extraOptions) {
     final typedOptions = options as quill.QuillToolbarFontFamilyButtonOptions;
-    final typedExtra = extraOptions as quill.QuillToolbarFontFamilyButtonExtraOptions;
+    final typedExtra =
+        extraOptions as quill.QuillToolbarFontFamilyButtonExtraOptions;
     return quill.QuillToolbarIconButton(
       tooltip: typedOptions.tooltip,
       isSelected: false,
@@ -2118,12 +2113,10 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     );
   }
 
-  Widget _fontSizeIconButton(
-    dynamic options,
-    dynamic extraOptions,
-  ) {
+  Widget _fontSizeIconButton(dynamic options, dynamic extraOptions) {
     final typedOptions = options as quill.QuillToolbarFontSizeButtonOptions;
-    final typedExtra = extraOptions as quill.QuillToolbarFontSizeButtonExtraOptions;
+    final typedExtra =
+        extraOptions as quill.QuillToolbarFontSizeButtonExtraOptions;
     return quill.QuillToolbarIconButton(
       tooltip: typedOptions.tooltip,
       isSelected: false,
@@ -2133,15 +2126,15 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     );
   }
 
-  Widget _headerStyleIconButton(
-    dynamic options,
-    dynamic extraOptions,
-  ) {
-    final typedOptions = options as quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions;
+  Widget _headerStyleIconButton(dynamic options, dynamic extraOptions) {
+    final typedOptions =
+        options as quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions;
     final typedExtra =
-        extraOptions as quill.QuillToolbarSelectHeaderStyleDropdownButtonExtraOptions;
+        extraOptions
+            as quill.QuillToolbarSelectHeaderStyleDropdownButtonExtraOptions;
     return quill.QuillToolbarIconButton(
-      tooltip: typedOptions.tooltip ??
+      tooltip:
+          typedOptions.tooltip ??
           (AppLocalizations.of(context)?.feedsParagraphType ??
               'Paragraph type'),
       isSelected: false,
@@ -2171,9 +2164,9 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
         ),
         selectHeaderStyleDropdownButton:
             quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions(
-          childBuilder: _headerStyleIconButton,
-          tooltip: l10n?.feedsParagraphType ?? 'Paragraph type',
-        ),
+              childBuilder: _headerStyleIconButton,
+              tooltip: l10n?.feedsParagraphType ?? 'Paragraph type',
+            ),
       ),
       showFontFamily: isText,
       showFontSize: isText,
@@ -2366,11 +2359,13 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     final mediaQuery = MediaQuery.of(context);
     final isPhone = mediaQuery.size.width < 600;
     final spacing = isPhone ? 8.0 : 12.0;
-    final toolbarIconColor = Theme.of(context).iconTheme.color ??
+    final toolbarIconColor =
+        Theme.of(context).iconTheme.color ??
         Theme.of(context).colorScheme.onSurfaceVariant;
     final toolbarActiveColor = Theme.of(context).colorScheme.primary;
-    final nonInlineAttachments =
-        _pendingAttachments.where((item) => !item.inline).toList();
+    final nonInlineAttachments = _pendingAttachments
+        .where((item) => !item.inline)
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -2392,7 +2387,8 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                     TextField(
                       controller: _titleController,
                       decoration: InputDecoration(
-                        labelText: AppLocalizations.of(context)?.commonTitle ??
+                        labelText:
+                            AppLocalizations.of(context)?.commonTitle ??
                             'Title',
                       ),
                     ),
@@ -2401,7 +2397,8 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                       children: [
                         Expanded(
                           child: IconButton(
-                            tooltip: AppLocalizations.of(context)?.feedsTextTools ??
+                            tooltip:
+                                AppLocalizations.of(context)?.feedsTextTools ??
                                 'Text tools',
                             onPressed: () => _toggleToolbarTab(0),
                             icon: Icon(
@@ -2414,7 +2411,10 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: AppLocalizations.of(context)?.feedsTextFormatting ??
+                            tooltip:
+                                AppLocalizations.of(
+                                  context,
+                                )?.feedsTextFormatting ??
                                 'Text formatting',
                             onPressed: () => _toggleToolbarTab(1),
                             icon: Icon(
@@ -2427,7 +2427,10 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: AppLocalizations.of(context)?.feedsJustificationTools ??
+                            tooltip:
+                                AppLocalizations.of(
+                                  context,
+                                )?.feedsJustificationTools ??
                                 'Justification tools',
                             onPressed: () => _toggleToolbarTab(2),
                             icon: Icon(
@@ -2440,7 +2443,10 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: AppLocalizations.of(context)?.feedsListsPaddingTools ??
+                            tooltip:
+                                AppLocalizations.of(
+                                  context,
+                                )?.feedsListsPaddingTools ??
                                 'Lists and padding tools',
                             onPressed: () => _toggleToolbarTab(3),
                             icon: Icon(
@@ -2453,7 +2459,10 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                         ),
                         Expanded(
                           child: IconButton(
-                            tooltip: AppLocalizations.of(context)?.feedsAttachments ??
+                            tooltip:
+                                AppLocalizations.of(
+                                  context,
+                                )?.feedsAttachments ??
                                 'Attachments',
                             onPressed: () => _toggleToolbarTab(4),
                             icon: Icon(
@@ -2527,7 +2536,8 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                         ),
                       ],
                     ),
-                    if (authService.isAdmin || authService.roles.contains('teacher'))
+                    if (authService.isAdmin ||
+                        authService.roles.contains('teacher'))
                       Row(
                         children: [
                           Checkbox(
@@ -2548,10 +2558,12 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                     Row(
                       children: [
                         TextButton(
-                          onPressed:
-                              _isSubmitting ? null : () => Navigator.of(context).pop(false),
+                          onPressed: _isSubmitting
+                              ? null
+                              : () => Navigator.of(context).pop(false),
                           child: Text(
-                            AppLocalizations.of(context)?.commonCancel ?? 'Cancel',
+                            AppLocalizations.of(context)?.commonCancel ??
+                                'Cancel',
                           ),
                         ),
                         const Spacer(),
@@ -2561,10 +2573,13 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
                               ? const SizedBox(
                                   height: 16,
                                   width: 16,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
                                 )
                               : Text(
-                                  AppLocalizations.of(context)?.commonPost ?? 'Post',
+                                  AppLocalizations.of(context)?.commonPost ??
+                                      'Post',
                                 ),
                         ),
                       ],
@@ -2716,7 +2731,9 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
 
   void _insertEmbed(String type, String url) {
     final selection = _controller.selection;
-    final index = selection.baseOffset < 0 ? _controller.document.length : selection.baseOffset;
+    final index = selection.baseOffset < 0
+        ? _controller.document.length
+        : selection.baseOffset;
 
     quill.BlockEmbed embed;
     switch (type) {
@@ -2729,14 +2746,10 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
       case 'audio':
       case 'voice':
       case 'file':
-        embed = quill.BlockEmbed.custom(
-          quill.CustomBlockEmbed(type, url),
-        );
+        embed = quill.BlockEmbed.custom(quill.CustomBlockEmbed(type, url));
         break;
       default:
-        embed = quill.BlockEmbed.custom(
-          quill.CustomBlockEmbed('file', url),
-        );
+        embed = quill.BlockEmbed.custom(quill.CustomBlockEmbed('file', url));
     }
 
     _controller.document.insert(index, embed);
@@ -2762,7 +2775,9 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
     final type = attachmentType == 'file' ? FileType.any : FileType.custom;
     final result = await FilePicker.platform.pickFiles(
       type: type,
-      allowedExtensions: type == FileType.custom ? allowed[attachmentType] : null,
+      allowedExtensions: type == FileType.custom
+          ? allowed[attachmentType]
+          : null,
       withData: true,
     );
 
@@ -2859,9 +2874,7 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
               ),
               ListTile(
                 leading: const Icon(Icons.insert_drive_file),
-                title: Text(
-                  AppLocalizations.of(context)?.commonFile ?? 'File',
-                ),
+                title: Text(AppLocalizations.of(context)?.commonFile ?? 'File'),
                 onTap: () {
                   Navigator.of(context).pop();
                   _pickAttachment(attachmentType: 'file', inline: false);
@@ -3142,4 +3155,3 @@ class _FeedSettingsDialogState extends State<FeedSettingsDialog> {
     );
   }
 }
-

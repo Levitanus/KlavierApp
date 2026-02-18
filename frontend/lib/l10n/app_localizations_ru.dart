@@ -744,10 +744,10 @@ class AppLocalizationsRu extends AppLocalizations {
   String get adminViewProfile => 'Просмотр профиля';
 
   @override
-  String get adminEditUser => 'Редактировать пользователя';
+  String get adminEditUser => 'Редактировать';
 
   @override
-  String get adminDeleteUser => 'Удалить пользователя';
+  String get adminDeleteUser => 'Удалить';
 
   @override
   String get adminFullName => 'Полное имя';

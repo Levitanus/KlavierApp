@@ -8,6 +8,7 @@ import 'auth.dart';
 import 'home_screen.dart';
 import 'config/app_config.dart';
 import 'l10n/app_localizations.dart';
+import 'widgets/app_body_container.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -59,8 +60,8 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } else {
         setState(() {
-          _errorMessage = result.errorMessage ??
-              l10n?.loginFailed ?? 'Login failed';
+          _errorMessage =
+              result.errorMessage ?? l10n?.loginFailed ?? 'Login failed';
         });
       }
     }
@@ -145,7 +146,10 @@ class _LoginScreenState extends State<LoginScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -167,7 +171,10 @@ class _LoginScreenState extends State<LoginScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -187,7 +194,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      
+
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
@@ -197,8 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
           actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
           title: Text(l10n?.commonErrorTitle ?? 'Error'),
           content: Text(
-            l10n?.loginErrorMessage(e.toString()) ??
-                'An error occurred: $e',
+            l10n?.loginErrorMessage(e.toString()) ?? 'An error occurred: $e',
           ),
           actions: [
             TextButton(
@@ -216,134 +222,125 @@ class _LoginScreenState extends State<LoginScreen> {
     final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final logoAsset = isDark
-      ? 'assets/branding/logo_bright.svg'
-      : 'assets/branding/logo_dark.svg';
-
+        ? 'assets/branding/logo_bright.svg'
+        : 'assets/branding/logo_dark.svg';
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n?.loginTitle ?? 'Login'),
         centerTitle: true,
       ),
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Form(
-              key: _formKey,
-              child: AutofillGroup(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // Logo or App Title
-                    SvgPicture.asset(
-                      'assets/branding/icon_white_note.svg',
-                      height: 72,
-                      width: 72,
-                    ),
-                    const SizedBox(height: 12),
-                    SvgPicture.asset(
-                      logoAsset,
-                      height: 32,
-                    ),
-                    const SizedBox(height: 48),
-
-                    // Username Field
-                    TextFormField(
-                      controller: _usernameController,
-                      autofillHints: const [AutofillHints.username],
-                      decoration: InputDecoration(
-                        labelText: l10n?.commonUsername ?? 'Username',
-                        prefixIcon: const Icon(Icons.person),
-                        border: const OutlineInputBorder(),
+        child: AppBodyContainer(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Form(
+                key: _formKey,
+                child: AutofillGroup(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SvgPicture.asset(
+                        'assets/branding/icon_white_note.svg',
+                        height: 72,
+                        width: 72,
                       ),
-                      textInputAction: TextInputAction.next,
-                      validator: (value) {
-                        if (value == null || value.trim().isEmpty) {
-                          return l10n?.loginUsernameRequired ??
-                              'Please enter your username';
-                        }
-                        return null;
-                      },
-                      enabled: !_isLoading,
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Password Field
-                    TextFormField(
-                      controller: _passwordController,
-                      autofillHints: const [AutofillHints.password],
-                      decoration: InputDecoration(
-                        labelText: l10n?.commonPassword ?? 'Password',
-                        prefixIcon: const Icon(Icons.lock),
-                        border: const OutlineInputBorder(),
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword ? Icons.visibility : Icons.visibility_off,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            });
-                          },
+                      const SizedBox(height: 12),
+                      SvgPicture.asset(logoAsset, height: 32),
+                      const SizedBox(height: 48),
+                      TextFormField(
+                        controller: _usernameController,
+                        autofillHints: const [AutofillHints.username],
+                        decoration: InputDecoration(
+                          labelText: l10n?.commonUsername ?? 'Username',
+                          prefixIcon: const Icon(Icons.person),
+                          border: const OutlineInputBorder(),
                         ),
+                        textInputAction: TextInputAction.next,
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return l10n?.loginUsernameRequired ??
+                                'Please enter your username';
+                          }
+                          return null;
+                        },
+                        enabled: !_isLoading,
                       ),
-                      obscureText: _obscurePassword,
-                      autocorrect: false,
-                      enableSuggestions: false,
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return l10n?.loginPasswordRequired ??
-                              'Please enter your password';
-                        }
-                        return null;
-                      },
-                      enabled: !_isLoading,
-                      onFieldSubmitted: (_) => _handleLogin(),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Error Message
-                    if (_errorMessage != null)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 16),
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(
-                            color: Colors.red,
-                            fontSize: 14,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-
-                    // Login Button
-                    ElevatedButton(
-                      onPressed: _isLoading ? null : _handleLogin,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(
-                              l10n?.loginButton ?? 'Login',
-                              style: const TextStyle(fontSize: 16),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _passwordController,
+                        autofillHints: const [AutofillHints.password],
+                        decoration: InputDecoration(
+                          labelText: l10n?.commonPassword ?? 'Password',
+                          prefixIcon: const Icon(Icons.lock),
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _obscurePassword
+                                  ? Icons.visibility_off
+                                  : Icons.visibility,
                             ),
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Forgot Password Button
-                    TextButton(
-                      onPressed: _isLoading ? null : _handleForgotPassword,
-                      child: Text(
-                        l10n?.loginForgotPassword ?? 'Forgot Password?',
+                            onPressed: () {
+                              setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              });
+                            },
+                          ),
+                        ),
+                        obscureText: _obscurePassword,
+                        autocorrect: false,
+                        enableSuggestions: false,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return l10n?.loginPasswordRequired ??
+                                'Please enter your password';
+                          }
+                          return null;
+                        },
+                        enabled: !_isLoading,
+                        onFieldSubmitted: (_) => _handleLogin(),
                       ),
-                    ),
-                ],
+                      const SizedBox(height: 24),
+                      if (_errorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Text(
+                            _errorMessage!,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _handleLogin,
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: _isLoading
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(
+                                l10n?.loginButton ?? 'Login',
+                                style: const TextStyle(fontSize: 16),
+                              ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextButton(
+                        onPressed: _isLoading ? null : _handleForgotPassword,
+                        child: Text(
+                          l10n?.loginForgotPassword ?? 'Forgot Password?',
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
