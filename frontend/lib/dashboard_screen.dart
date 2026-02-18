@@ -174,7 +174,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),
-                  ownerLabel: _ownerLabel(feed, l10n),
                   importantLimit: 2,
                   recentLimit: 2,
                   onTap: () {
@@ -202,7 +201,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),
-                  ownerLabel: _ownerLabel(feed, l10n),
                   importantLimit: 2,
                   recentLimit: 2,
                   onTap: () {
@@ -230,7 +228,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),
-                  ownerLabel: _ownerLabel(feed, l10n),
                   importantLimit: 2,
                   recentLimit: 2,
                   onTap: () {
@@ -379,19 +376,5 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   String _formatFeedTitle(Feed feed) {
     return feed.title.replaceFirst(RegExp(r'\s*Feed$'), '').trim();
-  }
-
-  String _ownerLabel(Feed feed, AppLocalizations? l10n) {
-    final ownerType = feed.ownerType.toLowerCase();
-    if (ownerType == 'school') {
-      return l10n?.dashboardOwnerSchool ?? 'School';
-    }
-    if (ownerType == 'teacher') {
-      return l10n?.dashboardOwnerTeacher ?? 'Teacher';
-    }
-    if (ownerType == 'group') {
-      return l10n?.dashboardOwnerGroup ?? 'Group';
-    }
-    return feed.ownerType;
   }
 }

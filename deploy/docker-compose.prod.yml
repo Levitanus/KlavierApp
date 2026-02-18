@@ -1,6 +1,10 @@
 services:
   db:
-    image: postgres:15
+    build:
+      context: ..
+      dockerfile: deploy/postgres.Dockerfile
+    command: >
+      postgres -c shared_preload_libraries=pg_cron -c cron.database_name=${POSTGRES_DB}
     restart: unless-stopped
     env_file:
       - .env

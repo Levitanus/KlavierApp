@@ -6,7 +6,9 @@ use serde_json::json;
 use sqlx::{FromRow, PgPool};
 use std::collections::{HashMap, HashSet};
 
-use crate::notifications::{ContentBlock, NotificationBody, NotificationContent};
+use crate::notifications::{
+    is_user_notification_eligible, ContentBlock, NotificationBody, NotificationContent,
+};
 use crate::push;
 use crate::users::verify_token;
 use crate::websockets;
@@ -1202,6 +1204,10 @@ async fn send_message(
 
     let notification_body = build_chat_notification(&sender_name, &preview, thread_id, user_id);
     for recipient_id in &recipients {
+        if !is_user_notification_eligible(&app_state.db, *recipient_id).await {
+            continue;
+        }
+
         let notification_id = sqlx::query_scalar::<_, i32>(
             "INSERT INTO notifications (user_id, type, title, body, priority)
              VALUES ($1, $2, $3, $4, $5)
@@ -1352,6 +1358,10 @@ async fn send_admin_message(
 
     let notification_body = build_chat_notification(&sender_name, &preview, thread_id, user_id);
     for admin_id in &admin_recipients {
+        if !is_user_notification_eligible(&app_state.db, *admin_id).await {
+            continue;
+        }
+
         let notification_id = sqlx::query_scalar::<_, i32>(
             "INSERT INTO notifications (user_id, type, title, body, priority)
              VALUES ($1, $2, $3, $4, $5)

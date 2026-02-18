@@ -44,20 +44,6 @@ class _FeedsScreenState extends State<FeedsScreen> {
     return feed.title.replaceFirst(RegExp(r'\s*Feed$'), '').trim();
   }
 
-  String _ownerLabel(BuildContext context, Feed feed) {
-    final ownerType = feed.ownerType.toLowerCase();
-    if (ownerType == 'school') {
-      return AppLocalizations.of(context)?.feedsOwnerSchool ?? 'School';
-    }
-    if (ownerType == 'teacher') {
-      return AppLocalizations.of(context)?.feedsOwnerTeacher ?? 'Teacher';
-    }
-    if (ownerType == 'group') {
-      return AppLocalizations.of(context)?.feedsOwnerGroup ?? 'Group';
-    }
-    return feed.ownerType;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Consumer<FeedService>(
@@ -131,7 +117,6 @@ class _FeedsScreenState extends State<FeedsScreen> {
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),
-                  ownerLabel: _ownerLabel(context, feed),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -153,7 +138,6 @@ class _FeedsScreenState extends State<FeedsScreen> {
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),
-                  ownerLabel: _ownerLabel(context, feed),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -175,7 +159,6 @@ class _FeedsScreenState extends State<FeedsScreen> {
                 (feed) => FeedPreviewCard(
                   feed: feed,
                   title: _formatFeedTitle(feed),
-                  ownerLabel: _ownerLabel(context, feed),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(

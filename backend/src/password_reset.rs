@@ -12,6 +12,7 @@ use log::error;
 
 use crate::email::{EmailError, EmailService};
 use crate::notification_builders::build_password_reset_request_notification;
+use crate::notifications::is_user_notification_eligible;
 use crate::push;
 
 #[derive(Debug)]
@@ -166,6 +167,10 @@ pub async fn request_password_reset(
         let notification_body = build_password_reset_request_notification(username, request_id);
         
         for admin_id in admin_ids {
+            if !is_user_notification_eligible(pool, admin_id).await {
+                continue;
+            }
+
             let notification_id = sqlx::query_scalar::<_, i32>(
                 "INSERT INTO notifications (user_id, type, title, body, priority)
                  VALUES ($1, $2, $3, $4, $5)

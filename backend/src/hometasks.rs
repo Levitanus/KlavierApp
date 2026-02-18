@@ -11,6 +11,7 @@ use crate::notification_builders::{
     build_hometask_completed_notification, build_hometask_refreshed_notification,
     build_hometask_reopened_notification,
 };
+use crate::notifications::is_user_notification_eligible;
 use crate::notifications::NotificationBody;
 use crate::push;
 use crate::roles::helpers::verify_can_access_student;
@@ -102,6 +103,10 @@ struct RepeatableHometask {
 }
 
 async fn insert_notification(db: &PgPool, user_id: i32, body: &NotificationBody, priority: &str) {
+    if !is_user_notification_eligible(db, user_id).await {
+        return;
+    }
+
     let notification_id = sqlx::query_scalar::<_, i32>(
         "INSERT INTO notifications (user_id, type, title, body, priority)
          VALUES ($1, $2, $3, $4, $5)
@@ -149,7 +154,11 @@ async fn fetch_student_name(db: &PgPool, student_id: i32) -> String {
 
 async fn fetch_parent_ids(db: &PgPool, student_id: i32) -> Vec<i32> {
     sqlx::query_scalar::<_, i32>(
-        "SELECT parent_user_id FROM parent_student_relations WHERE student_user_id = $1",
+        "SELECT psr.parent_user_id
+         FROM parent_student_relations psr
+         JOIN parents p ON p.user_id = psr.parent_user_id
+         WHERE psr.student_user_id = $1
+           AND p.status = 'active'",
     )
     .bind(student_id)
     .fetch_all(db)

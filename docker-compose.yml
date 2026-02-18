@@ -1,7 +1,11 @@
 version: "3.8"
 services:
   db_prod:
-    image: postgres:15
+    build:
+      context: .
+      dockerfile: deploy/postgres.Dockerfile
+    command: >
+      postgres -c shared_preload_libraries=pg_cron -c cron.database_name=${POSTGRES_DB}
     env_file:
       - .env
     environment:

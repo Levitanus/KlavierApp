@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::chats::{ChatAttachmentInput, ChatAttachmentResponse};
 use crate::notification_builders::{build_feed_comment_notification, build_feed_post_notification};
+use crate::notifications::is_user_notification_eligible;
 use crate::notifications::NotificationBody;
 use crate::push;
 use crate::users::verify_token;
@@ -441,6 +442,10 @@ async fn store_comment_attachments(
 }
 
 async fn insert_notification(db: &PgPool, user_id: i32, body: &NotificationBody, priority: &str) {
+    if !is_user_notification_eligible(db, user_id).await {
+        return;
+    }
+
     let notification_id = sqlx::query_scalar::<_, i32>(
         "INSERT INTO notifications (user_id, type, title, body, priority)
          VALUES ($1, $2, $3, $4, $5)
