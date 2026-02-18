@@ -6,7 +6,8 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     _username = data['username'] ?? '';
     _email = data['email'];
     _phone = data['phone'];
-    _profileImage = data['profile_image'] != null &&
+    _profileImage =
+        data['profile_image'] != null &&
             data['profile_image'].toString().isNotEmpty
         ? '${_ProfileScreenStateBase._baseUrl}/uploads/profile_images/${data['profile_image']}'
         : null;
@@ -57,8 +58,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       return;
     }
 
-    final cachedProfile = await AppDataCacheService.instance
-        .readJsonMap('profile', authService.userId);
+    final cachedProfile = await AppDataCacheService.instance.readJsonMap(
+      'profile',
+      authService.userId,
+    );
     final hasCached = cachedProfile != null;
 
     if (cachedProfile != null && mounted) {
@@ -79,8 +82,11 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        await AppDataCacheService.instance
-            .writeJson('profile', authService.userId, data);
+        await AppDataCacheService.instance.writeJson(
+          'profile',
+          authService.userId,
+          data,
+        );
         setState(() {
           _applyProfileData(data);
           _isLoading = false;
@@ -194,7 +200,8 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
       await _loadAdminRoleDetails(token);
 
-        final unifiedFullName = _studentData?['full_name'] ??
+      final unifiedFullName =
+          _studentData?['full_name'] ??
           _parentData?['full_name'] ??
           _teacherData?['full_name'] ??
           userData['full_name'] ??
@@ -230,7 +237,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     if (_roles.contains('student')) {
       try {
         final response = await http.get(
-          Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/students/$_userId'),
+          Uri.parse(
+            '${_ProfileScreenStateBase._baseUrl}/api/students/$_userId',
+          ),
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json',
@@ -260,7 +269,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     if (_roles.contains('teacher')) {
       try {
         final response = await http.get(
-          Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId'),
+          Uri.parse(
+            '${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId',
+          ),
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json',
@@ -369,7 +380,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         };
 
         response = await http.put(
-          Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/students/$_userId'),
+          Uri.parse(
+            '${_ProfileScreenStateBase._baseUrl}/api/students/$_userId',
+          ),
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json',
@@ -401,7 +414,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         };
 
         response = await http.put(
-          Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId'),
+          Uri.parse(
+            '${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId',
+          ),
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json',
@@ -415,7 +430,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         };
 
         response = await http.put(
-          Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/admin/users/$_userId'),
+          Uri.parse(
+            '${_ProfileScreenStateBase._baseUrl}/api/admin/users/$_userId',
+          ),
           headers: {
             'Authorization': 'Bearer $token',
             'Content-Type': 'application/json',
@@ -516,20 +533,25 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/profile/upload-image'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/profile/upload-image',
+        ),
       );
 
       request.headers['Authorization'] = 'Bearer $token';
 
       if (file.bytes != null) {
-        request.files.add(http.MultipartFile.fromBytes(
-          'image',
-          file.bytes!,
-          filename: file.name,
-        ));
+        request.files.add(
+          http.MultipartFile.fromBytes(
+            'image',
+            file.bytes!,
+            filename: file.name,
+          ),
+        );
       } else if (file.path != null) {
-        request.files
-            .add(await http.MultipartFile.fromPath('image', file.path!));
+        request.files.add(
+          await http.MultipartFile.fromPath('image', file.path!),
+        );
       } else {
         setState(() {
           _isSaving = false;
@@ -569,13 +591,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         }
       } else {
         if (mounted) {
-          final error = jsonDecode(response.body)['error'] ??
-              'Failed to upload image';
+          final error =
+              jsonDecode(response.body)['error'] ?? 'Failed to upload image';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text(error), backgroundColor: Colors.red),
           );
         }
       }
@@ -608,9 +627,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     try {
       final response = await http.delete(
         Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/profile/image'),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       setState(() {
@@ -674,14 +691,14 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
       final response = await http.post(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/students/$_userId/parent-registration-token'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/students/$_userId/parent-registration-token',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -695,7 +712,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         final registrationToken = data['token'];
         final expiresAt = DateTime.parse(data['expires_at']);
 
-        final origin = kIsWeb ? Uri.base.origin : _ProfileScreenStateBase._baseUrl;
+        final origin = kIsWeb
+            ? Uri.base.origin
+            : _ProfileScreenStateBase._baseUrl;
         final registrationLink = '$origin/register?token=$registrationToken';
 
         print('DEBUG - Registration link origin: $origin');
@@ -705,7 +724,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 8,
+              ),
               titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
               contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
               actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -724,7 +746,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
                     decoration: BoxDecoration(
                       color: Colors.grey[200],
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[400]!),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
                     ),
                     child: SelectableText(
                       registrationLink,
@@ -734,18 +758,12 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
                   const SizedBox(height: 16),
                   Text(
                     'Expires: ${expiresAt.day}/${expiresAt.month}/${expiresAt.year} ${expiresAt.hour}:${expiresAt.minute.toString().padLeft(2, '0')}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 8),
                   const Text(
                     'This link is valid for 48 hours.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                    ),
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
                   ),
                 ],
               ),
@@ -778,10 +796,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           final error =
               jsonDecode(response.body)['error'] ?? 'Failed to generate link';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text(error), backgroundColor: Colors.red),
           );
         }
       }
@@ -807,7 +822,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
     try {
       final response = await http.get(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/students'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/students',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -826,14 +843,18 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     } catch (_) {}
   }
 
-  Future<List<Map<String, dynamic>>> _fetchTeacherStudents(int teacherId) async {
+  Future<List<Map<String, dynamic>>> _fetchTeacherStudents(
+    int teacherId,
+  ) async {
     final authService = Provider.of<AuthService>(context, listen: false);
     final token = authService.token;
     if (token == null) return [];
 
     try {
       final response = await http.get(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/teachers/$teacherId/students'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/teachers/$teacherId/students',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -852,14 +873,18 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     return [];
   }
 
-  Future<List<Map<String, dynamic>>> _fetchStudentTeachers(int studentId) async {
+  Future<List<Map<String, dynamic>>> _fetchStudentTeachers(
+    int studentId,
+  ) async {
     final authService = Provider.of<AuthService>(context, listen: false);
     final token = authService.token;
     if (token == null) return [];
 
     try {
       final response = await http.get(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/students/$studentId/teachers'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/students/$studentId/teachers',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -895,7 +920,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
     try {
       final response = await http.get(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/students/$studentId/parents'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/students/$studentId/parents',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -921,22 +948,22 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     try {
       for (final studentId in studentIds) {
         final response = await http.post(
-          Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/students'),
+          Uri.parse(
+            '${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/students',
+          ),
           headers: {
             'Authorization': 'Bearer ${authService.token}',
             'Content-Type': 'application/json',
           },
-          body: jsonEncode({
-            'student_id': studentId,
-          }),
+          body: jsonEncode({'student_id': studentId}),
         );
 
         if (response.statusCode != 201 && response.statusCode != 200) {
           if (mounted) {
             final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error: $error')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Error: $error')));
           }
           return;
         }
@@ -950,9 +977,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -972,31 +999,31 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
     try {
       final response = await http.delete(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/students/$studentId'),
-        headers: {
-          'Authorization': 'Bearer ${authService.token}',
-        },
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/students/$studentId',
+        ),
+        headers: {'Authorization': 'Bearer ${authService.token}'},
       );
 
       if (response.statusCode == 200) {
         await _loadTeacherStudents();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Student removed')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Student removed')));
         }
       } else if (mounted) {
         final error =
             jsonDecode(response.body)['error'] ?? 'Failed to remove student';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -1014,10 +1041,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
     try {
       final response = await http.delete(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/students/$studentId/teachers/$teacherId'),
-        headers: {
-          'Authorization': 'Bearer ${authService.token}',
-        },
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/students/$studentId/teachers/$teacherId',
+        ),
+        headers: {'Authorization': 'Bearer ${authService.token}'},
       );
 
       if (response.statusCode == 200) {
@@ -1025,22 +1052,22 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           await _loadStudentTeachers();
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Teacher removed')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Teacher removed')));
         }
       } else if (mounted) {
         final error =
             jsonDecode(response.body)['error'] ?? 'Failed to remove teacher';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(error)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(error)));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -1072,14 +1099,14 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
+      builder: (context) => const Center(child: CircularProgressIndicator()),
     );
 
     try {
       final response = await http.post(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/student-registration-token'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/teachers/$_userId/student-registration-token',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
@@ -1092,14 +1119,19 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         final data = jsonDecode(response.body);
         final registrationToken = data['token'];
         final expiresAt = DateTime.parse(data['expires_at']);
-        final origin = kIsWeb ? Uri.base.origin : _ProfileScreenStateBase._baseUrl;
+        final origin = kIsWeb
+            ? Uri.base.origin
+            : _ProfileScreenStateBase._baseUrl;
         final registrationLink = '$origin/register?token=$registrationToken';
 
         if (mounted) {
           showDialog(
             context: context,
             builder: (context) => AlertDialog(
-              insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 8,
+              ),
               titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
               contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
               actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -1116,9 +1148,11 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.grey[200],
+                      color: Theme.of(context).colorScheme.outlineVariant,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.grey[400]!),
+                      border: Border.all(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
                     ),
                     child: SelectableText(
                       registrationLink,
@@ -1128,18 +1162,12 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
                   const SizedBox(height: 16),
                   Text(
                     'Expires: ${expiresAt.day}/${expiresAt.month}/${expiresAt.year} ${expiresAt.hour}:${expiresAt.minute.toString().padLeft(2, '0')}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                   ),
                   const SizedBox(height: 8),
                   const Text(
                     'This link is valid for 48 hours.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontStyle: FontStyle.italic,
-                    ),
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
                   ),
                 ],
               ),
@@ -1171,10 +1199,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         final error =
             jsonDecode(response.body)['error'] ?? 'Failed to generate link';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error),
-            backgroundColor: Colors.red,
-          ),
+          SnackBar(content: Text(error), backgroundColor: Colors.red),
         );
       }
     } catch (e) {
@@ -1206,14 +1231,14 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
     try {
       final response = await http.put(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/admin/users/$_userId'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/admin/users/$_userId',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'roles': rolesToSave,
-        }),
+        body: jsonEncode({'roles': rolesToSave}),
       );
 
       if (response.statusCode == 200) {
@@ -1237,9 +1262,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -1317,9 +1342,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     try {
       final response = await http.post(
         Uri.parse(url),
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        headers: {'Authorization': 'Bearer $token'},
       );
 
       if (response.statusCode == 200) {
@@ -1331,9 +1354,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(
-                archive ? 'Role archived' : 'Role unarchived',
-              ),
+              content: Text(archive ? 'Role archived' : 'Role unarchived'),
             ),
           );
         }
@@ -1346,28 +1367,27 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
 
-    Future<void> _makeUserStudent(
-      String birthday) async {
+  Future<void> _makeUserStudent(String birthday) async {
     if (_userId == null) return;
     final authService = Provider.of<AuthService>(context, listen: false);
 
     try {
       final response = await http.post(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/admin/users/$_userId/make-student'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/admin/users/$_userId/make-student',
+        ),
         headers: {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'birthday': birthday,
-        }),
+        body: jsonEncode({'birthday': birthday}),
       );
 
       if (response.statusCode == 200) {
@@ -1380,16 +1400,16 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       } else {
         if (mounted) {
           final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: $error')));
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -1400,14 +1420,14 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
     try {
       final response = await http.post(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/admin/users/$_userId/make-parent'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/admin/users/$_userId/make-parent',
+        ),
         headers: {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'student_ids': studentIds,
-        }),
+        body: jsonEncode({'student_ids': studentIds}),
       );
 
       if (response.statusCode == 200) {
@@ -1420,16 +1440,16 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       } else {
         if (mounted) {
           final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: $error')));
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -1440,7 +1460,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
     try {
       final response = await http.post(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/admin/users/$_userId/make-teacher'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/admin/users/$_userId/make-teacher',
+        ),
         headers: {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
@@ -1458,16 +1480,16 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       } else {
         if (mounted) {
           final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error: $error')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error: $error')));
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -1538,7 +1560,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
         try {
           final studentResponse = await http.get(
-            Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/students/$userId'),
+            Uri.parse(
+              '${_ProfileScreenStateBase._baseUrl}/api/students/$userId',
+            ),
             headers: {
               'Authorization': 'Bearer $token',
               'Content-Type': 'application/json',
@@ -1550,11 +1574,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
           }
         } catch (_) {}
 
-        students.add(StudentInfo(
-          userId: userId,
-          username: username,
-          fullName: fullName,
-        ));
+        students.add(
+          StudentInfo(userId: userId, username: username, fullName: fullName),
+        );
       }
 
       return students;
@@ -1570,22 +1592,22 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     try {
       for (final studentId in studentIds) {
         final response = await http.post(
-          Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/parents/$_userId/students'),
+          Uri.parse(
+            '${_ProfileScreenStateBase._baseUrl}/api/parents/$_userId/students',
+          ),
           headers: {
             'Authorization': 'Bearer ${authService.token}',
             'Content-Type': 'application/json',
           },
-          body: jsonEncode({
-            'student_id': studentId,
-          }),
+          body: jsonEncode({'student_id': studentId}),
         );
 
         if (response.statusCode != 201 && response.statusCode != 200) {
           if (mounted) {
             final error = jsonDecode(response.body)['error'] ?? 'Unknown error';
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error: $error')),
-            );
+            ScaffoldMessenger.of(
+              context,
+            ).showSnackBar(SnackBar(content: Text('Error: $error')));
           }
           return;
         }
@@ -1599,9 +1621,9 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -1628,15 +1650,14 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
     try {
       final response = await http.put(
-        Uri.parse('${_ProfileScreenStateBase._baseUrl}/api/students/$childUserId'),
+        Uri.parse(
+          '${_ProfileScreenStateBase._baseUrl}/api/students/$childUserId',
+        ),
         headers: {
           'Authorization': 'Bearer $token',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'full_name': fullName,
-          'birthday': birthday,
-        }),
+        body: jsonEncode({'full_name': fullName, 'birthday': birthday}),
       );
 
       if (mounted) {
@@ -1650,10 +1671,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         } else {
           final error = jsonDecode(response.body)['error'] ?? 'Update failed';
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(error),
-              backgroundColor: Colors.red,
-            ),
+            SnackBar(content: Text(error), backgroundColor: Colors.red),
           );
         }
       }
