@@ -509,6 +509,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatDeleteMessageFailed => 'Failed to delete message';
 
   @override
+  String get chatEditMessage => 'Edit message';
+
+  @override
+  String get chatMessageActions => 'Message actions';
+
+  @override
   String get chatMessages => 'Messages';
 
   @override

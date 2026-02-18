@@ -155,6 +155,8 @@
   "chatDeleteMessageTitle": "Delete message",
   "chatDeleteMessageBody": "Are you sure you want to delete this message? This action cannot be undone.",
   "chatDeleteMessageFailed": "Failed to delete message",
+  "chatEditMessage": "Edit message",
+  "chatMessageActions": "Message actions",
   "chatMessages": "Messages",
   "chatChats": "Chats",
   "chatAdmin": "Admin",

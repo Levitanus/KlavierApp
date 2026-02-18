@@ -1036,6 +1036,18 @@ abstract class AppLocalizations {
   /// **'Failed to delete message'**
   String get chatDeleteMessageFailed;
 
+  /// No description provided for @chatEditMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit message'**
+  String get chatEditMessage;
+
+  /// No description provided for @chatMessageActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Message actions'**
+  String get chatMessageActions;
+
   /// No description provided for @chatMessages.
   ///
   /// In en, this message translates to:

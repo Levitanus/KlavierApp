@@ -632,6 +632,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   Future<void> _editMessage(ChatMessage message) async {
+    final l10n = AppLocalizations.of(context);
     final controller = quill.QuillController(
       document: message.quillController.document,
       selection: const TextSelection.collapsed(offset: 0),
@@ -644,7 +645,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Edit message'),
+        title: Text(l10n?.chatEditMessage ?? 'Edit message'),
         content: SizedBox(
           width: 600,
           child: Column(
@@ -835,17 +836,40 @@ class _MessageBubble extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (onEdit != null)
-                          IconButton(
-                            icon: const Icon(Icons.edit, size: 16),
-                            tooltip: 'Edit message',
-                            onPressed: onEdit,
-                          ),
-                        if (onDelete != null)
-                          IconButton(
-                            icon: const Icon(Icons.delete, size: 16),
-                            tooltip: l10n?.commonDelete ?? 'Delete',
-                            onPressed: onDelete,
+                        if (onEdit != null || onDelete != null)
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_horiz, size: 18),
+                            tooltip:
+                                l10n?.chatMessageActions ?? 'Message actions',
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                onEdit?.call();
+                              } else if (value == 'delete') {
+                                onDelete?.call();
+                              }
+                            },
+                            itemBuilder: (context) {
+                              final items = <PopupMenuEntry<String>>[];
+                              if (onEdit != null) {
+                                items.add(
+                                  PopupMenuItem<String>(
+                                    value: 'edit',
+                                    child: Text(
+                                      l10n?.chatEditMessage ?? 'Edit message',
+                                    ),
+                                  ),
+                                );
+                              }
+                              if (onDelete != null) {
+                                items.add(
+                                  PopupMenuItem<String>(
+                                    value: 'delete',
+                                    child: Text(l10n?.commonDelete ?? 'Delete'),
+                                  ),
+                                );
+                              }
+                              return items;
+                            },
                           ),
                       ],
                     ),

@@ -517,6 +517,12 @@ class AppLocalizationsDe extends AppLocalizations {
       'Nachricht konnte nicht geloescht werden';
 
   @override
+  String get chatEditMessage => 'Nachricht bearbeiten';
+
+  @override
+  String get chatMessageActions => 'Nachrichtenaktionen';
+
+  @override
   String get chatMessages => 'Nachrichten';
 
   @override

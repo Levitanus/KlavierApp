@@ -155,6 +155,8 @@
   "chatDeleteMessageTitle": "Удалить сообщение",
   "chatDeleteMessageBody": "Вы уверены, что хотите удалить это сообщение? Это действие нельзя отменить.",
   "chatDeleteMessageFailed": "Не удалось удалить сообщение",
+  "chatEditMessage": "Редактировать сообщение",
+  "chatMessageActions": "Действия с сообщением",
   "chatMessages": "Сообщения",
   "chatChats": "Чаты",
   "chatAdmin": "Админ",

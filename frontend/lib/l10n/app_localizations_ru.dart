@@ -509,6 +509,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get chatDeleteMessageFailed => 'Не удалось удалить сообщение';
 
   @override
+  String get chatEditMessage => 'Редактировать сообщение';
+
+  @override
+  String get chatMessageActions => 'Действия с сообщением';
+
+  @override
   String get chatMessages => 'Сообщения';
 
   @override

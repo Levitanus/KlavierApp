@@ -155,6 +155,8 @@
   "chatDeleteMessageTitle": "Nachricht loeschen",
   "chatDeleteMessageBody": "Sind Sie sicher, dass Sie diese Nachricht loeschen moechten? Diese Aktion kann nicht rueckgaengig gemacht werden.",
   "chatDeleteMessageFailed": "Nachricht konnte nicht geloescht werden",
+  "chatEditMessage": "Nachricht bearbeiten",
+  "chatMessageActions": "Nachrichtenaktionen",
   "chatMessages": "Nachrichten",
   "chatChats": "Chats",
   "chatAdmin": "Admin",
