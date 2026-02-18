@@ -42,8 +42,12 @@ impl EmailService {
                 .map_err(|_| EmailError::ConfigError("SMTP_USERNAME not set".to_string()))?,
             smtp_password: env::var("SMTP_PASSWORD")
                 .map_err(|_| EmailError::ConfigError("SMTP_PASSWORD not set".to_string()))?,
-            reset_url_base: env::var("RESET_URL_BASE")
-                .unwrap_or_else(|_| "http://localhost:8080/reset-password".to_string()),
+            reset_url_base: format!(
+                "{}/reset-password",
+                env::var("API_BASE_URL")
+                    .unwrap_or_else(|_| "http://localhost:8080".to_string())
+                    .trim_end_matches('/')
+            ),
             app_name: env::var("APP_NAME").unwrap_or_else(|_| "KlavierApp".to_string()),
         })
     }
@@ -119,7 +123,10 @@ impl EmailService {
             .to(to_email
                 .parse()
                 .map_err(|e| EmailError::BuildError(format!("Invalid to email: {}", e)))?)
-            .subject(format!("Password Reset Request Pending - {}", self.app_name))
+            .subject(format!(
+                "Password Reset Request Pending - {}",
+                self.app_name
+            ))
             .header(ContentType::TEXT_PLAIN)
             .body(body)
             .map_err(|e| EmailError::BuildError(e.to_string()))?;
