@@ -1,9 +1,15 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_quill/flutter_quill.dart' as quill;
+import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
 import 'auth.dart';
 import 'models/hometask.dart';
 import 'services/hometask_service.dart';
+import 'services/feed_service.dart';
 import 'widgets/hometask_widget.dart';
+import 'widgets/quill_editor_composer.dart';
 import 'l10n/app_localizations.dart';
 
 class HometasksScreen extends StatefulWidget {
@@ -20,7 +26,11 @@ class _HometasksScreenState extends State<HometasksScreen> {
   bool _isLoadingStudents = false;
   String? _studentsError;
   int? _selectedStudentId;
+  String _teacherStudentSearchQuery = '';
+  final TextEditingController _teacherStudentSearchController =
+      TextEditingController();
   List<StudentSummary> _students = [];
+  List<StudentGroupSummary> _groups = [];
   List<Hometask> _orderedHometasks = [];
   String _lastRoleSignature = '';
 
@@ -30,6 +40,12 @@ class _HometasksScreenState extends State<HometasksScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initScreen();
     });
+  }
+
+  @override
+  void dispose() {
+    _teacherStudentSearchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -65,6 +81,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
       _isLoadingStudents = true;
       _studentsError = null;
       _students = [];
+      _groups = [];
       _selectedStudentId = null;
     });
 
@@ -75,6 +92,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
     StudentSummary? selfSummary;
     if (_isTeacher(authService)) {
       students = await hometaskService.fetchStudentsForTeacher();
+      _groups = await hometaskService.fetchGroupsForTeacher();
     } else if (_isParent(authService)) {
       students = await hometaskService.fetchStudentsForParent();
       selfSummary = await hometaskService.getCurrentStudentSummary();
@@ -91,7 +109,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
     if (students.isEmpty) {
       setState(() {
         _isLoadingStudents = false;
-        _studentsError = AppLocalizations.of(context)?.dashboardNoStudents ??
+        _studentsError =
+            AppLocalizations.of(context)?.dashboardNoStudents ??
             'No students available.';
       });
       return;
@@ -100,7 +119,9 @@ class _HometasksScreenState extends State<HometasksScreen> {
     setState(() {
       _students = students;
       if (widget.initialStudentId != null &&
-          students.any((student) => student.userId == widget.initialStudentId)) {
+          students.any(
+            (student) => student.userId == widget.initialStudentId,
+          )) {
         _selectedStudentId = widget.initialStudentId;
       } else if (_isStudent(authService) && selfSummary != null) {
         _selectedStudentId = selfSummary.userId;
@@ -146,6 +167,54 @@ class _HometasksScreenState extends State<HometasksScreen> {
     });
   }
 
+  bool _matchesStudentSearch(StudentSummary student) {
+    if (_teacherStudentSearchQuery.isEmpty) {
+      return true;
+    }
+
+    final fullName = student.fullName.toLowerCase();
+    final username = student.username.toLowerCase();
+    return fullName.contains(_teacherStudentSearchQuery) ||
+        username.contains(_teacherStudentSearchQuery);
+  }
+
+  Future<void> _onTeacherStudentSearchChanged(String value) async {
+    final query = value.trim().toLowerCase();
+    if (query == _teacherStudentSearchQuery) {
+      return;
+    }
+
+    setState(() {
+      _teacherStudentSearchQuery = query;
+    });
+
+    final authService = context.read<AuthService>();
+    if (!_isTeacher(authService)) {
+      return;
+    }
+
+    final filtered = _students.where(_matchesStudentSearch).toList();
+    if (filtered.isEmpty) {
+      return;
+    }
+
+    final selectedStudentId = _selectedStudentId;
+    if (selectedStudentId != null &&
+        filtered.any((student) => student.userId == selectedStudentId)) {
+      return;
+    }
+
+    setState(() {
+      _selectedStudentId = filtered.first.userId;
+    });
+    await _loadHometasks();
+  }
+
+  void _clearTeacherStudentSearch() {
+    _teacherStudentSearchController.clear();
+    _onTeacherStudentSearchChanged('');
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -155,12 +224,16 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final isTeacher = _isTeacher(authService);
     final isParent = _isParent(authService);
     final showStudentSelector = isParent || isTeacher;
+    final filteredStudents = isTeacher
+        ? _students.where(_matchesStudentSearch).toList()
+        : _students;
     final showChildLabel = isParent && !isTeacher;
     final selectorLabel = showChildLabel
-      ? (l10n?.dashboardChildLabel ?? 'Child:')
-      : (l10n?.dashboardStudentLabel ?? 'Student:');
+        ? (l10n?.dashboardChildLabel ?? 'Child:')
+        : (l10n?.dashboardStudentLabel ?? 'Student:');
     final canComplete = (isStudent || isParent) && !_showArchive;
-    final canToggleItems = (isStudent || isParent || isTeacher) && !_showArchive;
+    final canToggleItems =
+        (isStudent || isParent || isTeacher) && !_showArchive;
     final listBottomPadding = isTeacher ? 96.0 : 16.0;
     StudentSummary? selectedStudent;
     final selectedStudentId = _selectedStudentId;
@@ -197,11 +270,37 @@ class _HometasksScreenState extends State<HometasksScreen> {
               ),
               const SizedBox(height: 8),
               if (showStudentSelector) ...[
+                if (isTeacher) ...[
+                  TextField(
+                    controller: _teacherStudentSearchController,
+                    onChanged: (value) {
+                      _onTeacherStudentSearchChanged(value);
+                    },
+                    decoration: InputDecoration(
+                      labelText: l10n?.adminSearchStudents ?? 'Search students',
+                      prefixIcon: const Icon(Icons.search),
+                      suffixIcon: _teacherStudentSearchQuery.isNotEmpty
+                          ? IconButton(
+                              tooltip:
+                                  l10n?.commonClearSearch ?? 'Clear search',
+                              onPressed: _clearTeacherStudentSearch,
+                              icon: const Icon(Icons.close),
+                            )
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
                 if (_isLoadingStudents)
                   const LinearProgressIndicator()
                 else if (_studentsError != null)
                   Text(
                     _studentsError!,
+                    style: const TextStyle(color: Colors.redAccent),
+                  )
+                else if (isTeacher && filteredStudents.isEmpty)
+                  Text(
+                    l10n?.dashboardNoStudents ?? 'No students available.',
                     style: const TextStyle(color: Colors.redAccent),
                   )
                 else
@@ -210,8 +309,13 @@ class _HometasksScreenState extends State<HometasksScreen> {
                       Text(selectorLabel),
                       const SizedBox(width: 12),
                       DropdownButton<int>(
-                        value: _selectedStudentId,
-                        items: _students
+                        value:
+                            filteredStudents.any(
+                              (student) => student.userId == _selectedStudentId,
+                            )
+                            ? _selectedStudentId
+                            : null,
+                        items: filteredStudents
                             .map(
                               (student) => DropdownMenuItem(
                                 value: student.userId,
@@ -282,12 +386,49 @@ class _HometasksScreenState extends State<HometasksScreen> {
             child: FloatingActionButton.extended(
               onPressed: selectedStudent == null
                   ? null
-                  : () => _showAssignHometaskDialog(selectedStudent!),
+                  : () => _showAssignHometaskDialog(student: selectedStudent),
               icon: const Icon(Icons.assignment_add),
               label: Text(l10n?.hometasksAssign ?? 'Assign Hometask'),
             ),
           ),
+        if (isTeacher && _groups.isNotEmpty)
+          Positioned(
+            right: 16,
+            bottom: 84,
+            child: FloatingActionButton.extended(
+              onPressed: () async {
+                final group = await _selectGroupForAssignment();
+                if (!mounted || group == null) return;
+                await _showAssignHometaskDialog(group: group);
+              },
+              icon: const Icon(Icons.groups_2_outlined),
+              label: Text(l10n?.hometasksAssignToGroup ?? 'Assign to Group'),
+            ),
+          ),
       ],
+    );
+  }
+
+  Future<StudentGroupSummary?> _selectGroupForAssignment() async {
+    if (_groups.isEmpty) {
+      return null;
+    }
+
+    final l10n = AppLocalizations.of(context);
+
+    return showDialog<StudentGroupSummary>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(l10n?.hometasksSelectGroupTitle ?? 'Select Group'),
+        children: _groups
+            .map(
+              (group) => SimpleDialogOption(
+                onPressed: () => Navigator.of(context).pop(group),
+                child: Text('${group.name} (${group.students.length})'),
+              ),
+            )
+            .toList(),
+      ),
     );
   }
 
@@ -317,9 +458,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
             const SizedBox(height: 12),
             ElevatedButton(
               onPressed: _loadHometasks,
-              child: Text(
-                AppLocalizations.of(context)?.commonRetry ?? 'Retry',
-              ),
+              child: Text(AppLocalizations.of(context)?.commonRetry ?? 'Retry'),
             ),
           ],
         ),
@@ -333,8 +472,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
     if (hometasks.isEmpty) {
       return Center(
         child: Text(
-          AppLocalizations.of(context)?.hometasksNone ??
-              'No hometasks found.',
+          AppLocalizations.of(context)?.hometasksNone ?? 'No hometasks found.',
         ),
       );
     }
@@ -382,31 +520,40 @@ class _HometasksScreenState extends State<HometasksScreen> {
               hometask: hometask,
               showDragHandle: true,
               dragHandleIndex: index,
-              canEditItems: _isTeacher(context.read<AuthService>()),
+              canEditItems: false,
+              onEditHometask: _isTeacher(context.read<AuthService>())
+                  ? () => _showEditHometaskDialog(hometask)
+                  : _isStudent(context.read<AuthService>()) &&
+                        hometask.hometaskType == HometaskType.freeAnswer &&
+                        !_showArchive
+                  ? () => _showStudentFreeAnswerDialog(hometask)
+                  : null,
               onMarkCompleted: canComplete
                   ? () async => _markCompleted(hometask.id)
                   : null,
-              onToggleItem: canToggleItems &&
+              onToggleItem:
+                  canToggleItems &&
                       hometask.hometaskType == HometaskType.checklist
                   ? (index, value) async => _toggleChecklistItem(
-                        hometaskId: hometask.id,
-                        itemIndex: index,
-                        isDone: value,
-                      )
+                      hometaskId: hometask.id,
+                      itemIndex: index,
+                      isDone: value,
+                    )
                   : null,
-              onChangeProgress: canToggleItems &&
+              onChangeProgress:
+                  canToggleItems &&
                       hometask.hometaskType == HometaskType.progress
                   ? (index, progress) async => _changeProgressItem(
-                        hometaskId: hometask.id,
-                        itemIndex: index,
-                        progress: progress,
-                      )
+                      hometaskId: hometask.id,
+                      itemIndex: index,
+                      progress: progress,
+                    )
                   : null,
               onSaveItems: _isTeacher(context.read<AuthService>())
                   ? (items) async => _saveHometaskItems(
-                        hometaskId: hometask.id,
-                        items: items,
-                      )
+                      hometaskId: hometask.id,
+                      items: items,
+                    )
                   : null,
               onMarkAccomplished: canAccomplish
                   ? () async => _markAccomplished(hometask.id)
@@ -425,10 +572,10 @@ class _HometasksScreenState extends State<HometasksScreen> {
       final rawName = task.teacherName?.trim() ?? '';
       final key = rawName.isNotEmpty
           ? rawName
-          : (AppLocalizations.of(context)?.hometasksTeacherFallback(
-                  task.teacherId,
-                ) ??
-              'Teacher #${task.teacherId}');
+          : (AppLocalizations.of(
+                  context,
+                )?.hometasksTeacherFallback(task.teacherId) ??
+                'Teacher #${task.teacherId}');
       grouped.putIfAbsent(key, () => []).add(task);
     }
 
@@ -449,33 +596,43 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         child: HometaskWidget(
                           hometask: hometask,
-                          canEditItems: _isTeacher(context.read<AuthService>()),
+                          canEditItems: false,
+                          onEditHometask:
+                              _isTeacher(context.read<AuthService>())
+                              ? () => _showEditHometaskDialog(hometask)
+                              : _isStudent(context.read<AuthService>()) &&
+                                    hometask.hometaskType ==
+                                        HometaskType.freeAnswer &&
+                                    !_showArchive
+                              ? () => _showStudentFreeAnswerDialog(hometask)
+                              : null,
                           onMarkCompleted: canComplete
                               ? () async => _markCompleted(hometask.id)
                               : null,
-                          onToggleItem: canToggleItems &&
+                          onToggleItem:
+                              canToggleItems &&
                                   hometask.hometaskType ==
                                       HometaskType.checklist
                               ? (index, value) async => _toggleChecklistItem(
-                                    hometaskId: hometask.id,
-                                    itemIndex: index,
-                                    isDone: value,
-                                  )
+                                  hometaskId: hometask.id,
+                                  itemIndex: index,
+                                  isDone: value,
+                                )
                               : null,
-                          onChangeProgress: canToggleItems &&
-                                  hometask.hometaskType ==
-                                      HometaskType.progress
+                          onChangeProgress:
+                              canToggleItems &&
+                                  hometask.hometaskType == HometaskType.progress
                               ? (index, progress) async => _changeProgressItem(
-                                    hometaskId: hometask.id,
-                                    itemIndex: index,
-                                    progress: progress,
-                                  )
+                                  hometaskId: hometask.id,
+                                  itemIndex: index,
+                                  progress: progress,
+                                )
                               : null,
                           onSaveItems: _isTeacher(context.read<AuthService>())
                               ? (items) async => _saveHometaskItems(
-                                    hometaskId: hometask.id,
-                                    items: items,
-                                  )
+                                  hometaskId: hometask.id,
+                                  items: items,
+                                )
                               : null,
                           onMarkAccomplished: canAccomplish
                               ? () async => _markAccomplished(hometask.id)
@@ -494,10 +651,21 @@ class _HometasksScreenState extends State<HometasksScreen> {
     );
   }
 
-  void _showAssignHometaskDialog(StudentSummary student) {
+  Future<void> _showAssignHometaskDialog({
+    StudentSummary? student,
+    StudentGroupSummary? group,
+  }) async {
+    if ((student == null && group == null) ||
+        (student != null && group != null)) {
+      return;
+    }
+
     final l10n = AppLocalizations.of(context);
     final titleController = TextEditingController();
-    final descriptionController = TextEditingController();
+    final descriptionController = quill.QuillController(
+      document: _documentFromRawContent(null),
+      selection: const TextSelection.collapsed(offset: 0),
+    );
     final itemControllers = [TextEditingController()];
     final repeatDaysController = TextEditingController();
     DateTime? dueDate;
@@ -506,16 +674,25 @@ class _HometasksScreenState extends State<HometasksScreen> {
     String repeatSelection = 'none';
     final formKey = GlobalKey<FormState>();
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           return AlertDialog(
             title: Text(
-              l10n?.hometasksAssignTitle(student.fullName) ??
-                  'Assign Hometask to ${student.fullName}',
+              student != null
+                  ? (l10n?.hometasksAssignTitle(student.fullName) ??
+                        'Assign Hometask to ${student.fullName}')
+                  : () {
+                      final groupName = group!.name;
+                      return l10n?.hometasksAssignTitleGroup(groupName) ??
+                          'Assign Hometask to group $groupName';
+                    }(),
             ),
-            insetPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
             titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
             contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
@@ -536,20 +713,29 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         ),
                         validator: (value) =>
                             value == null || value.trim().isEmpty
-                                ? l10n?.hometasksTitleRequired ??
-                                    'Title is required'
-                                : null,
+                            ? l10n?.hometasksTitleRequired ??
+                                  'Title is required'
+                            : null,
                       ),
                       const SizedBox(height: 12),
-                      TextFormField(
+                      Text(
+                        l10n?.hometasksDescriptionLabel ??
+                            'Description (optional)',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      QuillEditorComposer(
                         controller: descriptionController,
-                        decoration: InputDecoration(
-                          labelText: l10n?.hometasksDescriptionLabel ??
-                              'Description (optional)',
-                          border: const OutlineInputBorder(),
+                        config: const QuillEditorComposerConfig(
+                          showSendButton: false,
+                          minHeight: 100,
+                          maxHeight: 180,
                         ),
-                        minLines: 2,
-                        maxLines: 4,
+                        onAttachmentSelected: () async {
+                          await _showAttachmentMenuForController(
+                            descriptionController,
+                          );
+                        },
                       ),
                       const SizedBox(height: 12),
                       ListTile(
@@ -589,19 +775,27 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         items: [
                           DropdownMenuItem(
                             value: 'none',
-                            child: Text(l10n?.hometasksRepeatNone ?? 'No repeat'),
+                            child: Text(
+                              l10n?.hometasksRepeatNone ?? 'No repeat',
+                            ),
                           ),
                           DropdownMenuItem(
                             value: 'daily',
-                            child: Text(l10n?.hometasksRepeatDaily ?? 'Each day'),
+                            child: Text(
+                              l10n?.hometasksRepeatDaily ?? 'Each day',
+                            ),
                           ),
                           DropdownMenuItem(
                             value: 'weekly',
-                            child: Text(l10n?.hometasksRepeatWeekly ?? 'Each week'),
+                            child: Text(
+                              l10n?.hometasksRepeatWeekly ?? 'Each week',
+                            ),
                           ),
                           DropdownMenuItem(
                             value: 'custom',
-                            child: Text(l10n?.hometasksRepeatCustom ?? 'Custom interval'),
+                            child: Text(
+                              l10n?.hometasksRepeatCustom ?? 'Custom interval',
+                            ),
                           ),
                         ],
                         onChanged: (value) {
@@ -616,7 +810,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         TextFormField(
                           controller: repeatDaysController,
                           decoration: InputDecoration(
-                            labelText: l10n?.hometasksRepeatEveryDays ??
+                            labelText:
+                                l10n?.hometasksRepeatEveryDays ??
                                 'Repeat every (days)',
                             border: const OutlineInputBorder(),
                           ),
@@ -638,7 +833,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
                       DropdownButtonFormField<HometaskType>(
                         initialValue: selectedType,
                         decoration: InputDecoration(
-                          labelText: l10n?.hometasksTypeLabel ?? 'Hometask type',
+                          labelText:
+                              l10n?.hometasksTypeLabel ?? 'Hometask type',
                           border: const OutlineInputBorder(),
                         ),
                         items: [
@@ -648,11 +844,19 @@ class _HometasksScreenState extends State<HometasksScreen> {
                           ),
                           DropdownMenuItem(
                             value: HometaskType.checklist,
-                            child: Text(l10n?.hometasksTypeChecklist ?? 'Checklist'),
+                            child: Text(
+                              l10n?.hometasksTypeChecklist ?? 'Checklist',
+                            ),
                           ),
                           DropdownMenuItem(
                             value: HometaskType.progress,
-                            child: Text(l10n?.hometasksTypeProgress ?? 'Progress'),
+                            child: Text(
+                              l10n?.hometasksTypeProgress ?? 'Progress',
+                            ),
+                          ),
+                          const DropdownMenuItem(
+                            value: HometaskType.freeAnswer,
+                            child: Text('Free answer'),
                           ),
                         ],
                         onChanged: (value) {
@@ -667,8 +871,10 @@ class _HometasksScreenState extends State<HometasksScreen> {
                           selectedType == HometaskType.progress) ...[
                         Text(
                           selectedType == HometaskType.checklist
-                                ? (l10n?.hometasksChecklistItems ?? 'Checklist items')
-                                : (l10n?.hometasksProgressItems ?? 'Progress items'),
+                              ? (l10n?.hometasksChecklistItems ??
+                                    'Checklist items')
+                              : (l10n?.hometasksProgressItems ??
+                                    'Progress items'),
                           style: Theme.of(context).textTheme.titleSmall,
                         ),
                         const SizedBox(height: 8),
@@ -681,14 +887,16 @@ class _HometasksScreenState extends State<HometasksScreen> {
                                   child: TextFormField(
                                     controller: itemControllers[index],
                                     decoration: InputDecoration(
-                                      labelText: l10n?.hometasksItemLabel(index + 1) ??
+                                      labelText:
+                                          l10n?.hometasksItemLabel(index + 1) ??
                                           'Item ${index + 1}',
                                       border: const OutlineInputBorder(),
                                     ),
                                     validator: (value) =>
                                         value == null || value.trim().isEmpty
-                                            ? (l10n?.hometasksRequired ?? 'Required')
-                                            : null,
+                                        ? (l10n?.hometasksRequired ??
+                                              'Required')
+                                        : null,
                                   ),
                                 ),
                                 if (itemControllers.length > 1)
@@ -698,7 +906,9 @@ class _HometasksScreenState extends State<HometasksScreen> {
                                         itemControllers.removeAt(index);
                                       });
                                     },
-                                    icon: const Icon(Icons.remove_circle_outline),
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                    ),
                                   ),
                               ],
                             ),
@@ -737,18 +947,20 @@ class _HometasksScreenState extends State<HometasksScreen> {
                           return;
                         }
 
-                        final items = selectedType == HometaskType.checklist ||
+                        final items =
+                            selectedType == HometaskType.checklist ||
                                 selectedType == HometaskType.progress
                             ? itemControllers
-                                .map((controller) => controller.text.trim())
-                                .where((text) => text.isNotEmpty)
-                                .toList()
+                                  .map((controller) => controller.text.trim())
+                                  .where((text) => text.isNotEmpty)
+                                  .toList()
                             : <String>[];
 
                         if ((selectedType == HometaskType.checklist ||
                                 selectedType == HometaskType.progress) &&
                             items.isEmpty) {
-                          final typeLabel = selectedType == HometaskType.checklist
+                          final typeLabel =
+                              selectedType == HometaskType.checklist
                               ? (l10n?.hometasksTypeChecklist ?? 'checklist')
                               : (l10n?.hometasksTypeProgress ?? 'progress');
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -771,9 +983,11 @@ class _HometasksScreenState extends State<HometasksScreen> {
                             repeatEveryDays = 7;
                             break;
                           case 'custom':
-                            repeatEveryDays =
-                                int.tryParse(repeatDaysController.text.trim());
-                            if (repeatEveryDays == null || repeatEveryDays <= 0) {
+                            repeatEveryDays = int.tryParse(
+                              repeatDaysController.text.trim(),
+                            );
+                            if (repeatEveryDays == null ||
+                                repeatEveryDays <= 0) {
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: Text(
@@ -796,11 +1010,17 @@ class _HometasksScreenState extends State<HometasksScreen> {
 
                         final hometaskService = context.read<HometaskService>();
                         final success = await hometaskService.createHometask(
-                          studentId: student.userId,
+                          studentId: student?.userId,
+                          groupId: group?.id,
                           title: titleController.text.trim(),
-                          description: descriptionController.text.trim().isEmpty
+                          description:
+                              _isQuillDocumentEmpty(
+                                descriptionController.document,
+                              )
                               ? null
-                              : descriptionController.text.trim(),
+                              : _serializeQuillDocument(
+                                  descriptionController.document,
+                                ),
                           dueDate: dueDate,
                           hometaskType: selectedType,
                           items: items.isEmpty ? null : items,
@@ -838,6 +1058,619 @@ class _HometasksScreenState extends State<HometasksScreen> {
         },
       ),
     );
+
+    titleController.dispose();
+    descriptionController.dispose();
+    repeatDaysController.dispose();
+    for (final controller in itemControllers) {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _showEditHometaskDialog(Hometask hometask) async {
+    final l10n = AppLocalizations.of(context);
+    final titleController = TextEditingController(text: hometask.title);
+    final descriptionController = quill.QuillController(
+      document: _documentFromRawContent(hometask.description),
+      selection: const TextSelection.collapsed(offset: 0),
+    );
+
+    final editingItems = hometask.checklistItems.isNotEmpty
+        ? List<ChecklistItem>.from(hometask.checklistItems)
+        : [
+            ChecklistItem(
+              text: '',
+              isDone: false,
+              progress: hometask.hometaskType == HometaskType.progress
+                  ? 0
+                  : null,
+            ),
+          ];
+    final itemControllers = editingItems
+        .map((item) => TextEditingController(text: item.text))
+        .toList();
+    bool isSubmitting = false;
+    final formKey = GlobalKey<FormState>();
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text(l10n?.commonEdit ?? 'Edit'),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            content: SizedBox(
+              width: 560,
+              child: Form(
+                key: formKey,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextFormField(
+                        controller: titleController,
+                        decoration: InputDecoration(
+                          labelText: l10n?.hometasksTitleLabel ?? 'Title',
+                          border: const OutlineInputBorder(),
+                        ),
+                        validator: (value) =>
+                            value == null || value.trim().isEmpty
+                            ? l10n?.hometasksTitleRequired ??
+                                  'Title is required'
+                            : null,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        l10n?.hometasksDescriptionLabel ??
+                            'Description (optional)',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      QuillEditorComposer(
+                        controller: descriptionController,
+                        config: const QuillEditorComposerConfig(
+                          showSendButton: false,
+                          minHeight: 100,
+                          maxHeight: 180,
+                        ),
+                        onAttachmentSelected: () async {
+                          await _showAttachmentMenuForController(
+                            descriptionController,
+                          );
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      if (hometask.hometaskType == HometaskType.checklist ||
+                          hometask.hometaskType == HometaskType.progress) ...[
+                        Text(
+                          hometask.hometaskType == HometaskType.checklist
+                              ? (l10n?.hometasksChecklistItems ??
+                                    'Checklist items')
+                              : (l10n?.hometasksProgressItems ??
+                                    'Progress items'),
+                          style: Theme.of(context).textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        ...List.generate(itemControllers.length, (index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextFormField(
+                                    controller: itemControllers[index],
+                                    decoration: InputDecoration(
+                                      labelText:
+                                          l10n?.hometasksItemLabel(index + 1) ??
+                                          'Item ${index + 1}',
+                                      border: const OutlineInputBorder(),
+                                    ),
+                                  ),
+                                ),
+                                if (itemControllers.length > 1)
+                                  IconButton(
+                                    onPressed: () {
+                                      setDialogState(() {
+                                        itemControllers
+                                            .removeAt(index)
+                                            .dispose();
+                                        editingItems.removeAt(index);
+                                      });
+                                    },
+                                    icon: const Icon(
+                                      Icons.remove_circle_outline,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          );
+                        }),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton.icon(
+                            onPressed: () {
+                              setDialogState(() {
+                                itemControllers.add(TextEditingController());
+                                editingItems.add(
+                                  ChecklistItem(
+                                    text: '',
+                                    isDone: false,
+                                    progress:
+                                        hometask.hometaskType ==
+                                            HometaskType.progress
+                                        ? 0
+                                        : null,
+                                  ),
+                                );
+                              });
+                            },
+                            icon: const Icon(Icons.add),
+                            label: Text(l10n?.hometasksAddItem ?? 'Add item'),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () => Navigator.of(context).pop(),
+                child: Text(l10n?.commonCancel ?? 'Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        if (!formKey.currentState!.validate()) {
+                          return;
+                        }
+
+                        List<ChecklistItem>? updatedItems;
+                        if (hometask.hometaskType == HometaskType.checklist ||
+                            hometask.hometaskType == HometaskType.progress) {
+                          final texts = itemControllers
+                              .map((controller) => controller.text.trim())
+                              .where((text) => text.isNotEmpty)
+                              .toList();
+                          if (texts.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Add at least one item.'),
+                              ),
+                            );
+                            return;
+                          }
+
+                          updatedItems = texts.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final text = entry.value;
+                            final currentItem = index < editingItems.length
+                                ? editingItems[index]
+                                : ChecklistItem(
+                                    text: '',
+                                    isDone: false,
+                                    progress:
+                                        hometask.hometaskType ==
+                                            HometaskType.progress
+                                        ? 0
+                                        : null,
+                                  );
+
+                            if (hometask.hometaskType ==
+                                HometaskType.progress) {
+                              return ChecklistItem(
+                                text: text,
+                                isDone: false,
+                                progress: currentItem.progress ?? 0,
+                              );
+                            }
+
+                            return ChecklistItem(
+                              text: text,
+                              isDone: currentItem.isDone,
+                            );
+                          }).toList();
+                        }
+
+                        setDialogState(() {
+                          isSubmitting = true;
+                        });
+
+                        bool applyToGroup = false;
+                        if (hometask.groupAssignmentId != null) {
+                          final decision = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: Text(
+                                l10n?.hometasksApplyGroupChangesTitle ??
+                                    'Apply group changes',
+                              ),
+                              content: Text(
+                                l10n?.hometasksApplyGroupChangesMessage ??
+                                    'Apply these edits to all students in this group hometask?',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(false),
+                                  child: Text(
+                                    l10n?.hometasksApplyOnlyThisStudent ??
+                                        'Only this student',
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () =>
+                                      Navigator.of(context).pop(true),
+                                  child: Text(
+                                    l10n?.hometasksApplyToGroup ??
+                                        'Apply to group',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+
+                          if (decision == null) {
+                            setDialogState(() {
+                              isSubmitting = false;
+                            });
+                            return;
+                          }
+                          applyToGroup = decision;
+                        }
+
+                        final hometaskService = context.read<HometaskService>();
+                        final success = await hometaskService.updateHometask(
+                          hometaskId: hometask.id,
+                          title: titleController.text.trim(),
+                          description:
+                              _isQuillDocumentEmpty(
+                                descriptionController.document,
+                              )
+                              ? null
+                              : _serializeQuillDocument(
+                                  descriptionController.document,
+                                ),
+                          items: updatedItems,
+                          applyToGroup: applyToGroup,
+                        );
+
+                        if (success && context.mounted) {
+                          Navigator.of(context).pop();
+                          await _loadHometasks();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                l10n?.hometasksItemsSaved ??
+                                    'Items saved successfully.',
+                              ),
+                            ),
+                          );
+                        } else if (context.mounted) {
+                          setDialogState(() {
+                            isSubmitting = false;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Failed to update hometask.'),
+                            ),
+                          );
+                        }
+                      },
+                child: Text(l10n?.commonSave ?? 'Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    titleController.dispose();
+    descriptionController.dispose();
+    for (final controller in itemControllers) {
+      controller.dispose();
+    }
+  }
+
+  Future<void> _showStudentFreeAnswerDialog(Hometask hometask) async {
+    final l10n = AppLocalizations.of(context);
+    final initialRaw = hometask.checklistItems.isNotEmpty
+        ? hometask.checklistItems.first.text
+        : null;
+    final answerController = quill.QuillController(
+      document: _documentFromRawContent(initialRaw),
+      selection: const TextSelection.collapsed(offset: 0),
+    );
+    bool isSubmitting = false;
+
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          return AlertDialog(
+            title: Text(l10n?.commonEdit ?? 'Edit'),
+            insetPadding: const EdgeInsets.symmetric(
+              horizontal: 8,
+              vertical: 8,
+            ),
+            titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
+            contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+            actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+            content: SizedBox(
+              width: 560,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Free answer content',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
+                  const SizedBox(height: 8),
+                  QuillEditorComposer(
+                    controller: answerController,
+                    config: const QuillEditorComposerConfig(
+                      showSendButton: false,
+                      minHeight: 120,
+                      maxHeight: 260,
+                    ),
+                    onAttachmentSelected: () async {
+                      await _showAttachmentMenuForController(answerController);
+                    },
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () => Navigator.of(context).pop(),
+                child: Text(l10n?.commonCancel ?? 'Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        if (_isQuillDocumentEmpty(answerController.document)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Answer cannot be empty.'),
+                            ),
+                          );
+                          return;
+                        }
+
+                        setDialogState(() {
+                          isSubmitting = true;
+                        });
+
+                        final hometaskService = context.read<HometaskService>();
+                        final success = await hometaskService
+                            .updateChecklistItems(
+                              hometaskId: hometask.id,
+                              items: [
+                                ChecklistItem(
+                                  text: _serializeQuillDocument(
+                                    answerController.document,
+                                  ),
+                                  isDone: false,
+                                ),
+                              ],
+                            );
+
+                        if (success && context.mounted) {
+                          Navigator.of(context).pop();
+                          await _loadHometasks();
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                l10n?.hometasksItemsSaved ??
+                                    'Items saved successfully.',
+                              ),
+                            ),
+                          );
+                        } else if (context.mounted) {
+                          setDialogState(() {
+                            isSubmitting = false;
+                          });
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Failed to save answer.'),
+                            ),
+                          );
+                        }
+                      },
+                child: Text(l10n?.commonSave ?? 'Save'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    answerController.dispose();
+  }
+
+  void _insertEmbed(quill.QuillController controller, String type, String url) {
+    final selection = controller.selection;
+    final index = selection.baseOffset < 0
+        ? controller.document.length
+        : selection.baseOffset;
+
+    quill.BlockEmbed embed;
+    switch (type) {
+      case 'image':
+        embed = quill.BlockEmbed.image(url);
+        break;
+      case 'video':
+        embed = quill.BlockEmbed.video(url);
+        break;
+      case 'audio':
+      case 'voice':
+      case 'file':
+        embed = quill.BlockEmbed.custom(quill.CustomBlockEmbed(type, url));
+        break;
+      default:
+        embed = quill.BlockEmbed.custom(quill.CustomBlockEmbed('file', url));
+    }
+
+    controller.document.insert(index, embed);
+    controller.updateSelection(
+      TextSelection.collapsed(offset: index + 1),
+      quill.ChangeSource.local,
+    );
+  }
+
+  Future<void> _pickAttachmentForController(
+    quill.QuillController controller, {
+    required String attachmentType,
+  }) async {
+    final allowed = <String, List<String>>{
+      'image': ['jpg', 'jpeg', 'png', 'webp'],
+      'audio': ['mp3', 'm4a', 'ogg', 'opus', 'wav'],
+      'video': ['mp4', 'webm', 'mov', 'mkv'],
+      'file': [],
+    };
+
+    final type = attachmentType == 'file' ? FileType.any : FileType.custom;
+    final result = await FilePicker.platform.pickFiles(
+      type: type,
+      allowedExtensions: type == FileType.custom
+          ? allowed[attachmentType]
+          : null,
+      withData: true,
+    );
+
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null) return;
+
+    final feedService = context.read<FeedService>();
+    final uploaded = await feedService.uploadMedia(
+      mediaType: attachmentType,
+      bytes: bytes,
+      filename: file.name,
+    );
+
+    if (!mounted) return;
+
+    if (uploaded == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLocalizations.of(context)?.feedsUploadFailed ??
+                'Failed to upload media',
+          ),
+        ),
+      );
+      return;
+    }
+
+    _insertEmbed(controller, attachmentType, uploaded.url);
+  }
+
+  Future<void> _showAttachmentMenuForController(
+    quill.QuillController controller,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Wrap(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.image),
+                title: const Text('Image'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachmentForController(
+                    controller,
+                    attachmentType: 'image',
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.video_library),
+                title: const Text('Video'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachmentForController(
+                    controller,
+                    attachmentType: 'video',
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.audiotrack),
+                title: const Text('Audio'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachmentForController(
+                    controller,
+                    attachmentType: 'audio',
+                  );
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.attach_file),
+                title: const Text('File'),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  _pickAttachmentForController(
+                    controller,
+                    attachmentType: 'file',
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  quill.Document _documentFromRawContent(String? rawContent) {
+    if (rawContent == null || rawContent.trim().isEmpty) {
+      return quill.Document();
+    }
+
+    try {
+      final decoded = jsonDecode(rawContent);
+      if (decoded is List) {
+        final ops = decoded.whereType<Map<String, dynamic>>().toList();
+        return quill.Document.fromJson(ops);
+      }
+      if (decoded is Map<String, dynamic> && decoded['ops'] is List) {
+        final ops = (decoded['ops'] as List)
+            .whereType<Map<String, dynamic>>()
+            .toList();
+        return quill.Document.fromJson(ops);
+      }
+    } catch (_) {}
+
+    return quill.Document()..insert(0, rawContent);
+  }
+
+  String _serializeQuillDocument(quill.Document document) {
+    return jsonEncode({'ops': document.toDelta().toJson()});
+  }
+
+  bool _isQuillDocumentEmpty(quill.Document document) {
+    return document.toPlainText().trim().isEmpty;
   }
 
   Future<void> _toggleChecklistItem({
@@ -984,8 +1817,52 @@ class _HometasksScreenState extends State<HometasksScreen> {
   }
 
   Future<void> _markAccomplished(int hometaskId) async {
+    final l10n = AppLocalizations.of(context);
     final hometaskService = context.read<HometaskService>();
-    final success = await hometaskService.markAccomplished(hometaskId);
+    final allTasks = _orderedHometasks.isNotEmpty
+        ? _orderedHometasks
+        : hometaskService.hometasks;
+    final task = allTasks.cast<Hometask?>().firstWhere(
+      (item) => item?.id == hometaskId,
+      orElse: () => null,
+    );
+
+    bool applyToGroup = false;
+    if (task?.groupAssignmentId != null) {
+      final decision = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            l10n?.hometasksArchiveGroupTitle ?? 'Archive group hometask',
+          ),
+          content: Text(
+            l10n?.hometasksArchiveGroupMessage ??
+                'Archive only this student task, or all tasks in this group assignment?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                l10n?.hometasksApplyOnlyThisStudent ?? 'Only this student',
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(
+                l10n?.hometasksArchiveForGroup ?? 'Archive for group',
+              ),
+            ),
+          ],
+        ),
+      );
+      if (decision == null) return;
+      applyToGroup = decision;
+    }
+
+    final success = await hometaskService.markAccomplishedWithOptions(
+      hometaskId: hometaskId,
+      applyToGroup: applyToGroup,
+    );
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -1002,8 +1879,50 @@ class _HometasksScreenState extends State<HometasksScreen> {
   }
 
   Future<void> _markReopened(int hometaskId) async {
+    final l10n = AppLocalizations.of(context);
     final hometaskService = context.read<HometaskService>();
-    final success = await hometaskService.markReopened(hometaskId);
+    final allTasks = _orderedHometasks.isNotEmpty
+        ? _orderedHometasks
+        : hometaskService.hometasks;
+    final task = allTasks.cast<Hometask?>().firstWhere(
+      (item) => item?.id == hometaskId,
+      orElse: () => null,
+    );
+
+    bool applyToGroup = false;
+    if (task?.groupAssignmentId != null) {
+      final decision = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(
+            l10n?.hometasksReopenGroupTitle ?? 'Reopen group hometask',
+          ),
+          content: Text(
+            l10n?.hometasksReopenGroupMessage ??
+                'Reopen only this student task, or all tasks in this group assignment?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(
+                l10n?.hometasksApplyOnlyThisStudent ?? 'Only this student',
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(l10n?.hometasksReopenForGroup ?? 'Reopen for group'),
+            ),
+          ],
+        ),
+      );
+      if (decision == null) return;
+      applyToGroup = decision;
+    }
+
+    final success = await hometaskService.markReopenedWithOptions(
+      hometaskId: hometaskId,
+      applyToGroup: applyToGroup,
+    );
     if (!success && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

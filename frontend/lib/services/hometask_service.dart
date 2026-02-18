@@ -19,10 +19,8 @@ class HometaskService extends ChangeNotifier {
   String? _currentFullName;
   String? _lastToken;
 
-  HometaskService({
-    required this.authService,
-    String? baseUrl,
-  }) : baseUrl = baseUrl ?? AppConfig.instance.baseUrl {
+  HometaskService({required this.authService, String? baseUrl})
+    : baseUrl = baseUrl ?? AppConfig.instance.baseUrl {
     _lastToken = authService.token;
   }
 
@@ -90,8 +88,9 @@ class HometaskService extends ChangeNotifier {
     }
 
     try {
-      final uri = Uri.parse('$baseUrl/api/students/$studentId/hometasks')
-          .replace(queryParameters: {'status': status});
+      final uri = Uri.parse(
+        '$baseUrl/api/students/$studentId/hometasks',
+      ).replace(queryParameters: {'status': status});
 
       final response = await http.get(
         uri,
@@ -133,9 +132,7 @@ class HometaskService extends ChangeNotifier {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'status': 'completed_by_student',
-        }),
+        body: jsonEncode({'status': 'completed_by_student'}),
       );
 
       if (response.statusCode == 200) {
@@ -151,6 +148,13 @@ class HometaskService extends ChangeNotifier {
   }
 
   Future<bool> markAccomplished(int hometaskId) async {
+    return markAccomplishedWithOptions(hometaskId: hometaskId);
+  }
+
+  Future<bool> markAccomplishedWithOptions({
+    required int hometaskId,
+    bool applyToGroup = false,
+  }) async {
     if (authService.token == null) return false;
 
     try {
@@ -162,6 +166,7 @@ class HometaskService extends ChangeNotifier {
         },
         body: jsonEncode({
           'status': 'accomplished_by_teacher',
+          if (applyToGroup) 'apply_to_group': true,
         }),
       );
 
@@ -178,6 +183,13 @@ class HometaskService extends ChangeNotifier {
   }
 
   Future<bool> markReopened(int hometaskId) async {
+    return markReopenedWithOptions(hometaskId: hometaskId);
+  }
+
+  Future<bool> markReopenedWithOptions({
+    required int hometaskId,
+    bool applyToGroup = false,
+  }) async {
     if (authService.token == null) return false;
 
     try {
@@ -189,6 +201,7 @@ class HometaskService extends ChangeNotifier {
         },
         body: jsonEncode({
           'status': 'assigned',
+          if (applyToGroup) 'apply_to_group': true,
         }),
       );
 
@@ -218,17 +231,15 @@ class HometaskService extends ChangeNotifier {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'items': items
-              .map((item) {
-                final itemMap = <String, dynamic>{'text': item.text};
-                if (item.progress != null) {
-                  itemMap['progress'] = item.progress;
-                } else {
-                  itemMap['is_done'] = item.isDone;
-                }
-                return itemMap;
-              })
-              .toList(),
+          'items': items.map((item) {
+            final itemMap = <String, dynamic>{'text': item.text};
+            if (item.progress != null) {
+              itemMap['progress'] = item.progress;
+            } else {
+              itemMap['is_done'] = item.isDone;
+            }
+            return itemMap;
+          }).toList(),
         }),
       );
 
@@ -242,7 +253,8 @@ class HometaskService extends ChangeNotifier {
   }
 
   Future<bool> createHometask({
-    required int studentId,
+    int? studentId,
+    int? groupId,
     required String title,
     String? description,
     DateTime? dueDate,
@@ -252,6 +264,11 @@ class HometaskService extends ChangeNotifier {
   }) async {
     if (authService.token == null) return false;
 
+    if ((studentId == null && groupId == null) ||
+        (studentId != null && groupId != null)) {
+      return false;
+    }
+
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/api/hometasks'),
@@ -260,7 +277,8 @@ class HometaskService extends ChangeNotifier {
           'Content-Type': 'application/json',
         },
         body: jsonEncode({
-          'student_id': studentId,
+          if (studentId != null) 'student_id': studentId,
+          if (groupId != null) 'group_id': groupId,
           'title': title,
           'description': description,
           if (dueDate != null) 'due_date': dueDate.toUtc().toIso8601String(),
@@ -281,6 +299,48 @@ class HometaskService extends ChangeNotifier {
     }
   }
 
+  Future<bool> updateHometask({
+    required int hometaskId,
+    String? title,
+    String? description,
+    List<ChecklistItem>? items,
+    bool applyToGroup = false,
+  }) async {
+    if (authService.token == null) return false;
+
+    try {
+      final response = await http.put(
+        Uri.parse('$baseUrl/api/hometasks/$hometaskId'),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          if (title != null) 'title': title,
+          'description': description,
+          if (applyToGroup) 'apply_to_group': true,
+          if (items != null)
+            'items': items.map((item) {
+              final itemMap = <String, dynamic>{'text': item.text};
+              if (item.progress != null) {
+                itemMap['progress'] = item.progress;
+              } else {
+                itemMap['is_done'] = item.isDone;
+              }
+              return itemMap;
+            }).toList(),
+        }),
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error updating hometask: $e');
+      }
+      return false;
+    }
+  }
+
   String _serializeType(HometaskType type) {
     switch (type) {
       case HometaskType.simple:
@@ -289,6 +349,8 @@ class HometaskService extends ChangeNotifier {
         return 'checklist';
       case HometaskType.progress:
         return 'progress';
+      case HometaskType.freeAnswer:
+        return 'free_answer';
       case HometaskType.dailyRoutine:
         return 'daily_routine';
       case HometaskType.photoSubmission:
@@ -311,9 +373,7 @@ class HometaskService extends ChangeNotifier {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({
-          'hometask_ids': orderedIds,
-        }),
+        body: jsonEncode({'hometask_ids': orderedIds}),
       );
 
       return response.statusCode == 200;
@@ -386,6 +446,36 @@ class HometaskService extends ChangeNotifier {
     }
   }
 
+  Future<List<StudentGroupSummary>> fetchGroupsForTeacher() async {
+    if (authService.token == null) return [];
+
+    final teacherId = await _ensureCurrentUserId();
+    if (teacherId == null) return [];
+
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/api/teachers/$teacherId/groups'),
+        headers: {
+          'Authorization': 'Bearer ${authService.token}',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode != 200) return [];
+
+      final List<dynamic> data = jsonDecode(response.body);
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(StudentGroupSummary.fromJson)
+          .toList();
+    } catch (e) {
+      if (kDebugMode) {
+        print('Error fetching teacher groups: $e');
+      }
+      return [];
+    }
+  }
+
   Future<int?> getCurrentUserId() async {
     return _ensureCurrentUserId();
   }
@@ -441,5 +531,32 @@ class HometaskService extends ChangeNotifier {
 
   bool _hasRole(String role) {
     return authService.roles.contains(role);
+  }
+}
+
+class StudentGroupSummary {
+  final int id;
+  final int teacherUserId;
+  final String name;
+  final List<StudentSummary> students;
+
+  StudentGroupSummary({
+    required this.id,
+    required this.teacherUserId,
+    required this.name,
+    required this.students,
+  });
+
+  factory StudentGroupSummary.fromJson(Map<String, dynamic> json) {
+    final studentsRaw = json['students'] as List<dynamic>? ?? [];
+    return StudentGroupSummary(
+      id: json['id'] as int,
+      teacherUserId: (json['teacher_user_id'] as num?)?.toInt() ?? 0,
+      name: (json['name'] as String?) ?? '',
+      students: studentsRaw
+          .whereType<Map<String, dynamic>>()
+          .map(StudentSummary.fromJson)
+          .toList(),
+    );
   }
 }

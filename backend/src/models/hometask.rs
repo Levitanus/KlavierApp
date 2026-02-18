@@ -18,6 +18,7 @@ pub enum HometaskType {
     Simple,
     Checklist,
     Progress,
+    FreeAnswer,
     DailyRoutine,
     PhotoSubmission,
     TextSubmission,

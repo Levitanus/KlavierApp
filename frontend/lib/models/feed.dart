@@ -1,10 +1,25 @@
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'chat.dart';
 
+int _parseIntField(Map<String, dynamic> json, List<String> keys) {
+  for (final key in keys) {
+    final raw = json[key];
+    if (raw == null) continue;
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    if (raw is String) {
+      final parsed = int.tryParse(raw);
+      if (parsed != null) return parsed;
+    }
+  }
+  throw FormatException('Missing integer field: ${keys.join(' or ')}');
+}
+
 class Feed {
   final int id;
   final String ownerType;
   final int? ownerUserId;
+  final int? ownerGroupId;
   final String title;
   final DateTime createdAt;
 
@@ -12,6 +27,7 @@ class Feed {
     required this.id,
     required this.ownerType,
     required this.ownerUserId,
+    required this.ownerGroupId,
     required this.title,
     required this.createdAt,
   });
@@ -21,6 +37,7 @@ class Feed {
       id: json['id'] as int,
       ownerType: json['owner_type'] as String,
       ownerUserId: json['owner_user_id'] as int?,
+      ownerGroupId: json['owner_group_id'] as int?,
       title: json['title'] as String,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
@@ -34,6 +51,7 @@ class Feed {
           id == other.id &&
           ownerType == other.ownerType &&
           ownerUserId == other.ownerUserId &&
+          ownerGroupId == other.ownerGroupId &&
           title == other.title &&
           createdAt == other.createdAt;
 
@@ -42,6 +60,7 @@ class Feed {
       id.hashCode ^
       ownerType.hashCode ^
       ownerUserId.hashCode ^
+      ownerGroupId.hashCode ^
       title.hashCode ^
       createdAt.hashCode;
 }
@@ -50,10 +69,7 @@ class FeedSettings {
   final int feedId;
   final bool allowStudentPosts;
 
-  FeedSettings({
-    required this.feedId,
-    required this.allowStudentPosts,
-  });
+  FeedSettings({required this.feedId, required this.allowStudentPosts});
 
   factory FeedSettings.fromJson(Map<String, dynamic> json) {
     return FeedSettings(
@@ -117,14 +133,15 @@ class FeedPost {
 
   factory FeedPost.fromJson(Map<String, dynamic> json) {
     return FeedPost(
-      id: json['id'] as int,
-      feedId: json['feed_id'] as int,
-      authorUserId: json['author_user_id'] as int,
+      id: _parseIntField(json, ['id']),
+      feedId: _parseIntField(json, ['feed_id', 'feedId']),
+      authorUserId: _parseIntField(json, ['author_user_id', 'authorUserId']),
       title: json['title'] as String?,
       content: (json['content'] as List<dynamic>? ?? []).toList(),
-        attachments: (json['attachments'] as List?)
-            ?.map((a) => ChatAttachment.fromJson(a as Map<String, dynamic>))
-            .toList() ??
+      attachments:
+          (json['attachments'] as List?)
+              ?.map((a) => ChatAttachment.fromJson(a as Map<String, dynamic>))
+              .toList() ??
           [],
       isImportant: json['is_important'] as bool? ?? false,
       importantRank: json['important_rank'] as int?,
@@ -167,12 +184,15 @@ class FeedComment {
 
   factory FeedComment.fromJson(Map<String, dynamic> json) {
     return FeedComment(
-      id: json['id'] as int,
-      postId: json['post_id'] as int,
-      authorUserId: json['author_user_id'] as int,
-      parentCommentId: json['parent_comment_id'] as int?,
+      id: _parseIntField(json, ['id']),
+      postId: _parseIntField(json, ['post_id', 'postId']),
+      authorUserId: _parseIntField(json, ['author_user_id', 'authorUserId']),
+      parentCommentId:
+          (json['parent_comment_id'] as num?)?.toInt() ??
+          (json['parentCommentId'] as num?)?.toInt(),
       content: (json['content'] as List<dynamic>? ?? []).toList(),
-      attachments: (json['attachments'] as List?)
+      attachments:
+          (json['attachments'] as List?)
               ?.map((a) => ChatAttachment.fromJson(a as Map<String, dynamic>))
               .toList() ??
           [],

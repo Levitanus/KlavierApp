@@ -1,13 +1,46 @@
-use actix_web::{web, HttpResponse, HttpRequest, Result};
-use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
+use actix_web::{web, HttpRequest, HttpResponse, Result};
 use chrono::{DateTime, Utc};
+use log::error;
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
-use log::{error};
+use sqlx::PgPool;
 
-use crate::AppState;
 use crate::push;
 use crate::users::verify_token;
+use crate::AppState;
+
+pub async fn is_user_notification_eligible(db: &PgPool, user_id: i32) -> bool {
+    let eligibility: (bool, bool, bool, bool, bool) = match sqlx::query_as(
+        "SELECT
+            EXISTS(SELECT 1 FROM users u WHERE u.id = $1) AS user_exists,
+            EXISTS(
+                SELECT 1 FROM user_roles ur
+                JOIN roles r ON ur.role_id = r.id
+                WHERE ur.user_id = $1 AND r.name = 'admin'
+            ) AS is_admin,
+            EXISTS(SELECT 1 FROM students s WHERE s.user_id = $1 AND s.status = 'active') AS has_active_student,
+            EXISTS(SELECT 1 FROM parents p WHERE p.user_id = $1 AND p.status = 'active') AS has_active_parent,
+            EXISTS(SELECT 1 FROM teachers t WHERE t.user_id = $1 AND t.status = 'active') AS has_active_teacher"
+    )
+    .bind(user_id)
+    .fetch_one(db)
+    .await
+    {
+        Ok(value) => value,
+        Err(e) => {
+            error!(
+                "Database error checking notification eligibility for user {}: {:?}",
+                user_id, e
+            );
+            return false;
+        }
+    };
+
+    let (user_exists, is_admin, has_active_student, has_active_parent, has_active_teacher) =
+        eligibility;
+
+    user_exists && (is_admin || has_active_student || has_active_parent || has_active_teacher)
+}
 
 #[derive(Debug, Serialize, Deserialize, sqlx::FromRow)]
 pub struct Notification {
@@ -113,31 +146,31 @@ pub async fn get_notifications(
     query: web::Query<NotificationQuery>,
 ) -> Result<HttpResponse> {
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
-    
+
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0);
-    
+
     let mut query_builder = sqlx::QueryBuilder::new(
         "SELECT id, user_id, type as notification_type, title, body, created_at, read_at, priority \
          FROM notifications WHERE user_id = "
     );
     query_builder.push_bind(user_id);
-    
+
     if let Some(true) = query.unread_only {
         query_builder.push(" AND read_at IS NULL");
     }
-    
+
     if let Some(ref notification_type) = query.notification_type {
         query_builder.push(" AND type = ");
         query_builder.push_bind(notification_type);
     }
     query_builder.push(" AND type <> 'chat_message'");
-    
+
     query_builder.push(" ORDER BY created_at DESC LIMIT ");
     query_builder.push_bind(limit);
     query_builder.push(" OFFSET ");
     query_builder.push_bind(offset);
-    
+
     let notifications = query_builder
         .build_query_as::<Notification>()
         .fetch_all(&app_state.db)
@@ -146,7 +179,7 @@ pub async fn get_notifications(
             error!("Database error fetching notifications: {:?}", e);
             actix_web::error::ErrorInternalServerError("Failed to fetch notifications")
         })?;
-    
+
     Ok(HttpResponse::Ok().json(notifications))
 }
 
@@ -157,13 +190,13 @@ pub async fn mark_as_read(
     payload: web::Json<MarkAsReadRequest>,
 ) -> Result<HttpResponse> {
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
-    
+
     let result = sqlx::query(
         r#"
         UPDATE notifications 
         SET read_at = NOW()
         WHERE id = ANY($1) AND user_id = $2 AND read_at IS NULL
-        "#
+        "#,
     )
     .bind(&payload.notification_ids)
     .bind(user_id)
@@ -173,7 +206,7 @@ pub async fn mark_as_read(
         error!("Database error marking notifications as read: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to mark notifications as read")
     })?;
-    
+
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "marked_as_read": result.rows_affected()
     })))
@@ -185,7 +218,7 @@ pub async fn get_unread_count(
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse> {
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
-    
+
     let count = sqlx::query_scalar::<_, i64>(
         "SELECT COUNT(*) FROM notifications WHERE user_id = $1 AND read_at IS NULL AND type <> 'chat_message'"
     )
@@ -196,7 +229,7 @@ pub async fn get_unread_count(
         error!("Database error getting unread count: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to get unread count")
     })?;
-    
+
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "unread_count": count
     })))
@@ -207,51 +240,37 @@ pub async fn create_notification(
     db: web::Data<PgPool>,
     payload: web::Json<CreateNotification>,
 ) -> Result<HttpResponse> {
-    // Check if target user has admin role or any active activity role
-    let role_statuses: (bool, bool, bool, bool, bool) = sqlx::query_as(
-        "SELECT
-            EXISTS(SELECT 1 FROM users u WHERE u.id = $1) AS user_exists,
-            EXISTS(
-                SELECT 1 FROM user_roles ur
-                JOIN roles r ON ur.role_id = r.id
-                WHERE ur.user_id = $1 AND r.name = 'admin'
-            ) AS is_admin,
-            EXISTS(SELECT 1 FROM students s WHERE s.user_id = $1 AND s.status = 'active') AS has_active_student,
-            EXISTS(SELECT 1 FROM parents p WHERE p.user_id = $1 AND p.status = 'active') AS has_active_parent,
-            EXISTS(SELECT 1 FROM teachers t WHERE t.user_id = $1 AND t.status = 'active') AS has_active_teacher"
-    )
-    .bind(payload.user_id)
-    .fetch_one(db.get_ref())
-    .await
-    .map_err(|e| {
-        error!("Database error checking role status: {:?}", e);
-        actix_web::error::ErrorInternalServerError("Failed to verify user")
-    })?;
-
-    let (user_exists, is_admin, has_active_student, has_active_parent, has_active_teacher) = role_statuses;
+    let user_exists =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)")
+            .bind(payload.user_id)
+            .fetch_one(db.get_ref())
+            .await
+            .map_err(|e| {
+                error!("Database error checking user existence: {:?}", e);
+                actix_web::error::ErrorInternalServerError("Failed to verify user")
+            })?;
 
     if !user_exists {
         return Err(actix_web::error::ErrorNotFound("User not found"));
     }
 
-    if !(is_admin || has_active_student || has_active_parent || has_active_teacher) {
+    if !is_user_notification_eligible(db.get_ref(), payload.user_id).await {
         return Err(actix_web::error::ErrorBadRequest(
-            "Cannot create notification for user without active roles"
+            "Cannot create notification for user without active roles",
         ));
     }
 
-    let body_json = serde_json::to_value(&payload.body)
-        .map_err(|e| {
-            error!("Failed to serialize notification body: {:?}", e);
-            actix_web::error::ErrorBadRequest("Invalid notification body format")
-        })?;
-    
+    let body_json = serde_json::to_value(&payload.body).map_err(|e| {
+        error!("Failed to serialize notification body: {:?}", e);
+        actix_web::error::ErrorBadRequest("Invalid notification body format")
+    })?;
+
     let notification = sqlx::query_as::<_, Notification>(
         r#"
         INSERT INTO notifications (user_id, type, title, body, priority)
         VALUES ($1, $2, $3, $4, $5)
         RETURNING id, user_id, type as notification_type, title, body, created_at, read_at, priority
-        "#
+        "#,
     )
     .bind(payload.user_id)
     .bind(&payload.notification_type)
@@ -265,8 +284,14 @@ pub async fn create_notification(
         actix_web::error::ErrorInternalServerError("Failed to create notification")
     })?;
 
-    push::send_notification_to_user(db.get_ref(), notification.user_id, &payload.body, Some(notification.id)).await;
-    
+    push::send_notification_to_user(
+        db.get_ref(),
+        notification.user_id,
+        &payload.body,
+        Some(notification.id),
+    )
+    .await;
+
     Ok(HttpResponse::Created().json(notification))
 }
 
@@ -277,19 +302,17 @@ pub async fn delete_notification(
     notification_id: web::Path<i32>,
 ) -> Result<HttpResponse> {
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
-    
-    let result = sqlx::query(
-        "DELETE FROM notifications WHERE id = $1 AND user_id = $2"
-    )
-    .bind(*notification_id)
-    .bind(user_id)
-    .execute(&app_state.db)
-    .await
-    .map_err(|e| {
-        error!("Database error deleting notification: {:?}", e);
-        actix_web::error::ErrorInternalServerError("Failed to delete notification")
-    })?;
-    
+
+    let result = sqlx::query("DELETE FROM notifications WHERE id = $1 AND user_id = $2")
+        .bind(*notification_id)
+        .bind(user_id)
+        .execute(&app_state.db)
+        .await
+        .map_err(|e| {
+            error!("Database error deleting notification: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Failed to delete notification")
+        })?;
+
     if result.rows_affected() > 0 {
         Ok(HttpResponse::Ok().json(serde_json::json!({"deleted": true})))
     } else {
@@ -302,22 +325,24 @@ async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> 
     // Verify JWT token and get claims
     let claims = match verify_token(req, app_state) {
         Ok(claims) => claims,
-        Err(_response) => return Err(actix_web::error::ErrorUnauthorized("Invalid or missing token")),
+        Err(_response) => {
+            return Err(actix_web::error::ErrorUnauthorized(
+                "Invalid or missing token",
+            ))
+        }
     };
-    
+
     // Get user_id from database using username from claims
-    let user_id = sqlx::query_scalar::<_, i32>(
-        "SELECT id FROM users WHERE username = $1"
-    )
-    .bind(&claims.sub)
-    .fetch_optional(&app_state.db)
-    .await
-    .map_err(|e| {
-        error!("Database error getting user_id: {:?}", e);
-        actix_web::error::ErrorInternalServerError("Failed to get user information")
-    })?
-    .ok_or_else(|| actix_web::error::ErrorUnauthorized("User not found"))?;
-    
+    let user_id = sqlx::query_scalar::<_, i32>("SELECT id FROM users WHERE username = $1")
+        .bind(&claims.sub)
+        .fetch_optional(&app_state.db)
+        .await
+        .map_err(|e| {
+            error!("Database error getting user_id: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Failed to get user information")
+        })?
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("User not found"))?;
+
     Ok(user_id)
 }
 
@@ -328,6 +353,6 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
             .route("", web::post().to(create_notification))
             .route("/unread-count", web::get().to(get_unread_count))
             .route("/mark-read", web::post().to(mark_as_read))
-            .route("/{id}", web::delete().to(delete_notification))
+            .route("/{id}", web::delete().to(delete_notification)),
     );
 }

@@ -57,7 +57,7 @@
     },
     {
       "name": "characters",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/characters-1.4.1",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/characters-1.4.0",
       "packageUri": "lib/",
       "languageVersion": "3.4"
     },
@@ -213,9 +213,9 @@
     },
     {
       "name": "flutter",
-      "rootUri": "file:///home/levitanus/flutter/packages/flutter",
+      "rootUri": "file:///home/levitanus/.cache/flutter/packages/flutter",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.8"
     },
     {
       "name": "flutter_cache_manager",
@@ -291,9 +291,9 @@
     },
     {
       "name": "flutter_localizations",
-      "rootUri": "file:///home/levitanus/flutter/packages/flutter_localizations",
+      "rootUri": "file:///home/levitanus/.cache/flutter/packages/flutter_localizations",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.8"
     },
     {
       "name": "flutter_plugin_android_lifecycle",
@@ -321,15 +321,15 @@
     },
     {
       "name": "flutter_test",
-      "rootUri": "file:///home/levitanus/flutter/packages/flutter_test",
+      "rootUri": "file:///home/levitanus/.cache/flutter/packages/flutter_test",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.8"
     },
     {
       "name": "flutter_web_plugins",
-      "rootUri": "file:///home/levitanus/flutter/packages/flutter_web_plugins",
+      "rootUri": "file:///home/levitanus/.cache/flutter/packages/flutter_web_plugins",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.8"
     },
     {
       "name": "glob",
@@ -441,15 +441,15 @@
     },
     {
       "name": "matcher",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/matcher-0.12.18",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/matcher-0.12.17",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.4"
     },
     {
       "name": "material_color_utilities",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/material_color_utilities-0.13.0",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/material_color_utilities-0.11.1",
       "packageUri": "lib/",
-      "languageVersion": "3.5"
+      "languageVersion": "2.17"
     },
     {
       "name": "meta",
@@ -711,9 +711,9 @@
     },
     {
       "name": "sky_engine",
-      "rootUri": "file:///home/levitanus/flutter/bin/cache/pkg/sky_engine",
+      "rootUri": "file:///home/levitanus/.cache/flutter/bin/cache/pkg/sky_engine",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.8"
     },
     {
       "name": "source_span",
@@ -783,9 +783,9 @@
     },
     {
       "name": "test_api",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/test_api-0.7.9",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/test_api-0.7.7",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.5"
     },
     {
       "name": "timezone",
@@ -963,8 +963,8 @@
     }
   ],
   "generator": "pub",
-  "generatorVersion": "3.11.0",
-  "flutterRoot": "file:///home/levitanus/flutter",
-  "flutterVersion": "3.41.1",
+  "generatorVersion": "3.10.4",
+  "flutterRoot": "file:///home/levitanus/.cache/flutter",
+  "flutterVersion": "3.38.5",
   "pubCache": "file:///home/levitanus/.pub-cache"
 }

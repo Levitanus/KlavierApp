@@ -7,7 +7,6 @@ import '../l10n/app_localizations.dart';
 class FeedPreviewCard extends StatelessWidget {
   final Feed feed;
   final String title;
-  final String ownerLabel;
   final int importantLimit;
   final int recentLimit;
   final VoidCallback onTap;
@@ -16,7 +15,6 @@ class FeedPreviewCard extends StatelessWidget {
     super.key,
     required this.feed,
     required this.title,
-    required this.ownerLabel,
     required this.onTap,
     this.importantLimit = 2,
     this.recentLimit = 3,
@@ -33,7 +31,10 @@ class FeedPreviewCard extends StatelessWidget {
       feed.id,
       limit: recentLimit + importantLimit,
     );
-    final recent = recentAll.where((post) => !post.isImportant).take(recentLimit).toList();
+    final recent = recentAll
+        .where((post) => !post.isImportant)
+        .take(recentLimit)
+        .toList();
     return _FeedPreviewData(important: important, recent: recent);
   }
 
@@ -60,7 +61,7 @@ class FeedPreviewCard extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          '$title - $ownerLabel',
+                          title,
                           style: Theme.of(context).textTheme.titleMedium,
                         ),
                       ),
@@ -70,7 +71,8 @@ class FeedPreviewCard extends StatelessWidget {
                   const SizedBox(height: 12),
                   if (isLoading)
                     const LinearProgressIndicator()
-                  else if (preview == null || (preview.important.isEmpty && preview.recent.isEmpty))
+                  else if (preview == null ||
+                      (preview.important.isEmpty && preview.recent.isEmpty))
                     Text(
                       l10n?.feedsNoPosts ?? 'No posts yet.',
                       style: Theme.of(context).textTheme.bodySmall,
@@ -82,7 +84,9 @@ class FeedPreviewCard extends StatelessWidget {
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
                       const SizedBox(height: 4),
-                      ...preview.important.map((post) => _buildPostLine(context, post)),
+                      ...preview.important.map(
+                        (post) => _buildPostLine(context, post),
+                      ),
                       const SizedBox(height: 8),
                     ],
                     if (preview.recent.isNotEmpty) ...[
@@ -91,7 +95,9 @@ class FeedPreviewCard extends StatelessWidget {
                         style: Theme.of(context).textTheme.labelLarge,
                       ),
                       const SizedBox(height: 4),
-                      ...preview.recent.map((post) => _buildPostLine(context, post)),
+                      ...preview.recent.map(
+                        (post) => _buildPostLine(context, post),
+                      ),
                     ],
                   ],
                 ],
@@ -106,7 +112,7 @@ class FeedPreviewCard extends StatelessWidget {
   Widget _buildPostLine(BuildContext context, FeedPost post) {
     final l10n = AppLocalizations.of(context);
     final title = (post.title == null || post.title!.isEmpty)
-      ? (l10n?.feedsUntitledPost ?? 'Untitled post')
+        ? (l10n?.feedsUntitledPost ?? 'Untitled post')
         : post.title!;
     final baseStyle = Theme.of(context).textTheme.bodyMedium;
     final unreadStyle = baseStyle?.copyWith(
@@ -130,8 +136,5 @@ class _FeedPreviewData {
   final List<FeedPost> important;
   final List<FeedPost> recent;
 
-  const _FeedPreviewData({
-    required this.important,
-    required this.recent,
-  });
+  const _FeedPreviewData({required this.important, required this.recent});
 }

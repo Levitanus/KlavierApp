@@ -6,10 +6,12 @@ use serde_json::json;
 use sqlx::{FromRow, PgPool};
 use std::collections::{HashMap, HashSet};
 
+use crate::notifications::{
+    is_user_notification_eligible, ContentBlock, NotificationBody, NotificationContent,
+};
+use crate::push;
 use crate::users::verify_token;
 use crate::websockets;
-use crate::notifications::{ContentBlock, NotificationBody, NotificationContent};
-use crate::push;
 use crate::AppState;
 
 // ============================================================================
@@ -19,20 +21,22 @@ use crate::AppState;
 async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> Result<i32> {
     let claims = match verify_token(req, app_state) {
         Ok(claims) => claims,
-        Err(_response) => return Err(actix_web::error::ErrorUnauthorized("Invalid or missing token")),
+        Err(_response) => {
+            return Err(actix_web::error::ErrorUnauthorized(
+                "Invalid or missing token",
+            ))
+        }
     };
 
-    let user_id = sqlx::query_scalar::<_, i32>(
-        "SELECT id FROM users WHERE username = $1"
-    )
-    .bind(&claims.sub)
-    .fetch_optional(&app_state.db)
-    .await
-    .map_err(|e| {
-        error!("Database error getting user_id: {:?}", e);
-        actix_web::error::ErrorInternalServerError("Failed to get user information")
-    })?
-    .ok_or_else(|| actix_web::error::ErrorUnauthorized("User not found"))?;
+    let user_id = sqlx::query_scalar::<_, i32>("SELECT id FROM users WHERE username = $1")
+        .bind(&claims.sub)
+        .fetch_optional(&app_state.db)
+        .await
+        .map_err(|e| {
+            error!("Database error getting user_id: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Failed to get user information")
+        })?
+        .ok_or_else(|| actix_web::error::ErrorUnauthorized("User not found"))?;
 
     Ok(user_id)
 }
@@ -41,7 +45,7 @@ async fn fetch_user_display_name(db: &PgPool, user_id: i32) -> String {
     sqlx::query_scalar::<_, String>(
         "SELECT COALESCE(full_name, username)
          FROM users
-         WHERE id = $1"
+         WHERE id = $1",
     )
     .bind(user_id)
     .fetch_optional(db)
@@ -50,7 +54,12 @@ async fn fetch_user_display_name(db: &PgPool, user_id: i32) -> String {
     .unwrap_or_else(|| "Unknown".to_string())
 }
 
-fn build_chat_notification(sender_name: &str, message: &str, thread_id: i32, sender_id: i32) -> NotificationBody {
+fn build_chat_notification(
+    sender_name: &str,
+    message: &str,
+    thread_id: i32,
+    sender_id: i32,
+) -> NotificationBody {
     NotificationBody {
         body_type: "chat_message".to_string(),
         title: format!("New message from {}", sender_name),
@@ -166,12 +175,16 @@ async fn store_message_attachments(
         .bind(user_id)
         .fetch_optional(db)
         .await
-        .map_err(|e| HttpResponse::InternalServerError().json(json!({
-            "error": format!("Failed to load media: {}", e)
-        })))?
-        .ok_or_else(|| HttpResponse::BadRequest().json(json!({
-            "error": "Media not found"
-        })))?;
+        .map_err(|e| {
+            HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to load media: {}", e)
+            }))
+        })?
+        .ok_or_else(|| {
+            HttpResponse::BadRequest().json(json!({
+                "error": "Media not found"
+            }))
+        })?;
 
         let is_voice = attachment.attachment_type == "voice";
         let matches_type = attachment.attachment_type == media.media_type
@@ -193,9 +206,11 @@ async fn store_message_attachments(
         .bind(&attachment.attachment_type)
         .execute(db)
         .await
-        .map_err(|e| HttpResponse::InternalServerError().json(json!({
-            "error": format!("Failed to save attachment: {}", e)
-        })))?;
+        .map_err(|e| {
+            HttpResponse::InternalServerError().json(json!({
+                "error": format!("Failed to save attachment: {}", e)
+            }))
+        })?;
 
         stored.push(ChatAttachmentResponse {
             media_id: media.id,
@@ -376,9 +391,12 @@ pub async fn can_message_user(
     // 1. Parent-student relationship
     let parent_student = sqlx::query_scalar::<_, bool>(
         "SELECT EXISTS(
-            SELECT 1 FROM parent_student_relations
-            WHERE (parent_user_id = $1 AND student_user_id = $2)
-               OR (parent_user_id = $2 AND student_user_id = $1)
+            SELECT 1
+            FROM parent_student_relations psr
+            JOIN parents p ON p.user_id = psr.parent_user_id
+            WHERE p.status = 'active'
+              AND ((psr.parent_user_id = $1 AND psr.student_user_id = $2)
+                   OR (psr.parent_user_id = $2 AND psr.student_user_id = $1))
         )",
     )
     .bind(initiator_id)
@@ -413,7 +431,12 @@ pub async fn can_message_user(
             SELECT 1
             FROM parent_student_relations psr1
             JOIN parent_student_relations psr2 ON psr1.student_user_id = psr2.student_user_id
-            WHERE psr1.parent_user_id = $1 AND psr2.parent_user_id = $2
+            JOIN parents p1 ON p1.user_id = psr1.parent_user_id
+            JOIN parents p2 ON p2.user_id = psr2.parent_user_id
+            WHERE psr1.parent_user_id = $1
+              AND psr2.parent_user_id = $2
+              AND p1.status = 'active'
+              AND p2.status = 'active'
         )",
     )
     .bind(initiator_id)
@@ -430,8 +453,11 @@ pub async fn can_message_user(
         "SELECT EXISTS(
             SELECT 1
             FROM parent_student_relations psr
+            JOIN parents p ON p.user_id = psr.parent_user_id
             JOIN teacher_student_relations tsr ON psr.student_user_id = tsr.student_user_id
-            WHERE psr.parent_user_id = $1 AND tsr.teacher_user_id = $2
+            WHERE psr.parent_user_id = $1
+              AND tsr.teacher_user_id = $2
+              AND p.status = 'active'
         )",
     )
     .bind(initiator_id)
@@ -449,7 +475,10 @@ pub async fn can_message_user(
             SELECT 1
             FROM teacher_student_relations tsr
             JOIN parent_student_relations psr ON tsr.student_user_id = psr.student_user_id
-            WHERE tsr.teacher_user_id = $1 AND psr.parent_user_id = $2
+            JOIN parents p ON p.user_id = psr.parent_user_id
+            WHERE tsr.teacher_user_id = $1
+              AND psr.parent_user_id = $2
+              AND p.status = 'active'
         )",
     )
     .bind(initiator_id)
@@ -485,9 +514,11 @@ async fn fetch_available_user_ids(
 
         if !student_ids.is_empty() {
             let parent_ids = sqlx::query_scalar::<_, i32>(
-                "SELECT DISTINCT parent_user_id
-                 FROM parent_student_relations
-                 WHERE student_user_id = ANY($1)",
+                "SELECT DISTINCT psr.parent_user_id
+                                 FROM parent_student_relations psr
+                                 JOIN parents p ON p.user_id = psr.parent_user_id
+                                 WHERE psr.student_user_id = ANY($1)
+                                     AND p.status = 'active'",
             )
             .bind(&student_ids)
             .fetch_all(pool)
@@ -495,12 +526,11 @@ async fn fetch_available_user_ids(
             user_ids.extend(parent_ids);
         }
 
-        let teacher_ids = sqlx::query_scalar::<_, i32>(
-            "SELECT user_id FROM teachers WHERE user_id <> $1",
-        )
-        .bind(user_id)
-        .fetch_all(pool)
-        .await?;
+        let teacher_ids =
+            sqlx::query_scalar::<_, i32>("SELECT user_id FROM teachers WHERE user_id <> $1")
+                .bind(user_id)
+                .fetch_all(pool)
+                .await?;
         user_ids.extend(teacher_ids);
 
         let admin_ids = sqlx::query_scalar::<_, i32>(
@@ -514,9 +544,11 @@ async fn fetch_available_user_ids(
         user_ids.extend(admin_ids);
     } else if roles.iter().any(|role| role == "student") {
         let parent_ids = sqlx::query_scalar::<_, i32>(
-            "SELECT parent_user_id
-             FROM parent_student_relations
-             WHERE student_user_id = $1",
+            "SELECT psr.parent_user_id
+                         FROM parent_student_relations psr
+                         JOIN parents p ON p.user_id = psr.parent_user_id
+                         WHERE psr.student_user_id = $1
+                             AND p.status = 'active'",
         )
         .bind(user_id)
         .fetch_all(pool)
@@ -546,9 +578,11 @@ async fn fetch_available_user_ids(
 
             if !related_student_ids.is_empty() {
                 let related_parent_ids = sqlx::query_scalar::<_, i32>(
-                    "SELECT DISTINCT parent_user_id
-                     FROM parent_student_relations
-                     WHERE student_user_id = ANY($1)",
+                    "SELECT DISTINCT psr.parent_user_id
+                                         FROM parent_student_relations psr
+                                         JOIN parents p ON p.user_id = psr.parent_user_id
+                                         WHERE psr.student_user_id = ANY($1)
+                                             AND p.status = 'active'",
                 )
                 .bind(&related_student_ids)
                 .fetch_all(pool)
@@ -558,9 +592,11 @@ async fn fetch_available_user_ids(
         }
     } else if roles.iter().any(|role| role == "parent") {
         let child_ids = sqlx::query_scalar::<_, i32>(
-            "SELECT student_user_id
-             FROM parent_student_relations
-             WHERE parent_user_id = $1",
+            "SELECT psr.student_user_id
+                         FROM parent_student_relations psr
+                         JOIN parents p ON p.user_id = psr.parent_user_id
+                         WHERE psr.parent_user_id = $1
+                             AND p.status = 'active'",
         )
         .bind(user_id)
         .fetch_all(pool)
@@ -591,9 +627,11 @@ async fn fetch_available_user_ids(
 
                 if !related_student_ids.is_empty() {
                     let related_parent_ids = sqlx::query_scalar::<_, i32>(
-                        "SELECT DISTINCT parent_user_id
-                         FROM parent_student_relations
-                         WHERE student_user_id = ANY($1)",
+                        "SELECT DISTINCT psr.parent_user_id
+                                                 FROM parent_student_relations psr
+                                                 JOIN parents p ON p.user_id = psr.parent_user_id
+                                                 WHERE psr.student_user_id = ANY($1)
+                                                     AND p.status = 'active'",
                     )
                     .bind(&related_student_ids)
                     .fetch_all(pool)
@@ -630,10 +668,7 @@ pub async fn get_related_teachers(
     if !student_teachers.is_empty() {
         return Ok(student_teachers
             .into_iter()
-            .map(|(id, name)| RelatedTeacher {
-                user_id: id,
-                name,
-            })
+            .map(|(id, name)| RelatedTeacher { user_id: id, name })
             .collect());
     }
 
@@ -641,10 +676,12 @@ pub async fn get_related_teachers(
     let parent_children_teachers = sqlx::query_as::<_, (i32, String)>(
         "SELECT DISTINCT t.user_id, u.full_name
          FROM parent_student_relations psr
+            JOIN parents p ON p.user_id = psr.parent_user_id
          JOIN teacher_student_relations tsr ON psr.student_user_id = tsr.student_user_id
          JOIN teachers t ON tsr.teacher_user_id = t.user_id
          JOIN users u ON t.user_id = u.id
          WHERE psr.parent_user_id = $1
+            AND p.status = 'active'
          AND t.status = 'active'
          ORDER BY u.full_name",
     )
@@ -654,19 +691,12 @@ pub async fn get_related_teachers(
 
     Ok(parent_children_teachers
         .into_iter()
-        .map(|(id, name)| RelatedTeacher {
-            user_id: id,
-            name,
-        })
+        .map(|(id, name)| RelatedTeacher { user_id: id, name })
         .collect())
 }
 
 /// Check if a user can view a specific thread
-async fn can_view_thread(
-    pool: &PgPool,
-    user_id: i32,
-    thread_id: i32,
-) -> Result<bool, sqlx::Error> {
+async fn can_view_thread(pool: &PgPool, user_id: i32, thread_id: i32) -> Result<bool, sqlx::Error> {
     // Get thread info
     let thread = sqlx::query_as::<_, ChatThread>(
         "SELECT id, participant_a_id, participant_b_id, is_admin_chat, created_at, updated_at
@@ -981,7 +1011,9 @@ async fn start_thread(
     let claims = match verify_token(&req, &app_state) {
         Ok(claims) => claims,
         Err(_response) => {
-            return Err(actix_web::error::ErrorUnauthorized("Invalid or missing token"))
+            return Err(actix_web::error::ErrorUnauthorized(
+                "Invalid or missing token",
+            ))
         }
     };
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
@@ -1101,17 +1133,18 @@ async fn send_message(
     };
 
     // Insert message
-    let (message_id, created_at, updated_at) = sqlx::query_as::<_, (i32, DateTime<Utc>, DateTime<Utc>)>(
-        "INSERT INTO chat_messages (thread_id, sender_id, body)
+    let (message_id, created_at, updated_at) =
+        sqlx::query_as::<_, (i32, DateTime<Utc>, DateTime<Utc>)>(
+            "INSERT INTO chat_messages (thread_id, sender_id, body)
          VALUES ($1, $2, $3)
          RETURNING id, created_at, updated_at",
-    )
-    .bind(thread_id)
-    .bind(user_id)
-    .bind(&payload.body)
-    .fetch_one(&app_state.db)
-    .await
-    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+        )
+        .bind(thread_id)
+        .bind(user_id)
+        .bind(&payload.body)
+        .fetch_one(&app_state.db)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
     let attachments = if let Some(items) = payload.attachments.as_deref() {
         match store_message_attachments(&app_state.db, user_id, message_id, items).await {
@@ -1155,7 +1188,7 @@ async fn send_message(
         "created_at": created_at.to_rfc3339(),
         "updated_at": updated_at.to_rfc3339(),
     });
-    
+
     let ws_message = websockets::WsMessage {
         msg_type: "chat_message".to_string(),
         user_id: Some(user_id),
@@ -1163,11 +1196,18 @@ async fn send_message(
         post_id: None,
         data: message_data,
     };
-    
-    app_state.ws_server.broadcast_to_thread(thread_id, ws_message).await;
+
+    app_state
+        .ws_server
+        .broadcast_to_thread(thread_id, ws_message)
+        .await;
 
     let notification_body = build_chat_notification(&sender_name, &preview, thread_id, user_id);
     for recipient_id in &recipients {
+        if !is_user_notification_eligible(&app_state.db, *recipient_id).await {
+            continue;
+        }
+
         let notification_id = sqlx::query_scalar::<_, i32>(
             "INSERT INTO notifications (user_id, type, title, body, priority)
              VALUES ($1, $2, $3, $4, $5)
@@ -1183,7 +1223,10 @@ async fn send_message(
         .unwrap_or(None);
 
         if let Some(notification_id) = notification_id {
-            debug!("[CHAT] Sending push to user {} for thread {}", recipient_id, thread_id);
+            debug!(
+                "[CHAT] Sending push to user {} for thread {}",
+                recipient_id, thread_id
+            );
             push::send_notification_to_user(
                 &app_state.db,
                 *recipient_id,
@@ -1221,31 +1264,30 @@ async fn send_admin_message(
 
     let thread_id = match existing_thread {
         Some(id) => id,
-        None => {
-            sqlx::query_scalar::<_, i32>(
-                "INSERT INTO chat_threads (participant_a_id, is_admin_chat)
+        None => sqlx::query_scalar::<_, i32>(
+            "INSERT INTO chat_threads (participant_a_id, is_admin_chat)
                  VALUES ($1, true)
                  RETURNING id",
-            )
-            .bind(user_id)
-            .fetch_one(&app_state.db)
-            .await
-            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?
-        }
+        )
+        .bind(user_id)
+        .fetch_one(&app_state.db)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?,
     };
 
     // Insert message
-    let (message_id, created_at, updated_at) = sqlx::query_as::<_, (i32, DateTime<Utc>, DateTime<Utc>)>(
-        "INSERT INTO chat_messages (thread_id, sender_id, body)
+    let (message_id, created_at, updated_at) =
+        sqlx::query_as::<_, (i32, DateTime<Utc>, DateTime<Utc>)>(
+            "INSERT INTO chat_messages (thread_id, sender_id, body)
          VALUES ($1, $2, $3)
          RETURNING id, created_at, updated_at",
-    )
-    .bind(thread_id)
-    .bind(user_id)
-    .bind(&payload.body)
-    .fetch_one(&app_state.db)
-    .await
-    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
+        )
+        .bind(thread_id)
+        .bind(user_id)
+        .bind(&payload.body)
+        .fetch_one(&app_state.db)
+        .await
+        .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?;
 
     let attachments = if let Some(items) = payload.attachments.as_deref() {
         match store_message_attachments(&app_state.db, user_id, message_id, items).await {
@@ -1309,10 +1351,17 @@ async fn send_admin_message(
         data: message_data,
     };
 
-    app_state.ws_server.broadcast_to_thread(thread_id, ws_message).await;
+    app_state
+        .ws_server
+        .broadcast_to_thread(thread_id, ws_message)
+        .await;
 
     let notification_body = build_chat_notification(&sender_name, &preview, thread_id, user_id);
     for admin_id in &admin_recipients {
+        if !is_user_notification_eligible(&app_state.db, *admin_id).await {
+            continue;
+        }
+
         let notification_id = sqlx::query_scalar::<_, i32>(
             "INSERT INTO notifications (user_id, type, title, body, priority)
              VALUES ($1, $2, $3, $4, $5)
@@ -1328,7 +1377,10 @@ async fn send_admin_message(
         .unwrap_or(None);
 
         if let Some(notification_id) = notification_id {
-            debug!("[CHAT] Sending push to admin {} for thread {}", admin_id, thread_id);
+            debug!(
+                "[CHAT] Sending push to admin {} for thread {}",
+                admin_id, thread_id
+            );
             push::send_notification_to_user(
                 &app_state.db,
                 *admin_id,
@@ -1361,9 +1413,7 @@ async fn update_receipt(
     if payload.state != "delivered" && payload.state != "read" {
         warn!(
             "receipt update invalid state: message_id={}, recipient_id={}, state={}",
-            message_id,
-            user_id,
-            payload.state
+            message_id, user_id, payload.state
         );
         return Ok(HttpResponse::BadRequest().json(json!({
             "error": "Invalid receipt state"
@@ -1371,14 +1421,13 @@ async fn update_receipt(
     }
 
     // Get thread_id for broadcasting
-    let thread_id = sqlx::query_scalar::<_, i32>(
-        "SELECT thread_id FROM chat_messages WHERE id = $1",
-    )
-    .bind(message_id)
-    .fetch_optional(&app_state.db)
-    .await
-    .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?
-    .ok_or_else(|| actix_web::error::ErrorNotFound("Message not found"))?;
+    let thread_id =
+        sqlx::query_scalar::<_, i32>("SELECT thread_id FROM chat_messages WHERE id = $1")
+            .bind(message_id)
+            .fetch_optional(&app_state.db)
+            .await
+            .map_err(|e| actix_web::error::ErrorInternalServerError(e.to_string()))?
+            .ok_or_else(|| actix_web::error::ErrorNotFound("Message not found"))?;
 
     // Update receipt
     let rows = sqlx::query(
@@ -1404,8 +1453,7 @@ async fn update_receipt(
     if rows.rows_affected() == 0 {
         warn!(
             "receipt update not found: message_id={}, recipient_id={} (no receipt row)",
-            message_id,
-            user_id
+            message_id, user_id
         );
         return Ok(HttpResponse::NotFound().json(json!({
             "error": "Receipt not found"
@@ -1424,8 +1472,11 @@ async fn update_receipt(
             "state": payload.state,
         }),
     };
-    
-    app_state.ws_server.broadcast_to_thread(thread_id, ws_message).await;
+
+    app_state
+        .ws_server
+        .broadcast_to_thread(thread_id, ws_message)
+        .await;
 
     Ok(HttpResponse::Ok().json(json!({"state": payload.state})))
 }
@@ -1654,7 +1705,9 @@ async fn list_available_chat_users(
     let claims = match verify_token(&req, &app_state) {
         Ok(claims) => claims,
         Err(_response) => {
-            return Err(actix_web::error::ErrorUnauthorized("Invalid or missing token"))
+            return Err(actix_web::error::ErrorUnauthorized(
+                "Invalid or missing token",
+            ))
         }
     };
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
@@ -1692,13 +1745,25 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         web::scope("/chat")
             .route("/threads", web::get().to(list_threads))
             .route("/threads", web::post().to(start_thread))
-            .route("/threads/{thread_id}/messages", web::get().to(get_thread_messages))
-            .route("/threads/{thread_id}/messages", web::post().to(send_message))
+            .route(
+                "/threads/{thread_id}/messages",
+                web::get().to(get_thread_messages),
+            )
+            .route(
+                "/threads/{thread_id}/messages",
+                web::post().to(send_message),
+            )
             .route("/messages/{message_id}", web::patch().to(update_message))
             .route("/messages/{message_id}", web::delete().to(delete_message))
-            .route("/messages/{message_id}/receipt", web::patch().to(update_receipt))
+            .route(
+                "/messages/{message_id}/receipt",
+                web::patch().to(update_receipt),
+            )
             .route("/admin/message", web::post().to(send_admin_message))
-            .route("/related-teachers", web::get().to(get_related_teachers_handler))
+            .route(
+                "/related-teachers",
+                web::get().to(get_related_teachers_handler),
+            )
             .route("/available-users", web::get().to(list_available_chat_users)),
     );
 }

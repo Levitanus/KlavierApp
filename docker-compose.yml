@@ -1,7 +1,11 @@
 version: "3.8"
 services:
   db_prod:
-    image: postgres:15
+    build:
+      context: .
+      dockerfile: deploy/postgres.Dockerfile
+    command: >
+      postgres -c shared_preload_libraries=pg_cron -c cron.database_name=${POSTGRES_DB}
     env_file:
       - .env
     environment:
@@ -13,19 +17,5 @@ services:
     ports:
       - "5432:5432"
 
-  db_test:
-    image: postgres:15
-    env_file:
-      - .env
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER_TEST}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD_TEST}
-      POSTGRES_DB: ${POSTGRES_DB_TEST}
-    volumes:
-      - db_test_data:/var/lib/postgresql/data
-    ports:
-      - "5433:5432"
-
 volumes:
   db_prod_data:
-  db_test_data:

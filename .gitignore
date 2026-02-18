@@ -17,6 +17,7 @@ node_modules/
 deploy/.env
 musikschule_app
 musikschule_app.pub
+.prod_backup/
 
 musikschule
 

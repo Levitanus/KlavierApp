@@ -1,13 +1,10 @@
-enum HometaskStatus {
-  assigned,
-  completedByStudent,
-  accomplishedByTeacher,
-}
+enum HometaskStatus { assigned, completedByStudent, accomplishedByTeacher }
 
 enum HometaskType {
   simple,
   checklist,
   progress,
+  freeAnswer,
   dailyRoutine,
   photoSubmission,
   textSubmission,
@@ -43,6 +40,7 @@ class Hometask {
   final int sortOrder;
   final HometaskType hometaskType;
   final List<ChecklistItem> checklistItems;
+  final int? groupAssignmentId;
 
   Hometask({
     required this.id,
@@ -58,6 +56,7 @@ class Hometask {
     required this.sortOrder,
     required this.hometaskType,
     required this.checklistItems,
+    required this.groupAssignmentId,
   });
 
   factory Hometask.fromJson(Map<String, dynamic> json) {
@@ -70,15 +69,16 @@ class Hometask {
       title: json['title'] ?? '',
       description: json['description'],
       status: _parseStatus(json['status']),
-      dueDate: json['due_date'] != null ? DateTime.parse(json['due_date']) : null,
+      dueDate: json['due_date'] != null
+          ? DateTime.parse(json['due_date'])
+          : null,
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       sortOrder: json['sort_order'] ?? 0,
       hometaskType: _parseType(json['hometask_type']),
-        checklistItems: itemsJson
-            ?.map((item) => ChecklistItem.fromJson(item))
-            .toList() ??
-          [],
+      checklistItems:
+          itemsJson?.map((item) => ChecklistItem.fromJson(item)).toList() ?? [],
+      groupAssignmentId: json['group_assignment_id'] as int?,
     );
   }
 
@@ -100,6 +100,7 @@ class Hometask {
       sortOrder: sortOrder,
       hometaskType: hometaskType,
       checklistItems: checklistItems ?? this.checklistItems,
+      groupAssignmentId: groupAssignmentId,
     );
   }
 
@@ -119,6 +120,8 @@ class Hometask {
     switch (type) {
       case 'simple':
         return HometaskType.simple;
+      case 'free_answer':
+        return HometaskType.freeAnswer;
       case 'daily_routine':
         return HometaskType.dailyRoutine;
       case 'photo_submission':

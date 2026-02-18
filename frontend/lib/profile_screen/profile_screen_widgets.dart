@@ -9,7 +9,7 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
             radius: 60,
             backgroundColor: Colors.grey[300],
             backgroundImage: _profileImage != null && _profileImage!.isNotEmpty
-              ? MediaCacheService.instance.imageProvider(_profileImage!)
+                ? MediaCacheService.instance.imageProvider(_profileImage!)
                 : null,
             child: _profileImage == null || _profileImage!.isEmpty
                 ? const Icon(Icons.person, size: 60, color: Colors.grey)
@@ -35,7 +35,11 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
                         ],
                       ),
                       child: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.white, size: 20),
+                        icon: const Icon(
+                          Icons.delete,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                         onPressed: _removeImage,
                         padding: const EdgeInsets.all(8),
                         constraints: const BoxConstraints(),
@@ -55,7 +59,11 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
                       ],
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
+                      icon: const Icon(
+                        Icons.camera_alt,
+                        color: Colors.white,
+                        size: 20,
+                      ),
                       onPressed: _pickImage,
                       padding: const EdgeInsets.all(8),
                       constraints: const BoxConstraints(),
@@ -206,7 +214,11 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
               ],
             ),
             const SizedBox(height: 16),
-            if (_roles.any((role) => role == 'student' || role == 'parent' || role == 'teacher')) ...[
+            if (_roles.any(
+              (role) =>
+                  role == 'student' ||
+                  (_isAdminView && (role == 'parent' || role == 'teacher')),
+            )) ...[
               Text(
                 AppLocalizations.of(context)?.profileArchiveRoles ??
                     'Archive Roles',
@@ -220,52 +232,67 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
                   if (_roles.contains('student'))
                     OutlinedButton.icon(
                       icon: Icon(
-                        _isRoleArchived('student') ? Icons.unarchive : Icons.archive,
+                        _isRoleArchived('student')
+                            ? Icons.unarchive
+                            : Icons.archive,
                         size: 16,
                       ),
                       label: Text(
                         _isRoleArchived('student')
-                          ? (AppLocalizations.of(context)?.
-                              profileUnarchiveStudent ??
-                            'Unarchive Student')
-                          : (AppLocalizations.of(context)?.profileArchiveStudent ??
-                            'Archive Student'),
+                            ? (AppLocalizations.of(
+                                    context,
+                                  )?.profileUnarchiveStudent ??
+                                  'Unarchive Student')
+                            : (AppLocalizations.of(
+                                    context,
+                                  )?.profileArchiveStudent ??
+                                  'Archive Student'),
                       ),
                       onPressed: canUpdate
                           ? () => _toggleRoleArchive('student')
                           : null,
                     ),
-                  if (_roles.contains('parent'))
+                  if (_isAdminView && _roles.contains('parent'))
                     OutlinedButton.icon(
                       icon: Icon(
-                        _isRoleArchived('parent') ? Icons.unarchive : Icons.archive,
+                        _isRoleArchived('parent')
+                            ? Icons.unarchive
+                            : Icons.archive,
                         size: 16,
                       ),
                       label: Text(
                         _isRoleArchived('parent')
-                          ? (AppLocalizations.of(context)?.
-                              profileUnarchiveParent ??
-                            'Unarchive Parent')
-                          : (AppLocalizations.of(context)?.profileArchiveParent ??
-                            'Archive Parent'),
+                            ? (AppLocalizations.of(
+                                    context,
+                                  )?.profileUnarchiveParent ??
+                                  'Unarchive Parent')
+                            : (AppLocalizations.of(
+                                    context,
+                                  )?.profileArchiveParent ??
+                                  'Archive Parent'),
                       ),
                       onPressed: canUpdate
                           ? () => _toggleRoleArchive('parent')
                           : null,
                     ),
-                  if (_roles.contains('teacher'))
+                  if (_isAdminView && _roles.contains('teacher'))
                     OutlinedButton.icon(
                       icon: Icon(
-                        _isRoleArchived('teacher') ? Icons.unarchive : Icons.archive,
+                        _isRoleArchived('teacher')
+                            ? Icons.unarchive
+                            : Icons.archive,
                         size: 16,
                       ),
                       label: Text(
                         _isRoleArchived('teacher')
-                          ? (AppLocalizations.of(context)?.
-                              profileUnarchiveTeacher ??
-                            'Unarchive Teacher')
-                          : (AppLocalizations.of(context)?.profileArchiveTeacher ??
-                            'Archive Teacher'),
+                            ? (AppLocalizations.of(
+                                    context,
+                                  )?.profileUnarchiveTeacher ??
+                                  'Unarchive Teacher')
+                            : (AppLocalizations.of(
+                                    context,
+                                  )?.profileArchiveTeacher ??
+                                  'Archive Teacher'),
                       ),
                       onPressed: canUpdate
                           ? () => _toggleRoleArchive('teacher')
@@ -335,19 +362,16 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
             fontWeight: FontWeight.w500,
           ),
         ),
-        Expanded(
-          child: Text(
-            value,
-            style: const TextStyle(
-              fontSize: 13,
-            ),
-          ),
-        ),
+        Expanded(child: Text(value, style: const TextStyle(fontSize: 13))),
       ],
     );
   }
 
-  Widget _buildChildAvatar(String? profileImage, String fullName, double radius) {
+  Widget _buildChildAvatar(
+    String? profileImage,
+    String fullName,
+    double radius,
+  ) {
     final imageUrl = profileImage != null && profileImage.isNotEmpty
         ? '${_ProfileScreenStateBase._baseUrl}/uploads/profile_images/$profileImage'
         : null;

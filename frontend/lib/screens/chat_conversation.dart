@@ -17,14 +17,13 @@ import '../widgets/quill_embed_builders.dart';
 import '../widgets/quill_editor_composer.dart';
 import '../widgets/floating_audio_player.dart';
 import '../l10n/app_localizations.dart';
+import '../widgets/app_body_container.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   final ChatThread thread;
 
-  const ChatConversationScreen({
-    Key? key,
-    required this.thread,
-  }) : super(key: key);
+  const ChatConversationScreen({Key? key, required this.thread})
+    : super(key: key);
 
   @override
   State<ChatConversationScreen> createState() => _ChatConversationScreenState();
@@ -84,7 +83,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       offset: 0,
       append: false,
     );
-    
+
     if (mounted) {
       _hasMore = count >= _pageSize;
       setState(() {});
@@ -189,7 +188,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     });
 
     final chatService = context.read<ChatService>();
-    final currentCount = chatService.messagesByThread[widget.thread.id]?.length ?? 0;
+    final currentCount =
+        chatService.messagesByThread[widget.thread.id]?.length ?? 0;
     final count = await chatService.loadThreadMessages(
       widget.thread.id,
       limit: _pageSize,
@@ -235,14 +235,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       case 'audio':
       case 'voice':
       case 'file':
-        embed = quill.BlockEmbed.custom(
-          quill.CustomBlockEmbed(type, url),
-        );
+        embed = quill.BlockEmbed.custom(quill.CustomBlockEmbed(type, url));
         break;
       default:
-        embed = quill.BlockEmbed.custom(
-          quill.CustomBlockEmbed('file', url),
-        );
+        embed = quill.BlockEmbed.custom(quill.CustomBlockEmbed('file', url));
     }
 
     _editorController.document.insert(index, embed);
@@ -269,7 +265,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final type = attachmentType == 'file' ? FileType.any : FileType.custom;
     final result = await FilePicker.platform.pickFiles(
       type: type,
-      allowedExtensions: type == FileType.custom ? allowed[attachmentType] : null,
+      allowedExtensions: type == FileType.custom
+          ? allowed[attachmentType]
+          : null,
       withData: true,
     );
 
@@ -297,7 +295,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         _isUploadingAttachment = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to upload media')),
+        SnackBar(
+          content: Text(chatService.errorMessage ?? 'Failed to upload media'),
+        ),
       );
       return;
     }
@@ -326,9 +326,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final chatService = context.read<ChatService>();
 
     if (_editorController.document.isEmpty()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Message cannot be empty')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Message cannot be empty')));
       return;
     }
 
@@ -345,10 +345,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       // Only use admin message endpoint for virtual threads (user creating first message to admin)
       if (widget.thread.isAdminChat && widget.thread.id == -1) {
         // Non-admin user sending first message to admin
-        final threadId = await chatService.sendAdminMessage(
-          {'ops': quillJson},
-          attachments: attachments,
-        );
+        final threadId = await chatService.sendAdminMessage({
+          'ops': quillJson,
+        }, attachments: attachments);
         success = threadId != null;
 
         if (success) {
@@ -360,7 +359,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           if (mounted && realThread.id != -1) {
             Navigator.of(context).pushReplacement(
               MaterialPageRoute(
-                builder: (context) => ChatConversationScreen(thread: realThread),
+                builder: (context) =>
+                    ChatConversationScreen(thread: realThread),
               ),
             );
             return;
@@ -395,7 +395,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to send message')),
+        SnackBar(
+          content: Text(chatService.errorMessage ?? 'Failed to send message'),
+        ),
       );
     }
   }
@@ -408,17 +410,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       value: AudioPlayerService(),
       child: Scaffold(
         resizeToAvoidBottomInset: true,
-        appBar: AppBar(
-          title: Text(displayName),
-        ),
-        body: Column(
-          children: [
-            const FloatingAudioPlayer(),
-            Expanded(
-              child: _buildMessageList(),
-            ),
-            _buildMessageComposer(),
-          ],
+        appBar: AppBar(title: Text(displayName)),
+        body: AppBodyContainer(
+          child: Column(
+            children: [
+              const FloatingAudioPlayer(),
+              Expanded(child: _buildMessageList()),
+              _buildMessageComposer(),
+            ],
+          ),
         ),
       ),
     );
@@ -428,7 +428,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     return Consumer<ChatService>(
       builder: (context, chatService, _) {
         // For virtual threads (id == -1), show empty state
-        final messages = widget.thread.id == -1 
+        final messages = widget.thread.id == -1
             ? <ChatMessage>[]
             : (chatService.messagesByThread[widget.thread.id] ?? []);
         final authService = context.read<AuthService>();
@@ -604,7 +604,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         _isUploadingAttachment = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to upload voice message')),
+        SnackBar(
+          content: Text(
+            chatService.errorMessage ?? 'Failed to upload voice message',
+          ),
+        ),
       );
       return;
     }
@@ -628,6 +632,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 
   Future<void> _editMessage(ChatMessage message) async {
+    final l10n = AppLocalizations.of(context);
     final controller = quill.QuillController(
       document: message.quillController.document,
       selection: const TextSelection.collapsed(offset: 0),
@@ -640,7 +645,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         titlePadding: const EdgeInsets.fromLTRB(8, 12, 8, 0),
         contentPadding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
         actionsPadding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-        title: const Text('Edit message'),
+        title: Text(l10n?.chatEditMessage ?? 'Edit message'),
         content: SizedBox(
           width: 600,
           child: Column(
@@ -681,7 +686,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     if (!mounted) return;
     if (result == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(chatService.errorMessage ?? 'Failed to update message')),
+        SnackBar(
+          content: Text(chatService.errorMessage ?? 'Failed to update message'),
+        ),
       );
     }
   }
@@ -717,7 +724,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     if (confirmed != true || !mounted) return;
 
     final chatService = context.read<ChatService>();
-    final success = await chatService.deleteMessage(widget.thread.id, message.id);
+    final success = await chatService.deleteMessage(
+      widget.thread.id,
+      message.id,
+    );
 
     if (!mounted) return;
     if (!success) {
@@ -826,17 +836,40 @@ class _MessageBubble extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (onEdit != null)
-                          IconButton(
-                            icon: const Icon(Icons.edit, size: 16),
-                            tooltip: 'Edit message',
-                            onPressed: onEdit,
-                          ),
-                        if (onDelete != null)
-                          IconButton(
-                            icon: const Icon(Icons.delete, size: 16),
-                            tooltip: l10n?.commonDelete ?? 'Delete',
-                            onPressed: onDelete,
+                        if (onEdit != null || onDelete != null)
+                          PopupMenuButton<String>(
+                            icon: const Icon(Icons.more_horiz, size: 18),
+                            tooltip:
+                                l10n?.chatMessageActions ?? 'Message actions',
+                            onSelected: (value) {
+                              if (value == 'edit') {
+                                onEdit?.call();
+                              } else if (value == 'delete') {
+                                onDelete?.call();
+                              }
+                            },
+                            itemBuilder: (context) {
+                              final items = <PopupMenuEntry<String>>[];
+                              if (onEdit != null) {
+                                items.add(
+                                  PopupMenuItem<String>(
+                                    value: 'edit',
+                                    child: Text(
+                                      l10n?.chatEditMessage ?? 'Edit message',
+                                    ),
+                                  ),
+                                );
+                              }
+                              if (onDelete != null) {
+                                items.add(
+                                  PopupMenuItem<String>(
+                                    value: 'delete',
+                                    child: Text(l10n?.commonDelete ?? 'Delete'),
+                                  ),
+                                );
+                              }
+                              return items;
+                            },
                           ),
                       ],
                     ),
@@ -887,7 +920,10 @@ class _MessageBubble extends StatelessWidget {
         .toList();
   }
 
-  Widget _buildAttachmentWidget(BuildContext context, ChatAttachment attachment) {
+  Widget _buildAttachmentWidget(
+    BuildContext context,
+    ChatAttachment attachment,
+  ) {
     final url = normalizeMediaUrl(attachment.url);
     Widget content;
     switch (attachment.attachmentType) {
@@ -941,10 +977,7 @@ class _MessageBubble extends StatelessWidget {
     return Stack(
       alignment: Alignment.topRight,
       children: [
-        Padding(
-          padding: const EdgeInsets.only(right: 32),
-          child: child,
-        ),
+        Padding(padding: const EdgeInsets.only(right: 32), child: child),
         PopupMenuButton<String>(
           tooltip: 'Attachment actions',
           onSelected: (value) {
@@ -976,13 +1009,13 @@ class _MessageBubble extends StatelessWidget {
 
     final message = result.success
         ? (result.filePath != null
-            ? 'Saved to ${result.filePath}'
-            : 'Download started')
+              ? 'Saved to ${result.filePath}'
+              : 'Download started')
         : (result.errorMessage ?? 'Download failed');
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   String? _fileNameFromUrl(String url) {

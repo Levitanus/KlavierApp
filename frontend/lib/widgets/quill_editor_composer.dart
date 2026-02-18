@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import '../widgets/quill_embed_builders.dart';
-import '../utils/voice_recorder.dart';
+// import '../utils/voice_recorder.dart';
 import '../l10n/app_localizations.dart';
 
 /// Configuration for the QuillEditorComposer
@@ -14,7 +14,7 @@ class QuillEditorComposerConfig {
   final double maxHeight;
   final bool readOnly;
   final String? sendButtonTooltip;
-  
+
   const QuillEditorComposerConfig({
     this.showAttachButton = true,
     this.showVoiceButton = true,
@@ -31,7 +31,8 @@ class QuillEditorComposer extends StatefulWidget {
   final QuillEditorComposerConfig config;
   final VoidCallback? onSendPressed;
   final Future<void> Function()? onAttachmentSelected;
-  final Future<void> Function(List<int> bytes, String filename)? onVoiceRecorded;
+  final Future<void> Function(List<int> bytes, String filename)?
+  onVoiceRecorded;
   final Key? controlKey;
   final FocusNode? focusNode;
 
@@ -54,7 +55,7 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
   late FocusNode _focusNode;
   late bool _ownsFocusNode;
   bool _isUploadingAttachment = false;
-  final VoiceRecorder _voiceRecorder = VoiceRecorder();
+  // final VoiceRecorder _voiceRecorder = VoiceRecorder();
 
   @override
   void initState() {
@@ -89,69 +90,69 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
     }
   }
 
-  Future<void> _onVoiceRecorded() async {
-    try {
-      if (_voiceRecorder.isRecording) {
-        // Stop recording and wait a bit for the file to be fully written
-        final audio = await _voiceRecorder.stop();
-        if (audio == null) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  AppLocalizations.of(context)?.voiceRecordFailed ??
-                      'Failed to record audio',
-                ),
-              ),
-            );
-          }
-          return;
-        }
+  // Future<void> _onVoiceRecorded() async {
+  //   try {
+  //     if (_voiceRecorder.isRecording) {
+  //       // Stop recording and wait a bit for the file to be fully written
+  //       final audio = await _voiceRecorder.stop();
+  //       if (audio == null) {
+  //         if (mounted) {
+  //           ScaffoldMessenger.of(context).showSnackBar(
+  //             SnackBar(
+  //               content: Text(
+  //                 AppLocalizations.of(context)?.voiceRecordFailed ??
+  //                     'Failed to record audio',
+  //               ),
+  //             ),
+  //           );
+  //         }
+  //         return;
+  //       }
 
-        // Give the system time to finalize the audio file (wait for OggWriter)
-        await Future.delayed(const Duration(milliseconds: 300));
+  //       // Give the system time to finalize the audio file (wait for OggWriter)
+  //       await Future.delayed(const Duration(milliseconds: 300));
 
-        if (mounted && widget.onVoiceRecorded != null) {
-          final filename = 'voice_${DateTime.now().millisecondsSinceEpoch}.${audio.extension}';
-          await widget.onVoiceRecorded!(audio.bytes, filename);
-          // Update UI to show recording stopped
-          setState(() {});
-        }
-      } else {
-        // Check if voice recording is available
-        final available = await _voiceRecorder.isAvailable();
-        if (!available) {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  AppLocalizations.of(context)?.voiceRecordUnavailable ??
-                      'Voice recording not available',
-                ),
-              ),
-            );
-          }
-          return;
-        }
-        // Start recording
-        await _voiceRecorder.start();
-        if (mounted) {
-          setState(() {});
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)?.voiceRecordError(e.toString()) ??
-                  'Voice error: ${e.toString()}',
-            ),
-          ),
-        );
-      }
-    }
-  }
+  //       if (mounted && widget.onVoiceRecorded != null) {
+  //         final filename = 'voice_${DateTime.now().millisecondsSinceEpoch}.${audio.extension}';
+  //         await widget.onVoiceRecorded!(audio.bytes, filename);
+  //         // Update UI to show recording stopped
+  //         setState(() {});
+  //       }
+  //     } else {
+  //       // Check if voice recording is available
+  //       final available = await _voiceRecorder.isAvailable();
+  //       if (!available) {
+  //         if (mounted) {
+  //           ScaffoldMessenger.of(context).showSnackBar(
+  //             SnackBar(
+  //               content: Text(
+  //                 AppLocalizations.of(context)?.voiceRecordUnavailable ??
+  //                     'Voice recording not available',
+  //               ),
+  //             ),
+  //           );
+  //         }
+  //         return;
+  //       }
+  //       // Start recording
+  //       await _voiceRecorder.start();
+  //       if (mounted) {
+  //         setState(() {});
+  //       }
+  //     }
+  //   } catch (e) {
+  //     if (mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text(
+  //             AppLocalizations.of(context)?.voiceRecordError(e.toString()) ??
+  //                 'Voice error: ${e.toString()}',
+  //           ),
+  //         ),
+  //       );
+  //     }
+  //   }
+  // }
 
   void _insertNewline() {
     final index = widget.controller.selection.extentOffset;
@@ -203,9 +204,7 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
     final url = controller.text.trim();
     if (url.isEmpty) return;
 
-    widget.controller.formatSelection(
-      quill.LinkAttribute(url),
-    );
+    widget.controller.formatSelection(quill.LinkAttribute(url));
   }
 
   Widget _buildEditorContextMenu(
@@ -288,18 +287,35 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
           Expanded(
             child: Shortcuts(
               shortcuts: {
-                LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyB):
-                    const _FormatIntent(_FormatType.bold),
-                LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyI):
-                    const _FormatIntent(_FormatType.italic),
-                LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyU):
-                    const _FormatIntent(_FormatType.underline),
-                LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyK):
-                    const _FormatIntent(_FormatType.link),
-                LogicalKeySet(LogicalKeyboardKey.enter):
-                    const _SendIntent(),
-                LogicalKeySet(LogicalKeyboardKey.shift, LogicalKeyboardKey.enter):
-                    const _NewlineIntent(),
+                LogicalKeySet(
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.keyB,
+                ): const _FormatIntent(
+                  _FormatType.bold,
+                ),
+                LogicalKeySet(
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.keyI,
+                ): const _FormatIntent(
+                  _FormatType.italic,
+                ),
+                LogicalKeySet(
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.keyU,
+                ): const _FormatIntent(
+                  _FormatType.underline,
+                ),
+                LogicalKeySet(
+                  LogicalKeyboardKey.control,
+                  LogicalKeyboardKey.keyK,
+                ): const _FormatIntent(
+                  _FormatType.link,
+                ),
+                LogicalKeySet(LogicalKeyboardKey.enter): const _SendIntent(),
+                LogicalKeySet(
+                  LogicalKeyboardKey.shift,
+                  LogicalKeyboardKey.enter,
+                ): const _NewlineIntent(),
               },
               child: Actions(
                 actions: {
@@ -307,13 +323,19 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
                     onInvoke: (intent) {
                       switch (intent.type) {
                         case _FormatType.bold:
-                          widget.controller.formatSelection(quill.Attribute.bold);
+                          widget.controller.formatSelection(
+                            quill.Attribute.bold,
+                          );
                           break;
                         case _FormatType.italic:
-                          widget.controller.formatSelection(quill.Attribute.italic);
+                          widget.controller.formatSelection(
+                            quill.Attribute.italic,
+                          );
                           break;
                         case _FormatType.underline:
-                          widget.controller.formatSelection(quill.Attribute.underline);
+                          widget.controller.formatSelection(
+                            quill.Attribute.underline,
+                          );
                           break;
                         case _FormatType.link:
                           _promptForLink();
@@ -339,7 +361,8 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
                   focusNode: _focusNode,
                   onKeyEvent: (node, event) {
                     if (event is KeyDownEvent) {
-                      final isShiftPressed = event.logicalKey == LogicalKeyboardKey.shiftLeft ||
+                      final isShiftPressed =
+                          event.logicalKey == LogicalKeyboardKey.shiftLeft ||
                           event.logicalKey == LogicalKeyboardKey.shiftRight ||
                           HardwareKeyboard.instance.isShiftPressed;
                       if (event.logicalKey == LogicalKeyboardKey.enter &&
@@ -383,10 +406,13 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
           if (widget.config.showAttachButton) ...[
             const SizedBox(width: 1),
             IconButton(
-              tooltip: AppLocalizations.of(context)?.commonAttachFile ??
+              tooltip:
+                  AppLocalizations.of(context)?.commonAttachFile ??
                   'Attach file',
               icon: Icon(
-                _isUploadingAttachment ? Icons.hourglass_top : Icons.attach_file,
+                _isUploadingAttachment
+                    ? Icons.hourglass_top
+                    : Icons.attach_file,
               ),
               onPressed: _isUploadingAttachment ? null : _onAttachmentSelected,
               visualDensity: VisualDensity.compact,
@@ -394,27 +420,28 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
               constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
             ),
           ],
-          if (widget.config.showVoiceButton) ...[
-            const SizedBox(width: 1),
-            IconButton(
-              tooltip: _voiceRecorder.isRecording
-                  ? (AppLocalizations.of(context)?.voiceStopRecording ??
-                      'Stop recording')
-                  : (AppLocalizations.of(context)?.voiceRecord ?? 'Record voice'),
-              icon: Icon(
-                _voiceRecorder.isRecording ? Icons.stop_circle : Icons.mic,
-                color: _voiceRecorder.isRecording ? Colors.red : null,
-              ),
-              onPressed: _onVoiceRecorded,
-              visualDensity: VisualDensity.compact,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-            ),
-          ],
+          // if (widget.config.showVoiceButton) ...[
+          //   const SizedBox(width: 1),
+          //   IconButton(
+          //     tooltip: _voiceRecorder.isRecording
+          //         ? (AppLocalizations.of(context)?.voiceStopRecording ??
+          //             'Stop recording')
+          //         : (AppLocalizations.of(context)?.voiceRecord ?? 'Record voice'),
+          //     icon: Icon(
+          //       _voiceRecorder.isRecording ? Icons.stop_circle : Icons.mic,
+          //       color: _voiceRecorder.isRecording ? Colors.red : null,
+          //     ),
+          //     onPressed: _onVoiceRecorded,
+          //     visualDensity: VisualDensity.compact,
+          //     padding: EdgeInsets.zero,
+          //     constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          //   ),
+          // ],
           if (widget.config.showSendButton) ...[
             const SizedBox(width: 1),
             IconButton(
-              tooltip: widget.config.sendButtonTooltip ??
+              tooltip:
+                  widget.config.sendButtonTooltip ??
                   (AppLocalizations.of(context)?.commonSend ?? 'Send'),
               icon: const Icon(Icons.send),
               onPressed: widget.onSendPressed,

@@ -296,6 +296,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get feedsAttachmentActions => 'Anhangaktionen';
 
   @override
+  String get feedsCommentActions => 'Kommentaraktionen';
+
+  @override
   String get feedsEditPost => 'Beitrag bearbeiten';
 
   @override
@@ -515,6 +518,12 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get chatDeleteMessageFailed =>
       'Nachricht konnte nicht geloescht werden';
+
+  @override
+  String get chatEditMessage => 'Nachricht bearbeiten';
+
+  @override
+  String get chatMessageActions => 'Nachrichtenaktionen';
 
   @override
   String get chatMessages => 'Nachrichten';
@@ -941,10 +950,19 @@ class AppLocalizationsDe extends AppLocalizations {
   String get dashboardNoSchoolFeed => 'Noch kein Schul-Feed.';
 
   @override
+  String get dashboardGroupFeeds => 'Gruppen-Feeds';
+
+  @override
+  String get dashboardNoGroupFeeds => 'Noch keine Gruppen-Feeds.';
+
+  @override
   String get dashboardOwnerSchool => 'Schule';
 
   @override
   String get dashboardOwnerTeacher => 'Lehrer';
+
+  @override
+  String get dashboardOwnerGroup => 'Gruppe';
 
   @override
   String get dashboardStudentLabel => 'Schueler:';
@@ -1340,4 +1358,133 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get hometasksAssign => 'Hausaufgabe zuweisen';
+
+  @override
+  String get hometasksAssignToGroup => 'An Gruppe zuweisen';
+
+  @override
+  String get hometasksSelectGroupTitle => 'Gruppe auswaehlen';
+
+  @override
+  String hometasksAssignTitleGroup(Object groupName) {
+    return 'Hausaufgabe an Gruppe $groupName zuweisen';
+  }
+
+  @override
+  String get hometasksApplyGroupChangesTitle => 'Gruppenaenderungen anwenden';
+
+  @override
+  String get hometasksApplyGroupChangesMessage =>
+      'Diese Aenderungen auf alle Schueler dieser Gruppen-Hausaufgabe anwenden?';
+
+  @override
+  String get hometasksApplyOnlyThisStudent => 'Nur dieser Schueler';
+
+  @override
+  String get hometasksApplyToGroup => 'Auf Gruppe anwenden';
+
+  @override
+  String get hometasksArchiveGroupTitle => 'Gruppen-Hausaufgabe archivieren';
+
+  @override
+  String get hometasksArchiveGroupMessage =>
+      'Nur diese Schueleraufgabe archivieren oder alle Aufgaben in dieser Gruppenzuweisung?';
+
+  @override
+  String get hometasksArchiveForGroup => 'Fuer Gruppe archivieren';
+
+  @override
+  String get hometasksReopenGroupTitle => 'Gruppen-Hausaufgabe wiedereroeffnen';
+
+  @override
+  String get hometasksReopenGroupMessage =>
+      'Nur diese Schueleraufgabe wiedereroeffnen oder alle Aufgaben in dieser Gruppenzuweisung?';
+
+  @override
+  String get hometasksReopenForGroup => 'Fuer Gruppe wiedereroeffnen';
+
+  @override
+  String get feedsGroupFeeds => 'Gruppen-Feeds';
+
+  @override
+  String get feedsOwnerGroup => 'Gruppe';
+
+  @override
+  String get profileCreateGroup => 'Gruppe erstellen';
+
+  @override
+  String get profileGroupsTitle => 'Gruppen';
+
+  @override
+  String get profileNoGroupsYet => 'Noch keine Gruppen';
+
+  @override
+  String get profileStudentsLabel => 'Schueler';
+
+  @override
+  String get profileStatusArchived => 'Archiviert';
+
+  @override
+  String get profileStatusActive => 'Aktiv';
+
+  @override
+  String get profileEditMembers => 'Mitglieder bearbeiten';
+
+  @override
+  String get profileArchiveGroup => 'Archivieren';
+
+  @override
+  String get profileUnarchiveGroup => 'Wiederherstellen';
+
+  @override
+  String get profileDeleteGroupTitle => 'Gruppe loeschen';
+
+  @override
+  String get profileDeleteGroupMessage =>
+      'Diese Gruppe dauerhaft loeschen? Feed- und Gruppenverlauf werden entfernt.';
+
+  @override
+  String get profileAddStudentsFirstToCreateGroup =>
+      'Fuegen Sie zuerst Schueler hinzu, um eine Gruppe zu erstellen';
+
+  @override
+  String get profileGroupNameLabel => 'Gruppenname';
+
+  @override
+  String get profileFilterStudentsLabel => 'Schueler filtern';
+
+  @override
+  String get profileNoStudentsFound => 'Keine Schueler gefunden';
+
+  @override
+  String get profileEnterGroupNameAndStudents =>
+      'Gruppennamen eingeben und Schueler auswaehlen';
+
+  @override
+  String get profileCreateAction => 'Erstellen';
+
+  @override
+  String get profileEditGroupTitle => 'Gruppe bearbeiten';
+
+  @override
+  String get profileArchivedGroupLabel => 'Gruppe archiviert';
+
+  @override
+  String get profileGroupCreatedSuccess => 'Gruppe erfolgreich erstellt';
+
+  @override
+  String get profileGroupUpdatedSuccess => 'Gruppe erfolgreich aktualisiert';
+
+  @override
+  String get profileGroupDeletedSuccess => 'Gruppe erfolgreich geloescht';
+
+  @override
+  String get profileGroupCreateFailed => 'Gruppe konnte nicht erstellt werden';
+
+  @override
+  String get profileGroupUpdateFailed =>
+      'Gruppe konnte nicht aktualisiert werden';
+
+  @override
+  String get profileGroupDeleteFailed => 'Gruppe konnte nicht geloescht werden';
 }

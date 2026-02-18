@@ -1,14 +1,14 @@
-use actix_web::{get, post, put, delete, web, HttpResponse, Responder, HttpRequest};
+use actix_web::{delete, get, post, put, web, HttpRequest, HttpResponse, Responder};
+use argon2::password_hash::{rand_core::OsRng, SaltString};
+use argon2::{Argon2, PasswordHasher};
+use chrono::{DateTime, NaiveDate, Utc};
+use log::{debug, error};
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
-use argon2::{Argon2, PasswordHasher};
-use argon2::password_hash::{SaltString, rand_core::OsRng};
-use chrono::{DateTime, Utc, NaiveDate};
-use log::{debug, error};
 
-use crate::AppState;
-use crate::users::verify_token;
 use crate::password_reset;
+use crate::users::verify_token;
+use crate::AppState;
 
 #[derive(Debug, Serialize, FromRow)]
 pub struct UserResponse {
@@ -65,13 +65,13 @@ pub struct UsersPageResponse {
 // Helper to verify admin role from claims
 fn verify_admin_role(req: &HttpRequest, app_state: &AppState) -> Result<(), HttpResponse> {
     let claims = verify_token(req, app_state)?;
-    
+
     if !claims.roles.contains(&"admin".to_string()) {
         return Err(HttpResponse::Forbidden().json(serde_json::json!({
             "error": "Admin access required"
         })));
     }
-    
+
     Ok(())
 }
 
@@ -164,7 +164,7 @@ async fn get_users(
         let roles_result = sqlx::query_scalar::<_, String>(
             "SELECT r.name FROM roles r 
              INNER JOIN user_roles ur ON r.id = ur.role_id 
-             WHERE ur.user_id = $1"
+             WHERE ur.user_id = $1",
         )
         .bind(user.id)
         .fetch_all(&app_state.db)
@@ -173,37 +173,34 @@ async fn get_users(
         user.roles = roles_result.unwrap_or_default();
 
         if user.roles.contains(&"student".to_string()) {
-            let status: Option<String> = sqlx::query_scalar(
-                "SELECT status::text FROM students WHERE user_id = $1"
-            )
-            .bind(user.id)
-            .fetch_optional(&app_state.db)
-            .await
-            .unwrap_or(None);
+            let status: Option<String> =
+                sqlx::query_scalar("SELECT status::text FROM students WHERE user_id = $1")
+                    .bind(user.id)
+                    .fetch_optional(&app_state.db)
+                    .await
+                    .unwrap_or(None);
 
             user.student_status = status;
         }
 
         if user.roles.contains(&"parent".to_string()) {
-            let status: Option<String> = sqlx::query_scalar(
-                "SELECT status::text FROM parents WHERE user_id = $1"
-            )
-            .bind(user.id)
-            .fetch_optional(&app_state.db)
-            .await
-            .unwrap_or(None);
+            let status: Option<String> =
+                sqlx::query_scalar("SELECT status::text FROM parents WHERE user_id = $1")
+                    .bind(user.id)
+                    .fetch_optional(&app_state.db)
+                    .await
+                    .unwrap_or(None);
 
             user.parent_status = status;
         }
 
         if user.roles.contains(&"teacher".to_string()) {
-            let status: Option<String> = sqlx::query_scalar(
-                "SELECT status::text FROM teachers WHERE user_id = $1"
-            )
-            .bind(user.id)
-            .fetch_optional(&app_state.db)
-            .await
-            .unwrap_or(None);
+            let status: Option<String> =
+                sqlx::query_scalar("SELECT status::text FROM teachers WHERE user_id = $1")
+                    .bind(user.id)
+                    .fetch_optional(&app_state.db)
+                    .await
+                    .unwrap_or(None);
 
             user.teacher_status = status;
         }
@@ -262,37 +259,34 @@ async fn get_user_by_id(
     user.roles = roles_result.unwrap_or_default();
 
     if user.roles.contains(&"student".to_string()) {
-        let status: Option<String> = sqlx::query_scalar(
-            "SELECT status::text FROM students WHERE user_id = $1",
-        )
-        .bind(user.id)
-        .fetch_optional(&app_state.db)
-        .await
-        .unwrap_or(None);
+        let status: Option<String> =
+            sqlx::query_scalar("SELECT status::text FROM students WHERE user_id = $1")
+                .bind(user.id)
+                .fetch_optional(&app_state.db)
+                .await
+                .unwrap_or(None);
 
         user.student_status = status;
     }
 
     if user.roles.contains(&"parent".to_string()) {
-        let status: Option<String> = sqlx::query_scalar(
-            "SELECT status::text FROM parents WHERE user_id = $1",
-        )
-        .bind(user.id)
-        .fetch_optional(&app_state.db)
-        .await
-        .unwrap_or(None);
+        let status: Option<String> =
+            sqlx::query_scalar("SELECT status::text FROM parents WHERE user_id = $1")
+                .bind(user.id)
+                .fetch_optional(&app_state.db)
+                .await
+                .unwrap_or(None);
 
         user.parent_status = status;
     }
 
     if user.roles.contains(&"teacher".to_string()) {
-        let status: Option<String> = sqlx::query_scalar(
-            "SELECT status::text FROM teachers WHERE user_id = $1",
-        )
-        .bind(user.id)
-        .fetch_optional(&app_state.db)
-        .await
-        .unwrap_or(None);
+        let status: Option<String> =
+            sqlx::query_scalar("SELECT status::text FROM teachers WHERE user_id = $1")
+                .bind(user.id)
+                .fetch_optional(&app_state.db)
+                .await
+                .unwrap_or(None);
 
         user.teacher_status = status;
     }
@@ -347,21 +341,17 @@ async fn create_user(
 
     // Assign roles
     for role_name in &user_data.roles {
-        let role_result = sqlx::query_scalar::<_, i32>(
-            "SELECT id FROM roles WHERE name = $1"
-        )
-        .bind(role_name)
-        .fetch_optional(&app_state.db)
-        .await;
+        let role_result = sqlx::query_scalar::<_, i32>("SELECT id FROM roles WHERE name = $1")
+            .bind(role_name)
+            .fetch_optional(&app_state.db)
+            .await;
 
         if let Ok(Some(role_id)) = role_result {
-            let _ = sqlx::query(
-                "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)"
-            )
-            .bind(user_id)
-            .bind(role_id)
-            .execute(&app_state.db)
-            .await;
+            let _ = sqlx::query("INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)")
+                .bind(user_id)
+                .bind(role_id)
+                .execute(&app_state.db)
+                .await;
         }
     }
 
@@ -442,20 +432,20 @@ async fn update_user(
     }
 
     // Update phone if provided
-        // Update full name if provided
-        if let Some(full_name) = &user_data.full_name {
-            let result = sqlx::query("UPDATE users SET full_name = $1 WHERE id = $2")
-                .bind(full_name)
-                .bind(user_id)
-                .execute(&app_state.db)
-                .await;
+    // Update full name if provided
+    if let Some(full_name) = &user_data.full_name {
+        let result = sqlx::query("UPDATE users SET full_name = $1 WHERE id = $2")
+            .bind(full_name)
+            .bind(user_id)
+            .execute(&app_state.db)
+            .await;
 
-            if result.is_err() {
-                return HttpResponse::InternalServerError().json(serde_json::json!({
-                    "error": "Failed to update full name"
-                }));
-            }
+        if result.is_err() {
+            return HttpResponse::InternalServerError().json(serde_json::json!({
+                "error": "Failed to update full name"
+            }));
         }
+    }
     if let Some(phone) = &user_data.phone {
         let result = sqlx::query("UPDATE users SET phone = $1 WHERE id = $2")
             .bind(phone)
@@ -480,21 +470,17 @@ async fn update_user(
 
         // Insert new roles
         for role_name in roles {
-            let role_result = sqlx::query_scalar::<_, i32>(
-                "SELECT id FROM roles WHERE name = $1"
-            )
-            .bind(role_name)
-            .fetch_optional(&app_state.db)
-            .await;
+            let role_result = sqlx::query_scalar::<_, i32>("SELECT id FROM roles WHERE name = $1")
+                .bind(role_name)
+                .fetch_optional(&app_state.db)
+                .await;
 
             if let Ok(Some(role_id)) = role_result {
-                let _ = sqlx::query(
-                    "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)"
-                )
-                .bind(user_id)
-                .bind(role_id)
-                .execute(&app_state.db)
-                .await;
+                let _ = sqlx::query("INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)")
+                    .bind(user_id)
+                    .bind(role_id)
+                    .execute(&app_state.db)
+                    .await;
             }
         }
     }
@@ -558,10 +544,11 @@ async fn generate_reset_link(
     let user_id = user_id.into_inner();
 
     // Check if user exists
-    let user_exists = sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)")
-        .bind(user_id)
-        .fetch_one(&app_state.db)
-        .await;
+    let user_exists =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)")
+            .bind(user_id)
+            .fetch_one(&app_state.db)
+            .await;
 
     match user_exists {
         Ok(false) | Err(_) => {
@@ -575,10 +562,11 @@ async fn generate_reset_link(
     // Generate reset token
     match password_reset::generate_reset_token_for_user(&app_state.db, user_id).await {
         Ok(token) => {
-            let reset_url_base = std::env::var("RESET_URL_BASE")
-                .unwrap_or_else(|_| "http://localhost:8080/reset-password".to_string());
+            let api_base_url = std::env::var("API_BASE_URL")
+                .unwrap_or_else(|_| "http://localhost:8080".to_string());
+            let reset_url_base = format!("{}/reset-password", api_base_url.trim_end_matches('/'));
             let reset_link = format!("{}/{}", reset_url_base, token);
-            
+
             HttpResponse::Ok().json(GenerateResetLinkResponse {
                 reset_link,
                 expires_at: "1 hour".to_string(),
@@ -623,7 +611,7 @@ async fn get_password_reset_requests(
                     resolved_by_admin_id: r.resolved_by_admin_id,
                 })
                 .collect();
-            
+
             HttpResponse::Ok().json(responses)
         }
         Err(e) => {
@@ -665,11 +653,9 @@ async fn resolve_password_reset_request(
     };
 
     match password_reset::resolve_request(&app_state.db, *request_id, admin_id).await {
-        Ok(_) => {
-            HttpResponse::Ok().json(serde_json::json!({
-                "message": "Password reset request resolved"
-            }))
-        }
+        Ok(_) => HttpResponse::Ok().json(serde_json::json!({
+            "message": "Password reset request resolved"
+        })),
         Err(e) => {
             error!("Failed to resolve password reset request: {}", e);
             HttpResponse::InternalServerError().json(serde_json::json!({
@@ -690,8 +676,7 @@ pub struct MakeParentRequest {
 }
 
 #[derive(Debug, Deserialize)]
-pub struct MakeTeacherRequest {
-}
+pub struct MakeTeacherRequest {}
 
 /// Convert an existing user to a student
 #[post("/api/admin/users/{id}/make-student")]
@@ -729,12 +714,11 @@ async fn make_student(
     };
 
     // Check if user exists
-    let user_exists = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)"
-    )
-    .bind(user_id)
-    .fetch_one(&mut *tx)
-    .await;
+    let user_exists =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)")
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await;
 
     if !user_exists.unwrap_or(false) {
         return HttpResponse::NotFound().json(serde_json::json!({
@@ -743,12 +727,11 @@ async fn make_student(
     }
 
     // Check if already a student
-    let is_student = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
-    )
-    .bind(user_id)
-    .fetch_one(&mut *tx)
-    .await;
+    let is_student =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)")
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await;
 
     if is_student.unwrap_or(false) {
         return HttpResponse::Conflict().json(serde_json::json!({
@@ -757,11 +740,9 @@ async fn make_student(
     }
 
     // Get student role ID
-    let role_id = match sqlx::query_scalar::<_, i32>(
-        "SELECT id FROM roles WHERE name = 'student'"
-    )
-    .fetch_one(&mut *tx)
-    .await
+    let role_id = match sqlx::query_scalar::<_, i32>("SELECT id FROM roles WHERE name = 'student'")
+        .fetch_one(&mut *tx)
+        .await
     {
         Ok(id) => id,
         Err(e) => {
@@ -775,7 +756,7 @@ async fn make_student(
 
     // Check if user already has the role
     let has_role = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = $1 AND role_id = $2)"
+        "SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = $1 AND role_id = $2)",
     )
     .bind(user_id)
     .bind(role_id)
@@ -785,13 +766,11 @@ async fn make_student(
 
     // Assign student role if not already assigned
     if !has_role {
-        if let Err(e) = sqlx::query(
-            "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)"
-        )
-        .bind(user_id)
-        .bind(role_id)
-        .execute(&mut *tx)
-        .await
+        if let Err(e) = sqlx::query("INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)")
+            .bind(user_id)
+            .bind(role_id)
+            .execute(&mut *tx)
+            .await
         {
             error!("Failed to assign role: {}", e);
             let _ = tx.rollback().await;
@@ -804,7 +783,7 @@ async fn make_student(
     // Create student entry
     if let Err(e) = sqlx::query(
         "INSERT INTO students (user_id, birthday) 
-         VALUES ($1, $2)"
+         VALUES ($1, $2)",
     )
     .bind(user_id)
     .bind(birthday)
@@ -871,12 +850,11 @@ async fn make_parent(
     };
 
     // Check if user exists
-    let user_exists = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)"
-    )
-    .bind(user_id)
-    .fetch_one(&mut *tx)
-    .await;
+    let user_exists =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)")
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await;
 
     if !user_exists.unwrap_or(false) {
         return HttpResponse::NotFound().json(serde_json::json!({
@@ -885,12 +863,11 @@ async fn make_parent(
     }
 
     // Check if already a parent
-    let is_parent = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM parents WHERE user_id = $1)"
-    )
-    .bind(user_id)
-    .fetch_one(&mut *tx)
-    .await;
+    let is_parent =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM parents WHERE user_id = $1)")
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await;
 
     if is_parent.unwrap_or(false) {
         return HttpResponse::Conflict().json(serde_json::json!({
@@ -899,11 +876,9 @@ async fn make_parent(
     }
 
     // Get parent role ID
-    let role_id = match sqlx::query_scalar::<_, i32>(
-        "SELECT id FROM roles WHERE name = 'parent'"
-    )
-    .fetch_one(&mut *tx)
-    .await
+    let role_id = match sqlx::query_scalar::<_, i32>("SELECT id FROM roles WHERE name = 'parent'")
+        .fetch_one(&mut *tx)
+        .await
     {
         Ok(id) => id,
         Err(e) => {
@@ -917,7 +892,7 @@ async fn make_parent(
 
     // Check if user already has the role
     let has_role = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = $1 AND role_id = $2)"
+        "SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = $1 AND role_id = $2)",
     )
     .bind(user_id)
     .bind(role_id)
@@ -927,13 +902,11 @@ async fn make_parent(
 
     // Assign parent role if not already assigned
     if !has_role {
-        if let Err(e) = sqlx::query(
-            "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)"
-        )
-        .bind(user_id)
-        .bind(role_id)
-        .execute(&mut *tx)
-        .await
+        if let Err(e) = sqlx::query("INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)")
+            .bind(user_id)
+            .bind(role_id)
+            .execute(&mut *tx)
+            .await
         {
             error!("Failed to assign role: {}", e);
             let _ = tx.rollback().await;
@@ -944,12 +917,10 @@ async fn make_parent(
     }
 
     // Create parent entry
-    if let Err(e) = sqlx::query(
-        "INSERT INTO parents (user_id) VALUES ($1)"
-    )
-    .bind(user_id)
-    .execute(&mut *tx)
-    .await
+    if let Err(e) = sqlx::query("INSERT INTO parents (user_id) VALUES ($1)")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await
     {
         error!("Failed to create parent entry: {}", e);
         let _ = tx.rollback().await;
@@ -962,7 +933,7 @@ async fn make_parent(
     for student_id in &parent_data.student_ids {
         // Verify student exists
         let student_exists = sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)"
+            "SELECT EXISTS(SELECT 1 FROM students WHERE user_id = $1)",
         )
         .bind(student_id)
         .fetch_one(&mut *tx)
@@ -977,7 +948,7 @@ async fn make_parent(
 
         if let Err(e) = sqlx::query(
             "INSERT INTO parent_student_relations (parent_user_id, student_user_id) 
-             VALUES ($1, $2) ON CONFLICT DO NOTHING"
+             VALUES ($1, $2) ON CONFLICT DO NOTHING",
         )
         .bind(user_id)
         .bind(student_id)
@@ -1031,12 +1002,11 @@ async fn make_teacher(
     };
 
     // Check if user exists
-    let user_exists = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)"
-    )
-    .bind(user_id)
-    .fetch_one(&mut *tx)
-    .await;
+    let user_exists =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM users WHERE id = $1)")
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await;
 
     if !user_exists.unwrap_or(false) {
         return HttpResponse::NotFound().json(serde_json::json!({
@@ -1045,12 +1015,11 @@ async fn make_teacher(
     }
 
     // Check if already a teacher
-    let is_teacher = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1)"
-    )
-    .bind(user_id)
-    .fetch_one(&mut *tx)
-    .await;
+    let is_teacher =
+        sqlx::query_scalar::<_, bool>("SELECT EXISTS(SELECT 1 FROM teachers WHERE user_id = $1)")
+            .bind(user_id)
+            .fetch_one(&mut *tx)
+            .await;
 
     if is_teacher.unwrap_or(false) {
         return HttpResponse::Conflict().json(serde_json::json!({
@@ -1059,11 +1028,9 @@ async fn make_teacher(
     }
 
     // Get teacher role ID
-    let role_id = match sqlx::query_scalar::<_, i32>(
-        "SELECT id FROM roles WHERE name = 'teacher'"
-    )
-    .fetch_one(&mut *tx)
-    .await
+    let role_id = match sqlx::query_scalar::<_, i32>("SELECT id FROM roles WHERE name = 'teacher'")
+        .fetch_one(&mut *tx)
+        .await
     {
         Ok(id) => id,
         Err(e) => {
@@ -1077,7 +1044,7 @@ async fn make_teacher(
 
     // Check if user already has the role
     let has_role = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = $1 AND role_id = $2)"
+        "SELECT EXISTS(SELECT 1 FROM user_roles WHERE user_id = $1 AND role_id = $2)",
     )
     .bind(user_id)
     .bind(role_id)
@@ -1087,13 +1054,11 @@ async fn make_teacher(
 
     // Assign teacher role if not already assigned
     if !has_role {
-        if let Err(e) = sqlx::query(
-            "INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)"
-        )
-        .bind(user_id)
-        .bind(role_id)
-        .execute(&mut *tx)
-        .await
+        if let Err(e) = sqlx::query("INSERT INTO user_roles (user_id, role_id) VALUES ($1, $2)")
+            .bind(user_id)
+            .bind(role_id)
+            .execute(&mut *tx)
+            .await
         {
             error!("Failed to assign role: {}", e);
             let _ = tx.rollback().await;
@@ -1104,12 +1069,10 @@ async fn make_teacher(
     }
 
     // Create teacher entry
-    if let Err(e) = sqlx::query(
-        "INSERT INTO teachers (user_id) VALUES ($1)"
-    )
-    .bind(user_id)
-    .execute(&mut *tx)
-    .await
+    if let Err(e) = sqlx::query("INSERT INTO teachers (user_id) VALUES ($1)")
+        .bind(user_id)
+        .execute(&mut *tx)
+        .await
     {
         error!("Failed to create teacher entry: {}", e);
         let _ = tx.rollback().await;
@@ -1120,7 +1083,7 @@ async fn make_teacher(
 
     // Create teacher feed if missing
     let has_feed = sqlx::query_scalar::<_, bool>(
-        "SELECT EXISTS(SELECT 1 FROM feeds WHERE owner_type = 'teacher' AND owner_user_id = $1)"
+        "SELECT EXISTS(SELECT 1 FROM feeds WHERE owner_type = 'teacher' AND owner_user_id = $1)",
     )
     .bind(user_id)
     .fetch_one(&mut *tx)
@@ -1128,20 +1091,19 @@ async fn make_teacher(
     .unwrap_or(false);
 
     if !has_feed {
-        let name = sqlx::query_scalar::<_, Option<String>>(
-            "SELECT full_name FROM users WHERE id = $1"
-        )
-        .bind(user_id)
-        .fetch_one(&mut *tx)
-        .await
-        .ok()
-        .flatten()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| "Teacher".to_string());
+        let name =
+            sqlx::query_scalar::<_, Option<String>>("SELECT full_name FROM users WHERE id = $1")
+                .bind(user_id)
+                .fetch_one(&mut *tx)
+                .await
+                .ok()
+                .flatten()
+                .filter(|value| !value.trim().is_empty())
+                .unwrap_or_else(|| "Teacher".to_string());
 
         let feed_title = format!("{} Feed", name);
         if let Err(e) = sqlx::query(
-            "INSERT INTO feeds (owner_type, owner_user_id, title) VALUES ('teacher', $1, $2)"
+            "INSERT INTO feeds (owner_type, owner_user_id, title) VALUES ('teacher', $1, $2)",
         )
         .bind(user_id)
         .bind(&feed_title)

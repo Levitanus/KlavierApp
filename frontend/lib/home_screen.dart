@@ -26,6 +26,7 @@ import 'notifications_screen.dart';
 import 'screens/chat_conversation.dart';
 import 'config/app_config.dart';
 import 'l10n/app_localizations.dart';
+import 'widgets/app_body_container.dart';
 
 class HomeScreen extends StatefulWidget {
   final String? adminUsername;
@@ -33,7 +34,7 @@ class HomeScreen extends StatefulWidget {
   final int? initialFeedId;
   final int? initialPostId;
   final int? initialChatThreadId;
-  
+
   const HomeScreen({
     super.key,
     this.adminUsername,
@@ -67,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    
+
     // If adminUsername is provided, navigate to admin panel
     if (widget.adminUsername != null) {
       _currentPage = AdminPanel(username: widget.adminUsername);
@@ -228,8 +229,10 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    final cached = await AppDataCacheService.instance
-        .readJsonMap('profile', authService.userId);
+    final cached = await AppDataCacheService.instance.readJsonMap(
+      'profile',
+      authService.userId,
+    );
     if (cached != null && mounted) {
       setState(() {
         _applyDrawerProfile(cached);
@@ -256,8 +259,11 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        await AppDataCacheService.instance
-            .writeJson('profile', authService.userId, data);
+        await AppDataCacheService.instance.writeJson(
+          'profile',
+          authService.userId,
+          data,
+        );
 
         setState(() {
           _applyDrawerProfile(data);
@@ -280,7 +286,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _applyDrawerProfile(Map<String, dynamic> data) {
-    final profileImage = data['profile_image'] != null &&
+    final profileImage =
+        data['profile_image'] != null &&
             data['profile_image'].toString().isNotEmpty
         ? '$_baseUrl/uploads/profile_images/${data['profile_image']}'
         : null;
@@ -348,9 +355,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            l10n?.homeAppCacheCleared ?? 'App data cache cleared.',
-          ),
+          content: Text(l10n?.homeAppCacheCleared ?? 'App data cache cleared.'),
         ),
       );
     }
@@ -390,9 +395,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            l10n?.homeMediaCacheCleared ?? 'Media cache cleared.',
-          ),
+          content: Text(l10n?.homeMediaCacheCleared ?? 'Media cache cleared.'),
         ),
       );
     }
@@ -440,7 +443,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _toggleNotificationsPage() {
     if (_currentPage is NotificationsScreen) {
-      final fallbackPage = _previousPageBeforeNotifications ??
+      final fallbackPage =
+          _previousPageBeforeNotifications ??
           _pageForTab(_previousTabIndexBeforeNotifications);
       setState(() {
         _currentPage = fallbackPage;
@@ -506,18 +510,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final l10n = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final logoAsset = isDark
-      ? 'assets/branding/logo_bright.svg'
-      : 'assets/branding/logo_dark.svg';
+        ? 'assets/branding/logo_bright.svg'
+        : 'assets/branding/logo_dark.svg';
     final isNotificationsPage = _currentPage is NotificationsScreen;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: InkWell(
           onTap: () => _navigateToTab(0),
-          child: SvgPicture.asset(
-            logoAsset,
-            height: 28,
-          ),
+          child: SvgPicture.asset(logoAsset, height: 28),
         ),
         automaticallyImplyLeading: false,
         actions: [
@@ -540,27 +541,23 @@ class _HomeScreenState extends State<HomeScreen> {
           padding: EdgeInsets.zero,
           children: [
             DrawerHeader(
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-              ),
+              decoration: BoxDecoration(color: Theme.of(context).primaryColor),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  SvgPicture.asset(
-                    logoAsset,
-                    height: 22,
-                  ),
+                  SvgPicture.asset(logoAsset, height: 22),
                   const SizedBox(height: 12),
                   Row(
                     children: [
                       CircleAvatar(
                         radius: 28,
-                        backgroundColor: Colors.white.withValues(alpha: 25),
+                        backgroundColor: Colors.white.withAlpha(25),
                         backgroundImage: _drawerProfileImage != null
-                          ? MediaCacheService.instance
-                            .imageProvider(_drawerProfileImage!)
-                          : null,
+                            ? MediaCacheService.instance.imageProvider(
+                                _drawerProfileImage!,
+                              )
+                            : null,
                         child: _drawerProfileImage == null
                             ? const Icon(
                                 Icons.person,
@@ -668,12 +665,16 @@ class _HomeScreenState extends State<HomeScreen> {
             const Divider(),
             ListTile(
               leading: const Icon(Icons.cached),
-              title: Text(l10n?.homeClearAppCacheTitle ?? 'Clear app data cache'),
+              title: Text(
+                l10n?.homeClearAppCacheTitle ?? 'Clear app data cache',
+              ),
               onTap: _confirmClearAppCache,
             ),
             ListTile(
               leading: const Icon(Icons.image_not_supported),
-              title: Text(l10n?.homeClearMediaCacheTitle ?? 'Clear media cache'),
+              title: Text(
+                l10n?.homeClearMediaCacheTitle ?? 'Clear media cache',
+              ),
               onTap: _confirmClearMediaCache,
             ),
             const Divider(),
@@ -685,11 +686,13 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      body: Stack(
-        children: [
-          _currentPage ?? const DashboardScreen(),
-          const _WebFaviconSync(),
-        ],
+      body: AppBodyContainer(
+        child: Stack(
+          children: [
+            _currentPage ?? const DashboardScreen(),
+            const _WebFaviconSync(),
+          ],
+        ),
       ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedTabIndex,
@@ -723,6 +726,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+      // body assignment fixed above, remove duplicate
     );
   }
 }
@@ -758,10 +762,7 @@ class _NotificationNavIcon extends StatelessWidget {
                   color: Theme.of(context).colorScheme.secondaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                constraints: const BoxConstraints(
-                  minWidth: 16,
-                  minHeight: 16,
-                ),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                 child: Text(
                   unreadCount > 99 ? '99+' : unreadCount.toString(),
                   style: TextStyle(
@@ -830,10 +831,7 @@ class _ChatNavIcon extends StatelessWidget {
                   color: Theme.of(context).colorScheme.secondaryContainer,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                constraints: const BoxConstraints(
-                  minWidth: 16,
-                  minHeight: 16,
-                ),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
                 child: Text(
                   unreadCount > 99 ? '99+' : unreadCount.toString(),
                   style: TextStyle(
@@ -863,11 +861,7 @@ class ProfilePage extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.person,
-            size: 80,
-            color: Colors.orange,
-          ),
+          const Icon(Icons.person, size: 80, color: Colors.orange),
           const SizedBox(height: 16),
           Text(
             l10n?.commonProfile ?? 'Profile',
