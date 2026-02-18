@@ -34,7 +34,8 @@ class FeedService extends ChangeNotifier {
 
   List<Feed> get feeds => _feeds;
   bool get isLoadingFeeds => _isLoadingFeeds;
-  List<FeedComment> commentsForPost(int postId) => _commentsByPost[postId] ?? [];
+  List<FeedComment> commentsForPost(int postId) =>
+      _commentsByPost[postId] ?? [];
 
   String _feedsCacheKey() => 'feeds';
   String _postsCacheKey(int feedId, bool importantOnly, int limit, int offset) {
@@ -66,7 +67,10 @@ class FeedService extends ChangeNotifier {
     if (authService.token == null) return;
 
     if (_feeds.isEmpty) {
-      final cached = await _cache.readJsonList(_feedsCacheKey(), authService.userId);
+      final cached = await _cache.readJsonList(
+        _feedsCacheKey(),
+        authService.userId,
+      );
       if (cached != null && cached.isNotEmpty) {
         _feeds = cached
             .whereType<Map<String, dynamic>>()
@@ -125,7 +129,10 @@ class FeedService extends ChangeNotifier {
     return null;
   }
 
-  Future<FeedSettings?> updateFeedSettings(int feedId, bool allowStudentPosts) async {
+  Future<FeedSettings?> updateFeedSettings(
+    int feedId,
+    bool allowStudentPosts,
+  ) async {
     if (authService.token == null) return null;
 
     try {
@@ -135,9 +142,7 @@ class FeedService extends ChangeNotifier {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: json.encode({
-          'allow_student_posts': allowStudentPosts,
-        }),
+        body: json.encode({'allow_student_posts': allowStudentPosts}),
       );
 
       if (response.statusCode == 200) {
@@ -427,7 +432,20 @@ class FeedService extends ChangeNotifier {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
-        final comments = data.map((json) => FeedComment.fromJson(json)).toList();
+        if (kDebugMode &&
+            data.isNotEmpty &&
+            data.first is Map<String, dynamic>) {
+          final first = data.first as Map<String, dynamic>;
+          debugPrint(
+            'Feed comments payload sample: keys=${first.keys.toList()} '
+            'author_user_id=${first['author_user_id']} '
+            'authorUserId=${first['authorUserId']} '
+            'authUserId=${authService.userId}',
+          );
+        }
+        final comments = data
+            .map((json) => FeedComment.fromJson(json))
+            .toList();
         _commentsByPost[postId] = comments;
         await _cache.writeJson(cacheKey, authService.userId, data);
         notifyListeners();
@@ -549,9 +567,7 @@ class FeedService extends ChangeNotifier {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: json.encode({
-          'content': content,
-        }),
+        body: json.encode({'content': content}),
       );
 
       if (response.statusCode == 200) {
@@ -587,9 +603,7 @@ class FeedService extends ChangeNotifier {
           'Authorization': 'Bearer ${authService.token}',
           'Content-Type': 'application/json',
         },
-        body: json.encode({
-          'notify_on_comments': notifyOnComments,
-        }),
+        body: json.encode({'notify_on_comments': notifyOnComments}),
       );
 
       return response.statusCode == 200;
@@ -675,7 +689,9 @@ class FeedService extends ChangeNotifier {
       if (response.statusCode == 200) {
         final existing = _commentsByPost[postId];
         if (existing != null) {
-          final updated = existing.where((item) => item.id != commentId).toList();
+          final updated = existing
+              .where((item) => item.id != commentId)
+              .toList();
           _commentsByPost[postId] = updated;
           _cacheComments(postId, updated);
           notifyListeners();
@@ -697,16 +713,15 @@ class FeedService extends ChangeNotifier {
     if (authService.token == null) return null;
 
     try {
-      final uri = Uri.parse('$baseUrl/api/media/upload')
-          .replace(queryParameters: {'type': mediaType});
+      final uri = Uri.parse(
+        '$baseUrl/api/media/upload',
+      ).replace(queryParameters: {'type': mediaType});
       final request = http.MultipartRequest('POST', uri);
 
       request.headers['Authorization'] = 'Bearer ${authService.token}';
-      request.files.add(http.MultipartFile.fromBytes(
-        'file',
-        bytes,
-        filename: filename,
-      ));
+      request.files.add(
+        http.MultipartFile.fromBytes('file', bytes, filename: filename),
+      );
 
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();

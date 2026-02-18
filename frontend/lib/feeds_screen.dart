@@ -884,7 +884,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     int depth,
   ) {
     final items = tree[parentId] ?? [];
-    final auth = context.read<AuthService>();
+    final auth = context.watch<AuthService>();
     final l10n = AppLocalizations.of(context);
     return items.expand((comment) {
       final controller = quill.QuillController(
@@ -937,27 +937,39 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                 _formatTimestamp(context, comment.createdAt, comment.updatedAt),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Wrap(
-                  spacing: 8,
-                  children: [
-                    if ((auth.userId ?? -1) == comment.authorUserId)
-                      TextButton(
-                        onPressed: () => _openCommentEditor(comment),
-                        child: Text(l10n?.commonEdit ?? 'Edit'),
-                      ),
-                    if ((auth.userId ?? -1) == comment.authorUserId)
-                      TextButton(
-                        onPressed: () => _deleteComment(comment),
-                        child: Text(l10n?.commonDelete ?? 'Delete'),
-                      ),
-                    TextButton(
-                      onPressed: () => _openCommentComposer(comment.id),
-                      child: Text(l10n?.commonReply ?? 'Reply'),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () => _openCommentComposer(comment.id),
+                    child: Text(l10n?.commonReply ?? 'Reply'),
+                  ),
+                  if ((auth.userId ?? -1) == comment.authorUserId)
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_horiz, size: 18),
+                      tooltip:
+                          l10n?.feedsCommentActions ??
+                          l10n?.chatMessageActions ??
+                          'Comment actions',
+                      onSelected: (value) {
+                        if (value == 'edit') {
+                          _openCommentEditor(comment);
+                        } else if (value == 'delete') {
+                          _deleteComment(comment);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        PopupMenuItem<String>(
+                          value: 'edit',
+                          child: Text(l10n?.feedsEditComment ?? 'Edit comment'),
+                        ),
+                        PopupMenuItem<String>(
+                          value: 'delete',
+                          child: Text(l10n?.commonDelete ?? 'Delete'),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                ],
               ),
             ],
           ),
@@ -1073,7 +1085,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final auth = context.read<AuthService>();
+    final auth = context.watch<AuthService>();
     final postController = quill.QuillController(
       document: _post.toDocument(),
       selection: const TextSelection.collapsed(offset: 0),

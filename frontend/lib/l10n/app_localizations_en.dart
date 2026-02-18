@@ -293,6 +293,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedsAttachmentActions => 'Attachment actions';
 
   @override
+  String get feedsCommentActions => 'Comment actions';
+
+  @override
   String get feedsEditPost => 'Edit post';
 
   @override

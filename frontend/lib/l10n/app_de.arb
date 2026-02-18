@@ -88,6 +88,7 @@
   "feedsDeleteCommentFailed": "Kommentar konnte nicht geloescht werden",
   "feedsUnsupportedAttachment": "Nicht unterstuetzter Anhang: {type}",
   "feedsAttachmentActions": "Anhangaktionen",
+  "feedsCommentActions": "Kommentaraktionen",
   "feedsEditPost": "Beitrag bearbeiten",
   "feedsNewPost": "Neuer Beitrag",
   "feedsTextTools": "Textwerkzeuge",

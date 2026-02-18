@@ -88,6 +88,7 @@
   "feedsDeleteCommentFailed": "Не удалось удалить комментарий",
   "feedsUnsupportedAttachment": "Неподдерживаемое вложение: {type}",
   "feedsAttachmentActions": "Действия с вложением",
+  "feedsCommentActions": "Действия с комментарием",
   "feedsEditPost": "Редактировать пост",
   "feedsNewPost": "Новый пост",
   "feedsTextTools": "Текстовые инструменты",

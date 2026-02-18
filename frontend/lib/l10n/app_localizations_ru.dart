@@ -293,6 +293,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get feedsAttachmentActions => 'Действия с вложением';
 
   @override
+  String get feedsCommentActions => 'Действия с комментарием';
+
+  @override
   String get feedsEditPost => 'Редактировать пост';
 
   @override

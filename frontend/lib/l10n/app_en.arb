@@ -88,6 +88,7 @@
   "feedsDeleteCommentFailed": "Failed to delete comment",
   "feedsUnsupportedAttachment": "Unsupported attachment: {type}",
   "feedsAttachmentActions": "Attachment actions",
+  "feedsCommentActions": "Comment actions",
   "feedsEditPost": "Edit post",
   "feedsNewPost": "New post",
   "feedsTextTools": "Text tools",

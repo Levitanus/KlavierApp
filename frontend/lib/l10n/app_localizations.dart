@@ -634,6 +634,12 @@ abstract class AppLocalizations {
   /// **'Attachment actions'**
   String get feedsAttachmentActions;
 
+  /// No description provided for @feedsCommentActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment actions'**
+  String get feedsCommentActions;
+
   /// No description provided for @feedsEditPost.
   ///
   /// In en, this message translates to:

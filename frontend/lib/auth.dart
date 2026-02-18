@@ -8,7 +8,7 @@ import 'config/app_config.dart';
 class AuthService extends ChangeNotifier {
   static const String _tokenKey = 'jwt_token';
   static String get _baseUrl => AppConfig.instance.baseUrl;
-  
+
   String? _token;
   bool _isAuthenticated = false;
   List<String> _roles = [];
@@ -19,6 +19,42 @@ class AuthService extends ChangeNotifier {
   List<String> get roles => _roles;
   bool get isAdmin => _roles.contains('admin');
   int? get userId => _userId;
+
+  int? _parseInt(dynamic raw) {
+    if (raw is int) return raw;
+    if (raw is num) return raw.toInt();
+    if (raw is String) return int.tryParse(raw);
+    return null;
+  }
+
+  Future<void> _resolveUserIdFromProfileIfNeeded() async {
+    if (_token == null || _token!.isEmpty || _userId != null) return;
+
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/api/profile'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      if (response.statusCode != 200) return;
+
+      final data = jsonDecode(response.body);
+      if (data is! Map<String, dynamic>) return;
+
+      final resolved = _parseInt(data['id']);
+      if (resolved != null && resolved != _userId) {
+        _userId = resolved;
+        notifyListeners();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        print('Failed to resolve user id from profile: $e');
+      }
+    }
+  }
 
   LoginResult _loginFailure(String message) {
     return LoginResult.failure(message);
@@ -37,20 +73,11 @@ class AuthService extends ChangeNotifier {
       } else {
         _roles = [];
       }
-      if (payload['user_id'] != null) {
-        final rawUserId = payload['user_id'];
-        if (rawUserId is int) {
-          _userId = rawUserId;
-        } else if (rawUserId is String) {
-          _userId = int.tryParse(rawUserId);
-        } else if (rawUserId is num) {
-          _userId = rawUserId.toInt();
-        } else {
-          _userId = null;
-        }
-      } else {
-        _userId = null;
-      }
+      _userId =
+          _parseInt(payload['user_id']) ??
+          _parseInt(payload['userId']) ??
+          _parseInt(payload['uid']) ??
+          _parseInt(payload['id']);
     } catch (e) {
       if (kDebugMode) {
         print('Error decoding token: $e');
@@ -68,6 +95,7 @@ class AuthService extends ChangeNotifier {
       _isAuthenticated = _token != null && _token!.isNotEmpty;
       if (_isAuthenticated && _token != null) {
         _decodeToken(_token!);
+        await _resolveUserIdFromProfileIfNeeded();
       }
       notifyListeners();
     } catch (e) {
@@ -86,6 +114,7 @@ class AuthService extends ChangeNotifier {
       _token = token;
       _isAuthenticated = true;
       _decodeToken(token);
+      await _resolveUserIdFromProfileIfNeeded();
       notifyListeners();
     } catch (e) {
       if (kDebugMode) {
@@ -118,28 +147,27 @@ class AuthService extends ChangeNotifier {
       final response = await http.post(
         Uri.parse('$_baseUrl/api/auth/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'username': username,
-          'password': password,
-        }),
+        body: jsonEncode({'username': username, 'password': password}),
       );
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final token = data['token'] as String?;
-        
+
         if (token != null && token.isNotEmpty) {
           await _saveToken(token);
           return const LoginResult.success();
         }
       }
-      
+
       return _loginFailure('Invalid username or password');
     } catch (e) {
       if (kDebugMode) {
         print('Login error: $e');
       }
-      return _loginFailure('Network error. Check your connection and try again.');
+      return _loginFailure(
+        'Network error. Check your connection and try again.',
+      );
     }
   }
 
@@ -157,12 +185,11 @@ class AuthService extends ChangeNotifier {
     try {
       final response = await http.get(
         Uri.parse('$_baseUrl/api/auth/validate'),
-        headers: {
-          'Authorization': 'Bearer $_token',
-        },
+        headers: {'Authorization': 'Bearer $_token'},
       );
 
       if (response.statusCode == 200) {
+        await _resolveUserIdFromProfileIfNeeded();
         return true;
       } else {
         await _removeToken();
@@ -181,9 +208,7 @@ class LoginResult {
   final bool success;
   final String? errorMessage;
 
-  const LoginResult.success()
-      : success = true,
-        errorMessage = null;
+  const LoginResult.success() : success = true, errorMessage = null;
 
   const LoginResult.failure(this.errorMessage) : success = false;
 }

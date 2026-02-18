@@ -296,6 +296,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get feedsAttachmentActions => 'Anhangaktionen';
 
   @override
+  String get feedsCommentActions => 'Kommentaraktionen';
+
+  @override
   String get feedsEditPost => 'Beitrag bearbeiten';
 
   @override
