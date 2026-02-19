@@ -499,11 +499,14 @@ class FeedPostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final document = post.toDocument();
     final controller = quill.QuillController(
-      document: post.toDocument(),
+      document: document,
       selection: const TextSelection.collapsed(offset: 0),
       readOnly: true,
     );
+    final hasPreviewContent =
+        document.toPlainText().trim().isNotEmpty || post.attachments.isNotEmpty;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -516,28 +519,67 @@ class FeedPostCard extends StatelessWidget {
               Text(
                 post.title!,
                 style: post.isRead
-                    ? Theme.of(context).textTheme.titleMedium
-                    : Theme.of(context).textTheme.titleMedium?.copyWith(
+                    ? Theme.of(context).textTheme.headlineSmall
+                    : Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: Theme.of(context).colorScheme.primary,
                       ),
               ),
               const SizedBox(height: 8),
             ],
-            quill.QuillEditor.basic(
-              controller: controller,
-              config: quill.QuillEditorConfig(
-                showCursor: false,
-                embedBuilders: [
-                  ImageEmbedBuilder(),
-                  VideoEmbedBuilder(),
-                  AudioEmbedBuilder(),
-                  VoiceEmbedBuilder(),
-                  FileEmbedBuilder(),
+            if (hasPreviewContent)
+              Stack(
+                children: [
+                  SizedBox(
+                    height: 170,
+                    child: AbsorbPointer(
+                      child: quill.QuillEditor.basic(
+                        controller: controller,
+                        config: quill.QuillEditorConfig(
+                          showCursor: false,
+                          embedBuilders: [
+                            ImageEmbedBuilder(),
+                            VideoEmbedBuilder(),
+                            AudioEmbedBuilder(),
+                            VoiceEmbedBuilder(),
+                            FileEmbedBuilder(),
+                          ],
+                          unknownEmbedBuilder: UnknownEmbedBuilder(),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: IgnorePointer(
+                      child: Container(
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Theme.of(
+                                context,
+                              ).colorScheme.surface.withOpacity(0),
+                              Theme.of(context).colorScheme.surface,
+                            ],
+                          ),
+                        ),
+                        alignment: Alignment.bottomRight,
+                        padding: const EdgeInsets.only(right: 8, bottom: 6),
+                      ),
+                    ),
+                  ),
                 ],
-                unknownEmbedBuilder: UnknownEmbedBuilder(),
+              )
+            else
+              Text(
+                l10n?.feedsNoTextPreview ?? 'No text preview available.',
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-            ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -551,7 +593,7 @@ class FeedPostCard extends StatelessWidget {
                 const Spacer(),
                 TextButton(
                   onPressed: onOpen,
-                  child: Text(l10n?.commonOpen ?? 'Open'),
+                  child: Text(l10n?.feedsReadAndDiscuss ?? 'Read and discuss'),
                 ),
               ],
             ),
@@ -1152,7 +1194,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                               _post.title!.isNotEmpty) ...[
                             Text(
                               _post.title!,
-                              style: Theme.of(context).textTheme.titleLarge,
+                              style: Theme.of(context).textTheme.headlineMedium,
                             ),
                             const SizedBox(height: 12),
                           ],

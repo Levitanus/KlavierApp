@@ -76,6 +76,8 @@
   "feedsNoImportantPosts": "Пока нет важных постов.",
   "feedsAllPosts": "Все посты",
   "feedsNoPosts": "Пока нет постов.",
+  "feedsNoTextPreview": "Текст превью недоступен.",
+  "feedsReadAndDiscuss": "Читать и обсудить",
   "feedsPostedAt": "Опубликовано {timestamp}",
   "feedsPostedEditedAt": "Опубликовано {timestamp} · отредактировано",
   "feedsSubscriptionFailed": "Не удалось обновить подписку",

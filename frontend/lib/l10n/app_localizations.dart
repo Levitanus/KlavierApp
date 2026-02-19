@@ -562,6 +562,18 @@ abstract class AppLocalizations {
   /// **'No posts yet.'**
   String get feedsNoPosts;
 
+  /// No description provided for @feedsNoTextPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'No text preview available.'**
+  String get feedsNoTextPreview;
+
+  /// No description provided for @feedsReadAndDiscuss.
+  ///
+  /// In en, this message translates to:
+  /// **'Read and discuss'**
+  String get feedsReadAndDiscuss;
+
   /// No description provided for @feedsPostedAt.
   ///
   /// In en, this message translates to:
