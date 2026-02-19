@@ -499,11 +499,14 @@ class FeedPostCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
+    final document = post.toDocument();
     final controller = quill.QuillController(
-      document: post.toDocument(),
+      document: document,
       selection: const TextSelection.collapsed(offset: 0),
       readOnly: true,
     );
+    final hasPreviewContent =
+        document.toPlainText().trim().isNotEmpty || post.attachments.isNotEmpty;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -516,28 +519,72 @@ class FeedPostCard extends StatelessWidget {
               Text(
                 post.title!,
                 style: post.isRead
-                    ? Theme.of(context).textTheme.titleMedium
-                    : Theme.of(context).textTheme.titleMedium?.copyWith(
+                    ? Theme.of(context).textTheme.headlineSmall
+                    : Theme.of(context).textTheme.headlineSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: Theme.of(context).colorScheme.primary,
                       ),
               ),
               const SizedBox(height: 8),
             ],
-            quill.QuillEditor.basic(
-              controller: controller,
-              config: quill.QuillEditorConfig(
-                showCursor: false,
-                embedBuilders: [
-                  ImageEmbedBuilder(),
-                  VideoEmbedBuilder(),
-                  AudioEmbedBuilder(),
-                  VoiceEmbedBuilder(),
-                  FileEmbedBuilder(),
+            if (hasPreviewContent)
+              Stack(
+                children: [
+                  SizedBox(
+                    height: 170,
+                    child: AbsorbPointer(
+                      child: DefaultTextStyle.merge(
+                        style:
+                            Theme.of(context).textTheme.bodyMedium ??
+                            const TextStyle(),
+                        child: quill.QuillEditor.basic(
+                          controller: controller,
+                          config: quill.QuillEditorConfig(
+                            showCursor: false,
+                            embedBuilders: [
+                              ImageEmbedBuilder(),
+                              VideoEmbedBuilder(),
+                              AudioEmbedBuilder(),
+                              VoiceEmbedBuilder(),
+                              FileEmbedBuilder(),
+                            ],
+                            unknownEmbedBuilder: UnknownEmbedBuilder(),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: IgnorePointer(
+                      child: Container(
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Theme.of(
+                                context,
+                              ).colorScheme.surface.withOpacity(0),
+                              Theme.of(context).colorScheme.surface,
+                            ],
+                          ),
+                        ),
+                        alignment: Alignment.bottomRight,
+                        padding: const EdgeInsets.only(right: 8, bottom: 6),
+                      ),
+                    ),
+                  ),
                 ],
-                unknownEmbedBuilder: UnknownEmbedBuilder(),
+              )
+            else
+              Text(
+                l10n?.feedsNoTextPreview ?? 'No text preview available.',
+                style: Theme.of(context).textTheme.bodyMedium,
               ),
-            ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -551,7 +598,7 @@ class FeedPostCard extends StatelessWidget {
                 const Spacer(),
                 TextButton(
                   onPressed: onOpen,
-                  child: Text(l10n?.commonOpen ?? 'Open'),
+                  child: Text(l10n?.feedsReadAndDiscuss ?? 'Read and discuss'),
                 ),
               ],
             ),
@@ -921,18 +968,22 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              quill.QuillEditor.basic(
-                controller: controller,
-                config: quill.QuillEditorConfig(
-                  showCursor: false,
-                  embedBuilders: [
-                    ImageEmbedBuilder(),
-                    VideoEmbedBuilder(),
-                    AudioEmbedBuilder(),
-                    VoiceEmbedBuilder(),
-                    FileEmbedBuilder(),
-                  ],
-                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+              DefaultTextStyle.merge(
+                style:
+                    Theme.of(context).textTheme.bodyMedium ?? const TextStyle(),
+                child: quill.QuillEditor.basic(
+                  controller: controller,
+                  config: quill.QuillEditorConfig(
+                    showCursor: false,
+                    embedBuilders: [
+                      ImageEmbedBuilder(),
+                      VideoEmbedBuilder(),
+                      AudioEmbedBuilder(),
+                      VoiceEmbedBuilder(),
+                      FileEmbedBuilder(),
+                    ],
+                    unknownEmbedBuilder: UnknownEmbedBuilder(),
+                  ),
                 ),
               ),
               if (commentAttachments.isNotEmpty) ...[
@@ -1152,22 +1203,27 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                               _post.title!.isNotEmpty) ...[
                             Text(
                               _post.title!,
-                              style: Theme.of(context).textTheme.titleLarge,
+                              style: Theme.of(context).textTheme.headlineMedium,
                             ),
                             const SizedBox(height: 12),
                           ],
-                          quill.QuillEditor.basic(
-                            controller: postController,
-                            config: quill.QuillEditorConfig(
-                              showCursor: false,
-                              embedBuilders: [
-                                ImageEmbedBuilder(),
-                                VideoEmbedBuilder(),
-                                AudioEmbedBuilder(),
-                                VoiceEmbedBuilder(),
-                                FileEmbedBuilder(),
-                              ],
-                              unknownEmbedBuilder: UnknownEmbedBuilder(),
+                          DefaultTextStyle.merge(
+                            style:
+                                Theme.of(context).textTheme.bodyMedium ??
+                                const TextStyle(),
+                            child: quill.QuillEditor.basic(
+                              controller: postController,
+                              config: quill.QuillEditorConfig(
+                                showCursor: false,
+                                embedBuilders: [
+                                  ImageEmbedBuilder(),
+                                  VideoEmbedBuilder(),
+                                  AudioEmbedBuilder(),
+                                  VoiceEmbedBuilder(),
+                                  FileEmbedBuilder(),
+                                ],
+                                unknownEmbedBuilder: UnknownEmbedBuilder(),
+                              ),
                             ),
                           ),
                           if (postAttachments.isNotEmpty) ...[
@@ -1271,6 +1327,9 @@ class FeedPostEditor extends StatefulWidget {
 class _FeedPostEditorState extends State<FeedPostEditor> {
   late final TextEditingController _titleController;
   late final quill.QuillController _controller;
+  final MenuController _fontFamilyMenuController = MenuController();
+  final MenuController _fontSizeMenuController = MenuController();
+  final MenuController _headerStyleMenuController = MenuController();
   bool _isImportant = false;
   bool _allowComments = true;
   bool _isSubmitting = false;
@@ -1443,16 +1502,95 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     });
   }
 
+  void _toggleMenu(MenuController controller) {
+    if (controller.isOpen) {
+      controller.close();
+    } else {
+      controller.open();
+    }
+  }
+
+  Map<String, String> _fontFamilyItems(
+    quill.QuillToolbarFontFamilyButtonOptions options,
+  ) {
+    return options.items ??
+        {
+          'Sans Serif': 'sans-serif',
+          'Serif': 'serif',
+          'Monospace': 'monospace',
+          'Ibarra Real Nova': 'ibarra-real-nova',
+          'SquarePeg': 'square-peg',
+          'Nunito': 'nunito',
+          'Pacifico': 'pacifico',
+          'Roboto Mono': 'roboto-mono',
+          'Clear': 'Clear',
+        };
+  }
+
+  Map<String, String> _fontSizeItems(
+    quill.QuillToolbarFontSizeButtonOptions options,
+  ) {
+    return options.items ??
+        {'Small': 'small', 'Large': 'large', 'Huge': 'huge', 'Clear': '0'};
+  }
+
+  List<quill.Attribute<int?>> _headerAttributes(
+    quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions options,
+  ) {
+    return options.attributes ??
+        [
+          quill.Attribute.h1,
+          quill.Attribute.h2,
+          quill.Attribute.h3,
+          quill.Attribute.h4,
+          quill.Attribute.h5,
+          quill.Attribute.h6,
+          quill.Attribute.header,
+        ];
+  }
+
+  String _headerLabel(quill.Attribute<dynamic> value) {
+    if (value == quill.Attribute.h1) return 'Heading 1';
+    if (value == quill.Attribute.h2) return 'Heading 2';
+    if (value == quill.Attribute.h3) return 'Heading 3';
+    if (value == quill.Attribute.h4) return 'Heading 4';
+    if (value == quill.Attribute.h5) return 'Heading 5';
+    if (value == quill.Attribute.h6) return 'Heading 6';
+    return AppLocalizations.of(context)?.feedsParagraphType ?? 'Normal';
+  }
+
   Widget _fontFamilyIconButton(dynamic options, dynamic extraOptions) {
     final typedOptions = options as quill.QuillToolbarFontFamilyButtonOptions;
     final typedExtra =
         extraOptions as quill.QuillToolbarFontFamilyButtonExtraOptions;
-    return quill.QuillToolbarIconButton(
-      tooltip: typedOptions.tooltip,
-      isSelected: false,
-      iconTheme: typedOptions.iconTheme,
-      onPressed: typedExtra.onPressed,
-      icon: const Icon(Icons.font_download_outlined, size: 18),
+    final items = _fontFamilyItems(typedOptions);
+
+    return MenuAnchor(
+      controller: _fontFamilyMenuController,
+      menuChildren: items.entries
+          .map(
+            (fontFamily) => MenuItemButton(
+              onPressed: () {
+                final value = fontFamily.value;
+                typedExtra.controller.formatSelection(
+                  quill.Attribute.fromKeyValue(
+                    quill.Attribute.font.key,
+                    value == 'Clear' ? null : value,
+                  ),
+                );
+                typedOptions.onSelected?.call(value);
+              },
+              child: Text(fontFamily.key),
+            ),
+          )
+          .toList(),
+      child: quill.QuillToolbarIconButton(
+        tooltip: typedOptions.tooltip,
+        isSelected: false,
+        iconTheme: typedOptions.iconTheme,
+        onPressed: () => _toggleMenu(_fontFamilyMenuController),
+        icon: const Icon(Icons.font_download_outlined, size: 18),
+      ),
     );
   }
 
@@ -1460,12 +1598,34 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     final typedOptions = options as quill.QuillToolbarFontSizeButtonOptions;
     final typedExtra =
         extraOptions as quill.QuillToolbarFontSizeButtonExtraOptions;
-    return quill.QuillToolbarIconButton(
-      tooltip: typedOptions.tooltip,
-      isSelected: false,
-      iconTheme: typedOptions.iconTheme,
-      onPressed: typedExtra.onPressed,
-      icon: const Icon(Icons.format_size_outlined, size: 18),
+    final items = _fontSizeItems(typedOptions);
+
+    return MenuAnchor(
+      controller: _fontSizeMenuController,
+      menuChildren: items.entries
+          .map(
+            (fontSize) => MenuItemButton(
+              onPressed: () {
+                final value = fontSize.value;
+                typedExtra.controller.formatSelection(
+                  quill.Attribute.fromKeyValue(
+                    quill.Attribute.size.key,
+                    value == '0' ? null : value,
+                  ),
+                );
+                typedOptions.onSelected?.call(value);
+              },
+              child: Text(fontSize.key),
+            ),
+          )
+          .toList(),
+      child: quill.QuillToolbarIconButton(
+        tooltip: typedOptions.tooltip,
+        isSelected: false,
+        iconTheme: typedOptions.iconTheme,
+        onPressed: () => _toggleMenu(_fontSizeMenuController),
+        icon: const Icon(Icons.format_size_outlined, size: 18),
+      ),
     );
   }
 
@@ -1475,15 +1635,30 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     final typedExtra =
         extraOptions
             as quill.QuillToolbarSelectHeaderStyleDropdownButtonExtraOptions;
-    return quill.QuillToolbarIconButton(
-      tooltip:
-          typedOptions.tooltip ??
-          (AppLocalizations.of(context)?.feedsParagraphType ??
-              'Paragraph type'),
-      isSelected: false,
-      iconTheme: typedOptions.iconTheme,
-      onPressed: typedExtra.onPressed,
-      icon: const Icon(Icons.text_fields_outlined, size: 18),
+    final attributes = _headerAttributes(typedOptions);
+
+    return MenuAnchor(
+      controller: _headerStyleMenuController,
+      menuChildren: attributes
+          .map(
+            (attribute) => MenuItemButton(
+              onPressed: () {
+                typedExtra.controller.formatSelection(attribute);
+              },
+              child: Text(_headerLabel(attribute)),
+            ),
+          )
+          .toList(),
+      child: quill.QuillToolbarIconButton(
+        tooltip:
+            typedOptions.tooltip ??
+            (AppLocalizations.of(context)?.feedsParagraphType ??
+                'Paragraph type'),
+        isSelected: false,
+        iconTheme: typedOptions.iconTheme,
+        onPressed: () => _toggleMenu(_headerStyleMenuController),
+        icon: const Icon(Icons.text_fields_outlined, size: 18),
+      ),
     );
   }
 
@@ -1535,7 +1710,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
       showLink: isAttachments,
       showSearchButton: false,
       showCodeBlock: false,
-      showQuote: false,
+      showQuote: isText,
       showLineHeightButton: false,
       showDirection: false,
       customButtons: isAttachments
@@ -1939,6 +2114,9 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
 class _FeedPostComposerState extends State<FeedPostComposer> {
   final TextEditingController _titleController = TextEditingController();
   final quill.QuillController _controller = quill.QuillController.basic();
+  final MenuController _fontFamilyMenuController = MenuController();
+  final MenuController _fontSizeMenuController = MenuController();
+  final MenuController _headerStyleMenuController = MenuController();
   bool _isImportant = false;
   bool _allowComments = true;
   bool _isSubmitting = false;
@@ -2123,16 +2301,95 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     });
   }
 
+  void _toggleMenu(MenuController controller) {
+    if (controller.isOpen) {
+      controller.close();
+    } else {
+      controller.open();
+    }
+  }
+
+  Map<String, String> _fontFamilyItems(
+    quill.QuillToolbarFontFamilyButtonOptions options,
+  ) {
+    return options.items ??
+        {
+          'Sans Serif': 'sans-serif',
+          'Serif': 'serif',
+          'Monospace': 'monospace',
+          'Ibarra Real Nova': 'ibarra-real-nova',
+          'SquarePeg': 'square-peg',
+          'Nunito': 'nunito',
+          'Pacifico': 'pacifico',
+          'Roboto Mono': 'roboto-mono',
+          'Clear': 'Clear',
+        };
+  }
+
+  Map<String, String> _fontSizeItems(
+    quill.QuillToolbarFontSizeButtonOptions options,
+  ) {
+    return options.items ??
+        {'Small': 'small', 'Large': 'large', 'Huge': 'huge', 'Clear': '0'};
+  }
+
+  List<quill.Attribute<int?>> _headerAttributes(
+    quill.QuillToolbarSelectHeaderStyleDropdownButtonOptions options,
+  ) {
+    return options.attributes ??
+        [
+          quill.Attribute.h1,
+          quill.Attribute.h2,
+          quill.Attribute.h3,
+          quill.Attribute.h4,
+          quill.Attribute.h5,
+          quill.Attribute.h6,
+          quill.Attribute.header,
+        ];
+  }
+
+  String _headerLabel(quill.Attribute<dynamic> value) {
+    if (value == quill.Attribute.h1) return 'Heading 1';
+    if (value == quill.Attribute.h2) return 'Heading 2';
+    if (value == quill.Attribute.h3) return 'Heading 3';
+    if (value == quill.Attribute.h4) return 'Heading 4';
+    if (value == quill.Attribute.h5) return 'Heading 5';
+    if (value == quill.Attribute.h6) return 'Heading 6';
+    return AppLocalizations.of(context)?.feedsParagraphType ?? 'Normal';
+  }
+
   Widget _fontFamilyIconButton(dynamic options, dynamic extraOptions) {
     final typedOptions = options as quill.QuillToolbarFontFamilyButtonOptions;
     final typedExtra =
         extraOptions as quill.QuillToolbarFontFamilyButtonExtraOptions;
-    return quill.QuillToolbarIconButton(
-      tooltip: typedOptions.tooltip,
-      isSelected: false,
-      iconTheme: typedOptions.iconTheme,
-      onPressed: typedExtra.onPressed,
-      icon: const Icon(Icons.font_download_outlined, size: 18),
+    final items = _fontFamilyItems(typedOptions);
+
+    return MenuAnchor(
+      controller: _fontFamilyMenuController,
+      menuChildren: items.entries
+          .map(
+            (fontFamily) => MenuItemButton(
+              onPressed: () {
+                final value = fontFamily.value;
+                typedExtra.controller.formatSelection(
+                  quill.Attribute.fromKeyValue(
+                    quill.Attribute.font.key,
+                    value == 'Clear' ? null : value,
+                  ),
+                );
+                typedOptions.onSelected?.call(value);
+              },
+              child: Text(fontFamily.key),
+            ),
+          )
+          .toList(),
+      child: quill.QuillToolbarIconButton(
+        tooltip: typedOptions.tooltip,
+        isSelected: false,
+        iconTheme: typedOptions.iconTheme,
+        onPressed: () => _toggleMenu(_fontFamilyMenuController),
+        icon: const Icon(Icons.font_download_outlined, size: 18),
+      ),
     );
   }
 
@@ -2140,12 +2397,34 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     final typedOptions = options as quill.QuillToolbarFontSizeButtonOptions;
     final typedExtra =
         extraOptions as quill.QuillToolbarFontSizeButtonExtraOptions;
-    return quill.QuillToolbarIconButton(
-      tooltip: typedOptions.tooltip,
-      isSelected: false,
-      iconTheme: typedOptions.iconTheme,
-      onPressed: typedExtra.onPressed,
-      icon: const Icon(Icons.format_size_outlined, size: 18),
+    final items = _fontSizeItems(typedOptions);
+
+    return MenuAnchor(
+      controller: _fontSizeMenuController,
+      menuChildren: items.entries
+          .map(
+            (fontSize) => MenuItemButton(
+              onPressed: () {
+                final value = fontSize.value;
+                typedExtra.controller.formatSelection(
+                  quill.Attribute.fromKeyValue(
+                    quill.Attribute.size.key,
+                    value == '0' ? null : value,
+                  ),
+                );
+                typedOptions.onSelected?.call(value);
+              },
+              child: Text(fontSize.key),
+            ),
+          )
+          .toList(),
+      child: quill.QuillToolbarIconButton(
+        tooltip: typedOptions.tooltip,
+        isSelected: false,
+        iconTheme: typedOptions.iconTheme,
+        onPressed: () => _toggleMenu(_fontSizeMenuController),
+        icon: const Icon(Icons.format_size_outlined, size: 18),
+      ),
     );
   }
 
@@ -2155,15 +2434,30 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     final typedExtra =
         extraOptions
             as quill.QuillToolbarSelectHeaderStyleDropdownButtonExtraOptions;
-    return quill.QuillToolbarIconButton(
-      tooltip:
-          typedOptions.tooltip ??
-          (AppLocalizations.of(context)?.feedsParagraphType ??
-              'Paragraph type'),
-      isSelected: false,
-      iconTheme: typedOptions.iconTheme,
-      onPressed: typedExtra.onPressed,
-      icon: const Icon(Icons.text_fields_outlined, size: 18),
+    final attributes = _headerAttributes(typedOptions);
+
+    return MenuAnchor(
+      controller: _headerStyleMenuController,
+      menuChildren: attributes
+          .map(
+            (attribute) => MenuItemButton(
+              onPressed: () {
+                typedExtra.controller.formatSelection(attribute);
+              },
+              child: Text(_headerLabel(attribute)),
+            ),
+          )
+          .toList(),
+      child: quill.QuillToolbarIconButton(
+        tooltip:
+            typedOptions.tooltip ??
+            (AppLocalizations.of(context)?.feedsParagraphType ??
+                'Paragraph type'),
+        isSelected: false,
+        iconTheme: typedOptions.iconTheme,
+        onPressed: () => _toggleMenu(_headerStyleMenuController),
+        icon: const Icon(Icons.text_fields_outlined, size: 18),
+      ),
     );
   }
 
@@ -2215,7 +2509,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
       showLink: isAttachments,
       showSearchButton: false,
       showCodeBlock: false,
-      showQuote: false,
+      showQuote: isText,
       showLineHeightButton: false,
       showDirection: false,
       customButtons: isAttachments

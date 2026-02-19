@@ -19,6 +19,7 @@
         "flutter_quill",
         "flutter_svg",
         "flutter_web_plugins",
+        "google_fonts",
         "http",
         "intl",
         "just_audio",
@@ -54,6 +55,16 @@
       "version": "2.0.3",
       "dependencies": [
         "lints"
+      ]
+    },
+    {
+      "name": "google_fonts",
+      "version": "8.0.2",
+      "dependencies": [
+        "crypto",
+        "flutter",
+        "http",
+        "path_provider"
       ]
     },
     {
@@ -377,6 +388,13 @@
       "dependencies": []
     },
     {
+      "name": "crypto",
+      "version": "3.0.7",
+      "dependencies": [
+        "typed_data"
+      ]
+    },
+    {
       "name": "timezone",
       "version": "0.9.4",
       "dependencies": [
@@ -670,13 +688,6 @@
       "dependencies": [
         "csslib",
         "source_span"
-      ]
-    },
-    {
-      "name": "crypto",
-      "version": "3.0.7",
-      "dependencies": [
-        "typed_data"
       ]
     },
     {
@@ -997,6 +1008,13 @@
       ]
     },
     {
+      "name": "typed_data",
+      "version": "1.4.0",
+      "dependencies": [
+        "collection"
+      ]
+    },
+    {
       "name": "xdg_directories",
       "version": "1.1.0",
       "dependencies": [
@@ -1112,13 +1130,6 @@
       "version": "1.0.2",
       "dependencies": [
         "source_span"
-      ]
-    },
-    {
-      "name": "typed_data",
-      "version": "1.4.0",
-      "dependencies": [
-        "collection"
       ]
     },
     {

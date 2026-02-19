@@ -248,6 +248,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get feedsNoPosts => 'No posts yet.';
 
   @override
+  String get feedsNoTextPreview => 'No text preview available.';
+
+  @override
+  String get feedsReadAndDiscuss => 'Read and discuss';
+
+  @override
   String feedsPostedAt(Object timestamp) {
     return 'Posted $timestamp';
   }

@@ -76,6 +76,8 @@
   "feedsNoImportantPosts": "Noch keine wichtigen Beitraege.",
   "feedsAllPosts": "Alle Beitraege",
   "feedsNoPosts": "Noch keine Beitraege.",
+  "feedsNoTextPreview": "Keine Textvorschau verfuegbar.",
+  "feedsReadAndDiscuss": "Lesen und diskutieren",
   "feedsPostedAt": "Gepostet {timestamp}",
   "feedsPostedEditedAt": "Gepostet {timestamp} · bearbeitet",
   "feedsSubscriptionFailed": "Abo konnte nicht aktualisiert werden",

@@ -76,6 +76,8 @@
   "feedsNoImportantPosts": "No important posts yet.",
   "feedsAllPosts": "All posts",
   "feedsNoPosts": "No posts yet.",
+  "feedsNoTextPreview": "No text preview available.",
+  "feedsReadAndDiscuss": "Read and discuss",
   "feedsPostedAt": "Posted {timestamp}",
   "feedsPostedEditedAt": "Posted {timestamp} · edited",
   "feedsSubscriptionFailed": "Failed to update subscription",

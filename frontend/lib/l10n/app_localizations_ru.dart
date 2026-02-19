@@ -249,6 +249,12 @@ class AppLocalizationsRu extends AppLocalizations {
   String get feedsNoPosts => 'Пока нет постов.';
 
   @override
+  String get feedsNoTextPreview => 'Текст превью недоступен.';
+
+  @override
+  String get feedsReadAndDiscuss => 'Читать и обсудить';
+
+  @override
   String feedsPostedAt(Object timestamp) {
     return 'Опубликовано $timestamp';
   }
