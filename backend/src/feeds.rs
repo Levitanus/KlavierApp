@@ -1226,41 +1226,160 @@ pub async fn create_post(
         actix_web::error::ErrorInternalServerError("Failed to create subscriptions")
     })?;
 
-    sqlx::query(
-        r#"
-        INSERT INTO feed_post_subscriptions (post_id, user_id, notify_on_comments)
-        SELECT $1, fus.user_id, TRUE
-        FROM feed_user_settings fus
-        WHERE fus.feed_id = $2 AND fus.auto_subscribe_new_posts = TRUE
-        ON CONFLICT (post_id, user_id) DO NOTHING
-        "#,
-    )
-    .bind(post.id)
-    .bind(*feed_id)
-    .execute(&mut *tx)
-    .await
-    .map_err(|e| {
-        error!("Database error auto-subscribing users: {:?}", e);
-        actix_web::error::ErrorInternalServerError("Failed to create subscriptions")
-    })?;
+    if feed.owner_type == "group" {
+        let group_id = match feed.owner_group_id {
+            Some(id) => id,
+            None => {
+                error!(
+                    "Group feed {} has no owner_group_id; skipping group auto-subscriptions",
+                    feed.id
+                );
+                0
+            }
+        };
+
+        if group_id > 0 {
+            sqlx::query(
+                r#"
+            INSERT INTO feed_post_subscriptions (post_id, user_id, notify_on_comments)
+            SELECT $1, participants.user_id, TRUE
+            FROM (
+                SELECT sg.teacher_user_id AS user_id
+                FROM student_groups sg
+                JOIN teachers t ON t.user_id = sg.teacher_user_id
+                WHERE sg.id = $2 AND sg.status = 'active' AND t.status = 'active'
+                UNION
+                SELECT gsr.student_user_id AS user_id
+                FROM group_student_relations gsr
+                JOIN student_groups sg ON sg.id = gsr.group_id
+                JOIN students s ON s.user_id = gsr.student_user_id
+                WHERE gsr.group_id = $2 AND sg.status = 'active' AND s.status = 'active'
+                UNION
+                SELECT psr.parent_user_id AS user_id
+                FROM group_student_relations gsr
+                JOIN student_groups sg ON sg.id = gsr.group_id
+                JOIN students s ON s.user_id = gsr.student_user_id
+                JOIN parent_student_relations psr ON psr.student_user_id = gsr.student_user_id
+                JOIN parents p ON p.user_id = psr.parent_user_id
+                WHERE gsr.group_id = $2
+                  AND sg.status = 'active'
+                  AND s.status = 'active'
+                  AND p.status = 'active'
+            ) participants
+            LEFT JOIN feed_user_settings fus
+              ON fus.feed_id = $3 AND fus.user_id = participants.user_id
+            WHERE participants.user_id <> $4
+              AND COALESCE(fus.auto_subscribe_new_posts, TRUE) = TRUE
+            ON CONFLICT (post_id, user_id) DO NOTHING
+            "#,
+            )
+            .bind(post.id)
+            .bind(group_id)
+            .bind(*feed_id)
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| {
+                error!(
+                    "Database error auto-subscribing group feed participants: {:?}",
+                    e
+                );
+                actix_web::error::ErrorInternalServerError("Failed to create subscriptions")
+            })?;
+        }
+    } else {
+        sqlx::query(
+            r#"
+            INSERT INTO feed_post_subscriptions (post_id, user_id, notify_on_comments)
+            SELECT $1, fus.user_id, TRUE
+            FROM feed_user_settings fus
+            WHERE fus.feed_id = $2 AND fus.auto_subscribe_new_posts = TRUE
+            ON CONFLICT (post_id, user_id) DO NOTHING
+            "#,
+        )
+        .bind(post.id)
+        .bind(*feed_id)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| {
+            error!("Database error auto-subscribing users: {:?}", e);
+            actix_web::error::ErrorInternalServerError("Failed to create subscriptions")
+        })?;
+    }
 
     tx.commit().await.map_err(|e| {
         error!("Database error committing post: {:?}", e);
         actix_web::error::ErrorInternalServerError("Failed to create post")
     })?;
 
-    let recipients = sqlx::query_scalar::<_, i32>(
-        r#"
-        SELECT user_id
-        FROM feed_user_settings
-        WHERE feed_id = $1 AND notify_new_posts = TRUE AND user_id <> $2
-        "#,
-    )
-    .bind(*feed_id)
-    .bind(user_id)
-    .fetch_all(&app_state.db)
-    .await
-    .unwrap_or_default();
+    let recipients = if feed.owner_type == "group" {
+        let group_id = match feed.owner_group_id {
+            Some(id) => id,
+            None => {
+                error!(
+                    "Group feed {} has no owner_group_id; skipping group notifications",
+                    feed.id
+                );
+                0
+            }
+        };
+
+        if group_id <= 0 {
+            Vec::new()
+        } else {
+            sqlx::query_scalar::<_, i32>(
+                r#"
+            SELECT participants.user_id
+            FROM (
+                SELECT sg.teacher_user_id AS user_id
+                FROM student_groups sg
+                JOIN teachers t ON t.user_id = sg.teacher_user_id
+                WHERE sg.id = $1 AND sg.status = 'active' AND t.status = 'active'
+                UNION
+                SELECT gsr.student_user_id AS user_id
+                FROM group_student_relations gsr
+                JOIN student_groups sg ON sg.id = gsr.group_id
+                JOIN students s ON s.user_id = gsr.student_user_id
+                WHERE gsr.group_id = $1 AND sg.status = 'active' AND s.status = 'active'
+                UNION
+                SELECT psr.parent_user_id AS user_id
+                FROM group_student_relations gsr
+                JOIN student_groups sg ON sg.id = gsr.group_id
+                JOIN students s ON s.user_id = gsr.student_user_id
+                JOIN parent_student_relations psr ON psr.student_user_id = gsr.student_user_id
+                JOIN parents p ON p.user_id = psr.parent_user_id
+                WHERE gsr.group_id = $1
+                  AND sg.status = 'active'
+                  AND s.status = 'active'
+                  AND p.status = 'active'
+            ) participants
+            LEFT JOIN feed_user_settings fus
+              ON fus.feed_id = $2 AND fus.user_id = participants.user_id
+            WHERE participants.user_id <> $3
+              AND COALESCE(fus.notify_new_posts, TRUE) = TRUE
+            "#,
+            )
+            .bind(group_id)
+            .bind(*feed_id)
+            .bind(user_id)
+            .fetch_all(&app_state.db)
+            .await
+            .unwrap_or_default()
+        }
+    } else {
+        sqlx::query_scalar::<_, i32>(
+            r#"
+            SELECT user_id
+            FROM feed_user_settings
+            WHERE feed_id = $1 AND notify_new_posts = TRUE AND user_id <> $2
+            "#,
+        )
+        .bind(*feed_id)
+        .bind(user_id)
+        .fetch_all(&app_state.db)
+        .await
+        .unwrap_or_default()
+    };
 
     if !recipients.is_empty() {
         let post_title = post.title.as_deref().unwrap_or("");
