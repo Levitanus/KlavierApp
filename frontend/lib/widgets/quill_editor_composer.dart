@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
@@ -55,6 +56,11 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
   late FocusNode _focusNode;
   late bool _ownsFocusNode;
   bool _isUploadingAttachment = false;
+  bool get _sendOnEnterEnabled {
+    return defaultTargetPlatform == TargetPlatform.linux ||
+        defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.windows;
+  }
   // final VoiceRecorder _voiceRecorder = VoiceRecorder();
 
   @override
@@ -311,7 +317,8 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
                 ): const _FormatIntent(
                   _FormatType.link,
                 ),
-                LogicalKeySet(LogicalKeyboardKey.enter): const _SendIntent(),
+                if (_sendOnEnterEnabled)
+                  LogicalKeySet(LogicalKeyboardKey.enter): const _SendIntent(),
                 LogicalKeySet(
                   LogicalKeyboardKey.shift,
                   LogicalKeyboardKey.enter,
@@ -371,7 +378,8 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
                         return KeyEventResult.handled;
                       }
                       if (event.logicalKey == LogicalKeyboardKey.enter &&
-                          !isShiftPressed) {
+                          !isShiftPressed &&
+                          _sendOnEnterEnabled) {
                         widget.onSendPressed?.call();
                         return KeyEventResult.handled;
                       }
