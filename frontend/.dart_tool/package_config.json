@@ -338,6 +338,12 @@
       "languageVersion": "3.3"
     },
     {
+      "name": "google_fonts",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/google_fonts-8.0.2",
+      "packageUri": "lib/",
+      "languageVersion": "3.9"
+    },
+    {
       "name": "hooks",
       "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/hooks-1.0.1",
       "packageUri": "lib/",

@@ -533,18 +533,23 @@ class FeedPostCard extends StatelessWidget {
                   SizedBox(
                     height: 170,
                     child: AbsorbPointer(
-                      child: quill.QuillEditor.basic(
-                        controller: controller,
-                        config: quill.QuillEditorConfig(
-                          showCursor: false,
-                          embedBuilders: [
-                            ImageEmbedBuilder(),
-                            VideoEmbedBuilder(),
-                            AudioEmbedBuilder(),
-                            VoiceEmbedBuilder(),
-                            FileEmbedBuilder(),
-                          ],
-                          unknownEmbedBuilder: UnknownEmbedBuilder(),
+                      child: DefaultTextStyle.merge(
+                        style:
+                            Theme.of(context).textTheme.bodyMedium ??
+                            const TextStyle(),
+                        child: quill.QuillEditor.basic(
+                          controller: controller,
+                          config: quill.QuillEditorConfig(
+                            showCursor: false,
+                            embedBuilders: [
+                              ImageEmbedBuilder(),
+                              VideoEmbedBuilder(),
+                              AudioEmbedBuilder(),
+                              VoiceEmbedBuilder(),
+                              FileEmbedBuilder(),
+                            ],
+                            unknownEmbedBuilder: UnknownEmbedBuilder(),
+                          ),
                         ),
                       ),
                     ),
@@ -963,18 +968,22 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              quill.QuillEditor.basic(
-                controller: controller,
-                config: quill.QuillEditorConfig(
-                  showCursor: false,
-                  embedBuilders: [
-                    ImageEmbedBuilder(),
-                    VideoEmbedBuilder(),
-                    AudioEmbedBuilder(),
-                    VoiceEmbedBuilder(),
-                    FileEmbedBuilder(),
-                  ],
-                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+              DefaultTextStyle.merge(
+                style:
+                    Theme.of(context).textTheme.bodyMedium ?? const TextStyle(),
+                child: quill.QuillEditor.basic(
+                  controller: controller,
+                  config: quill.QuillEditorConfig(
+                    showCursor: false,
+                    embedBuilders: [
+                      ImageEmbedBuilder(),
+                      VideoEmbedBuilder(),
+                      AudioEmbedBuilder(),
+                      VoiceEmbedBuilder(),
+                      FileEmbedBuilder(),
+                    ],
+                    unknownEmbedBuilder: UnknownEmbedBuilder(),
+                  ),
                 ),
               ),
               if (commentAttachments.isNotEmpty) ...[
@@ -1198,18 +1207,23 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                             ),
                             const SizedBox(height: 12),
                           ],
-                          quill.QuillEditor.basic(
-                            controller: postController,
-                            config: quill.QuillEditorConfig(
-                              showCursor: false,
-                              embedBuilders: [
-                                ImageEmbedBuilder(),
-                                VideoEmbedBuilder(),
-                                AudioEmbedBuilder(),
-                                VoiceEmbedBuilder(),
-                                FileEmbedBuilder(),
-                              ],
-                              unknownEmbedBuilder: UnknownEmbedBuilder(),
+                          DefaultTextStyle.merge(
+                            style:
+                                Theme.of(context).textTheme.bodyMedium ??
+                                const TextStyle(),
+                            child: quill.QuillEditor.basic(
+                              controller: postController,
+                              config: quill.QuillEditorConfig(
+                                showCursor: false,
+                                embedBuilders: [
+                                  ImageEmbedBuilder(),
+                                  VideoEmbedBuilder(),
+                                  AudioEmbedBuilder(),
+                                  VoiceEmbedBuilder(),
+                                  FileEmbedBuilder(),
+                                ],
+                                unknownEmbedBuilder: UnknownEmbedBuilder(),
+                              ),
                             ),
                           ),
                           if (postAttachments.isNotEmpty) ...[
