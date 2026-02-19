@@ -15,7 +15,8 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateMixin {
+class _ChatScreenState extends State<ChatScreen>
+    with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   late final bool _isAdmin;
   int _activeTabIndex = 0;
@@ -66,10 +67,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   }
 
   void _showNewChatDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => const _NewChatDialog(),
-    );
+    showDialog(context: context, builder: (context) => const _NewChatDialog());
   }
 
   void _showTeacherSelectionDialog() {
@@ -80,8 +78,7 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            AppLocalizations.of(context)?.chatNoTeachers ??
-                'No teachers found',
+            AppLocalizations.of(context)?.chatNoTeachers ?? 'No teachers found',
           ),
         ),
       );
@@ -117,18 +114,26 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
   Future<void> _startChatWithTeacher(int teacherId) async {
     final chatService = context.read<ChatService>();
     final success = await chatService.startThread(teacherId);
-    
+
     if (success && mounted) {
       // The new thread should be in the list now
       await chatService.loadThreads(mode: 'personal');
       // Find and open the new thread
-      final newThread = chatService.threads
-          .firstWhere((t) => t.peerUserId == teacherId, orElse: () => ChatThread(
-            id: -1, participantAId: 0, participantBId: null, peerUserId: null,
-            peerName: null, isAdminChat: false, lastMessage: null,
-            updatedAt: DateTime.now(), unreadCount: 0,
-          ));
-      
+      final newThread = chatService.threads.firstWhere(
+        (t) => t.peerUserId == teacherId,
+        orElse: () => ChatThread(
+          id: -1,
+          participantAId: 0,
+          participantBId: null,
+          peerUserId: null,
+          peerName: null,
+          isAdminChat: false,
+          lastMessage: null,
+          updatedAt: DateTime.now(),
+          unreadCount: 0,
+        ),
+      );
+
       if (newThread.id != -1) {
         _openConversation(newThread);
       }
@@ -183,13 +188,17 @@ class _ChatScreenState extends State<ChatScreen> with SingleTickerProviderStateM
                     tabs: [
                       Tab(
                         child: _TabLabel(
-                          label: AppLocalizations.of(context)?.chatChats ?? 'Chats',
+                          label:
+                              AppLocalizations.of(context)?.chatChats ??
+                              'Chats',
                           count: chatService.personalUnreadCount,
                         ),
                       ),
                       Tab(
                         child: _TabLabel(
-                          label: AppLocalizations.of(context)?.chatAdmin ?? 'Admin',
+                          label:
+                              AppLocalizations.of(context)?.chatAdmin ??
+                              'Admin',
                           count: chatService.adminUnreadCount,
                         ),
                       ),
@@ -268,27 +277,36 @@ class _ThreadListTile extends StatelessWidget {
     required this.showAdminPeerName,
   });
 
+  ImageProvider? _avatarImage() {
+    final profileImage = thread.peerProfileImage;
+    if (profileImage == null || profileImage.isEmpty) return null;
+    return MediaCacheService.instance.imageProvider(
+      '${AppConfig.instance.baseUrl}/uploads/profile_images/$profileImage',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final lastMsg = thread.lastMessage;
     final displayName = thread.isAdminChat && !showAdminPeerName
-      ? (AppLocalizations.of(context)?.chatAdministration ?? 'Administration')
-      : (thread.peerName ??
-        (AppLocalizations.of(context)?.chatUnknownUser ?? 'Unknown'));
-    final preview = lastMsg?.plainText ??
-      (AppLocalizations.of(context)?.chatNoMessages ?? '(No messages)');
+        ? (AppLocalizations.of(context)?.chatAdministration ?? 'Administration')
+        : (thread.peerName ??
+              (AppLocalizations.of(context)?.chatUnknownUser ?? 'Unknown'));
+    final avatarImage = _avatarImage();
+    final preview =
+        lastMsg?.plainText ??
+        (AppLocalizations.of(context)?.chatNoMessages ?? '(No messages)');
 
     return ListTile(
       onTap: onTap,
       leading: CircleAvatar(
-        child: Text(displayName.isEmpty ? '?' : displayName[0]),
+        backgroundImage: avatarImage,
+        child: avatarImage == null
+            ? Text(displayName.isEmpty ? '?' : displayName[0].toUpperCase())
+            : null,
       ),
       title: Text(displayName),
-      subtitle: Text(
-        preview,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
+      subtitle: Text(preview, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: thread.unreadCount > 0
           ? CircleAvatar(
               backgroundColor: Theme.of(context).colorScheme.secondaryContainer,
@@ -355,7 +373,9 @@ class _BottomChatToolbar extends StatelessWidget {
             ElevatedButton.icon(
               onPressed: onNewChat,
               icon: const Icon(Icons.add),
-              label: Text(AppLocalizations.of(context)?.chatNewChat ?? 'New Chat'),
+              label: Text(
+                AppLocalizations.of(context)?.chatNewChat ?? 'New Chat',
+              ),
             ),
           ],
         ),
@@ -368,10 +388,7 @@ class _TabLabel extends StatelessWidget {
   final String label;
   final int count;
 
-  const _TabLabel({
-    required this.label,
-    required this.count,
-  });
+  const _TabLabel({required this.label, required this.count});
 
   @override
   Widget build(BuildContext context) {
@@ -528,8 +545,9 @@ class _NewChatDialogState extends State<_NewChatDialog> {
   ImageProvider? _avatarImage(ChatUserOption user) {
     final profileImage = user.profileImage;
     if (profileImage == null || profileImage.isEmpty) return null;
-    return MediaCacheService.instance
-        .imageProvider('$_baseUrl/uploads/profile_images/$profileImage');
+    return MediaCacheService.instance.imageProvider(
+      '$_baseUrl/uploads/profile_images/$profileImage',
+    );
   }
 
   @override
@@ -550,7 +568,8 @@ class _NewChatDialogState extends State<_NewChatDialog> {
             TextField(
               controller: _searchController,
               decoration: InputDecoration(
-                hintText: AppLocalizations.of(context)?.chatSearchUsers ??
+                hintText:
+                    AppLocalizations.of(context)?.chatSearchUsers ??
                     'Search users...',
                 prefixIcon: const Icon(Icons.search),
               ),
@@ -582,10 +601,15 @@ class _NewChatDialogState extends State<_NewChatDialog> {
                   itemBuilder: (context, index) {
                     final user = _filteredUsers[index];
                     final initials = user.fullName.isNotEmpty
-                        ? user.fullName.trim().split(' ').map((part) => part[0]).take(2).join()
+                        ? user.fullName
+                              .trim()
+                              .split(' ')
+                              .map((part) => part[0])
+                              .take(2)
+                              .join()
                         : user.username.isNotEmpty
-                            ? user.username[0]
-                            : '?';
+                        ? user.username[0]
+                        : '?';
                     return ListTile(
                       leading: CircleAvatar(
                         backgroundImage: _avatarImage(user),

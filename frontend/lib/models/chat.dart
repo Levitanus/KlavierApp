@@ -7,6 +7,7 @@ class ChatThread {
   final int? participantBId;
   final int? peerUserId; // The "other" participant for UI convenience
   final String? peerName;
+  final String? peerProfileImage;
   final bool isAdminChat;
   final ChatMessage? lastMessage;
   final DateTime updatedAt;
@@ -18,6 +19,7 @@ class ChatThread {
     required this.participantBId,
     required this.peerUserId,
     required this.peerName,
+    this.peerProfileImage,
     required this.isAdminChat,
     required this.lastMessage,
     required this.updatedAt,
@@ -31,6 +33,7 @@ class ChatThread {
       participantBId: json['participant_b_id'] as int?,
       peerUserId: json['peer_user_id'] as int?,
       peerName: json['peer_name'] as String?,
+      peerProfileImage: json['peer_profile_image'] as String?,
       isAdminChat: json['is_admin_chat'] as bool,
       lastMessage: json['last_message'] != null
           ? ChatMessage.fromJson(json['last_message'] as Map<String, dynamic>)
@@ -47,6 +50,7 @@ class ChatThread {
       'participant_b_id': participantBId,
       'peer_user_id': peerUserId,
       'peer_name': peerName,
+      'peer_profile_image': peerProfileImage,
       'is_admin_chat': isAdminChat,
       'last_message': lastMessage?.toJson(),
       'updated_at': updatedAt.toIso8601String(),
@@ -97,7 +101,7 @@ class ChatMessage {
     try {
       final ops = bodyJson['ops'] as List?;
       if (ops == null || ops.isEmpty) return '';
-      
+
       final stringBuffer = StringBuffer();
       for (final op in ops) {
         if (op is Map && op.containsKey('insert')) {
@@ -120,14 +124,14 @@ class ChatMessage {
       updatedAt: DateTime.parse(
         (json['updated_at'] as String?) ?? (json['created_at'] as String),
       ),
-      receipts: (json['receipts'] as List?)
-              ?.map((r) =>
-                  MessageReceipt.fromJson(r as Map<String, dynamic>))
+      receipts:
+          (json['receipts'] as List?)
+              ?.map((r) => MessageReceipt.fromJson(r as Map<String, dynamic>))
               .toList() ??
           [],
-      attachments: (json['attachments'] as List?)
-              ?.map((a) =>
-                  ChatAttachment.fromJson(a as Map<String, dynamic>))
+      attachments:
+          (json['attachments'] as List?)
+              ?.map((a) => ChatAttachment.fromJson(a as Map<String, dynamic>))
               .toList() ??
           [],
     );
@@ -187,16 +191,10 @@ class ChatAttachmentInput {
   final int mediaId;
   final String attachmentType;
 
-  ChatAttachmentInput({
-    required this.mediaId,
-    required this.attachmentType,
-  });
+  ChatAttachmentInput({required this.mediaId, required this.attachmentType});
 
   Map<String, dynamic> toJson() {
-    return {
-      'media_id': mediaId,
-      'attachment_type': attachmentType,
-    };
+    return {'media_id': mediaId, 'attachment_type': attachmentType};
   }
 }
 
@@ -236,10 +234,7 @@ class RelatedTeacher {
   final int userId;
   final String name;
 
-  RelatedTeacher({
-    required this.userId,
-    required this.name,
-  });
+  RelatedTeacher({required this.userId, required this.name});
 
   factory RelatedTeacher.fromJson(Map<String, dynamic> json) {
     return RelatedTeacher(
@@ -249,10 +244,7 @@ class RelatedTeacher {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'user_id': userId,
-      'name': name,
-    };
+    return {'user_id': userId, 'name': name};
   }
 }
 

@@ -271,6 +271,7 @@ pub struct ChatThreadResponse {
     pub participant_b_id: Option<i32>,
     pub peer_user_id: Option<i32>, // For UI convenience: the "other" participant
     pub peer_name: Option<String>,
+    pub peer_profile_image: Option<String>,
     pub is_admin_chat: bool,
     pub last_message: Option<ChatMessageResponse>,
     pub updated_at: DateTime<Utc>,
@@ -802,19 +803,23 @@ async fn list_threads(
             Some(thread.participant_a_id)
         };
 
-        let peer_name = if let Some(pid) = peer_id {
-            sqlx::query_scalar::<_, Option<String>>(
-                "SELECT COALESCE(full_name, username)
+        let (peer_name, peer_profile_image) = if let Some(pid) = peer_id {
+            match sqlx::query_as::<_, (String, Option<String>)>(
+                "SELECT COALESCE(full_name, username), profile_image
                  FROM users
                  WHERE id = $1",
             )
             .bind(pid)
-            .fetch_one(&app_state.db)
+            .fetch_optional(&app_state.db)
             .await
             .ok()
             .flatten()
+            {
+                Some((name, profile_image)) => (Some(name), profile_image),
+                None => (None, None),
+            }
         } else {
-            Some("Administration".to_string())
+            (Some("Administration".to_string()), None)
         };
 
         let last_message = sqlx::query_as::<_, ChatMessage>(
@@ -902,6 +907,7 @@ async fn list_threads(
             participant_b_id: thread.participant_b_id,
             peer_user_id: peer_id,
             peer_name,
+            peer_profile_image,
             is_admin_chat: thread.is_admin_chat,
             last_message: last_message_response,
             updated_at: thread.updated_at,

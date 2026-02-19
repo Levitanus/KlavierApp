@@ -86,6 +86,8 @@ pub struct FeedCommentResponse {
     pub id: i32,
     pub post_id: i32,
     pub author_user_id: i32,
+    pub author_name: String,
+    pub author_profile_image: Option<String>,
     pub parent_comment_id: Option<i32>,
     pub content: JsonValue,
     pub created_at: DateTime<Utc>,
@@ -205,6 +207,19 @@ struct MediaRow {
     pub media_type: String,
 }
 
+#[derive(Debug, FromRow)]
+struct FeedCommentWithAuthor {
+    pub id: i32,
+    pub post_id: i32,
+    pub author_user_id: i32,
+    pub author_name: String,
+    pub author_profile_image: Option<String>,
+    pub parent_comment_id: Option<i32>,
+    pub content: JsonValue,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
 async fn load_attachments_for_posts(
     db: &PgPool,
     post_ids: &[i32],
@@ -283,6 +298,24 @@ async fn load_attachments_for_comments(
     }
 
     Ok(map)
+}
+
+async fn fetch_comment_author_meta(
+    db: &PgPool,
+    user_id: i32,
+) -> Result<(String, Option<String>), actix_web::Error> {
+    let row = sqlx::query_as::<_, (String, Option<String>)>(
+        "SELECT COALESCE(full_name, username), profile_image FROM users WHERE id = $1",
+    )
+    .bind(user_id)
+    .fetch_optional(db)
+    .await
+    .map_err(|e| {
+        error!("Database error fetching comment author meta: {:?}", e);
+        actix_web::error::ErrorInternalServerError("Failed to fetch comment author")
+    })?;
+
+    Ok(row.unwrap_or_else(|| ("Unknown".to_string(), None)))
 }
 
 async fn store_post_attachments(
@@ -1436,8 +1469,20 @@ pub async fn list_comments(
 
     ensure_feed_access(&app_state, &feed, user_id, &claims).await?;
 
-    let comments = sqlx::query_as::<_, FeedComment>(
-        "SELECT id, post_id, author_user_id, parent_comment_id, content, created_at, updated_at FROM feed_comments WHERE post_id = $1 ORDER BY created_at ASC"
+    let comments = sqlx::query_as::<_, FeedCommentWithAuthor>(
+        "SELECT fc.id,
+                fc.post_id,
+                fc.author_user_id,
+                COALESCE(u.full_name, u.username) AS author_name,
+                u.profile_image AS author_profile_image,
+                fc.parent_comment_id,
+                fc.content,
+                fc.created_at,
+                fc.updated_at
+         FROM feed_comments fc
+         JOIN users u ON u.id = fc.author_user_id
+         WHERE fc.post_id = $1
+         ORDER BY fc.created_at ASC",
     )
     .bind(*post_id)
     .fetch_all(&app_state.db)
@@ -1461,6 +1506,8 @@ pub async fn list_comments(
             id: comment.id,
             post_id: comment.post_id,
             author_user_id: comment.author_user_id,
+            author_name: comment.author_name,
+            author_profile_image: comment.author_profile_image,
             parent_comment_id: comment.parent_comment_id,
             content: comment.content,
             created_at: comment.created_at,
@@ -1581,10 +1628,15 @@ pub async fn create_comment(
         }
     }
 
+    let (author_name, author_profile_image) =
+        fetch_comment_author_meta(&app_state.db, comment.author_user_id).await?;
+
     let comment_response = FeedCommentResponse {
         id: comment.id,
         post_id: comment.post_id,
         author_user_id: comment.author_user_id,
+        author_name,
+        author_profile_image,
         parent_comment_id: comment.parent_comment_id,
         content: comment.content,
         created_at: comment.created_at,
@@ -1856,10 +1908,15 @@ pub async fn update_comment(
             .unwrap_or_default()
     };
 
+    let (author_name, author_profile_image) =
+        fetch_comment_author_meta(&app_state.db, updated_comment.author_user_id).await?;
+
     let response = FeedCommentResponse {
         id: updated_comment.id,
         post_id: updated_comment.post_id,
         author_user_id: updated_comment.author_user_id,
+        author_name,
+        author_profile_image,
         parent_comment_id: updated_comment.parent_comment_id,
         content: updated_comment.content,
         created_at: updated_comment.created_at,

@@ -165,6 +165,8 @@ class FeedComment {
   final int id;
   final int postId;
   final int authorUserId;
+  final String? authorName;
+  final String? authorProfileImage;
   final int? parentCommentId;
   final List<dynamic> content;
   final List<ChatAttachment> attachments;
@@ -175,6 +177,8 @@ class FeedComment {
     required this.id,
     required this.postId,
     required this.authorUserId,
+    this.authorName,
+    this.authorProfileImage,
     required this.parentCommentId,
     required this.content,
     required this.attachments,
@@ -187,6 +191,11 @@ class FeedComment {
       id: _parseIntField(json, ['id']),
       postId: _parseIntField(json, ['post_id', 'postId']),
       authorUserId: _parseIntField(json, ['author_user_id', 'authorUserId']),
+      authorName:
+          json['author_name'] as String? ?? json['authorName'] as String?,
+      authorProfileImage:
+          json['author_profile_image'] as String? ??
+          json['authorProfileImage'] as String?,
       parentCommentId:
           (json['parent_comment_id'] as num?)?.toInt() ??
           (json['parentCommentId'] as num?)?.toInt(),
@@ -206,6 +215,8 @@ class FeedComment {
       'id': id,
       'post_id': postId,
       'author_user_id': authorUserId,
+      'author_name': authorName,
+      'author_profile_image': authorProfileImage,
       'parent_comment_id': parentCommentId,
       'content': content,
       'attachments': attachments.map((a) => a.toJson()).toList(),

@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 
 import 'auth.dart';
+import 'config/app_config.dart';
 import 'models/chat.dart';
 import 'models/feed.dart';
 import 'services/feed_service.dart';
@@ -634,6 +635,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
   bool _loadingSubscription = true;
   bool _isSubscribed = false;
   late FeedService _feedService;
+  static String get _baseUrl => AppConfig.instance.baseUrl;
 
   @override
   void initState() {
@@ -873,6 +875,31 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     );
   }
 
+  ImageProvider? _commentAuthorAvatarImage(FeedComment comment) {
+    final profileImage = comment.authorProfileImage;
+    if (profileImage == null || profileImage.isEmpty) return null;
+    return MediaCacheService.instance.imageProvider(
+      '$_baseUrl/uploads/profile_images/$profileImage',
+    );
+  }
+
+  String _commentAuthorDisplayName(FeedComment comment) {
+    final name = comment.authorName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    return 'User #${comment.authorUserId}';
+  }
+
+  String _initialsFromName(String value) {
+    final parts = value
+        .trim()
+        .split(RegExp(r'\s+'))
+        .where((part) => part.isNotEmpty)
+        .toList();
+    if (parts.isEmpty) return '?';
+    if (parts.length == 1) return parts.first[0].toUpperCase();
+    return '${parts.first[0]}${parts[1][0]}'.toUpperCase();
+  }
+
   Widget _buildAttachmentWithMenu({
     required Widget child,
     required VoidCallback onDownload,
@@ -948,6 +975,9 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     final auth = context.watch<AuthService>();
     final l10n = AppLocalizations.of(context);
     return items.expand((comment) {
+      final isOwnComment = (auth.userId ?? -1) == comment.authorUserId;
+      final authorName = _commentAuthorDisplayName(comment);
+      final authorAvatar = _commentAuthorAvatarImage(comment);
       final controller = quill.QuillController(
         document: comment.toDocument(),
         selection: const TextSelection.collapsed(offset: 0),
@@ -971,6 +1001,32 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              if (!isOwnComment) ...[
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 14,
+                      backgroundImage: authorAvatar,
+                      child: authorAvatar == null
+                          ? Text(
+                              _initialsFromName(authorName),
+                              style: const TextStyle(fontSize: 11),
+                            )
+                          : null,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        authorName,
+                        style: Theme.of(context).textTheme.labelLarge,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+              ],
               DefaultTextStyle.merge(
                 style:
                     Theme.of(context).textTheme.bodyMedium ?? const TextStyle(),
@@ -1009,7 +1065,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
                     onPressed: () => _openCommentComposer(comment.id),
                     child: Text(l10n?.commonReply ?? 'Reply'),
                   ),
-                  if ((auth.userId ?? -1) == comment.authorUserId)
+                  if (isOwnComment)
                     PopupMenuButton<String>(
                       icon: const Icon(Icons.more_horiz, size: 18),
                       tooltip:
