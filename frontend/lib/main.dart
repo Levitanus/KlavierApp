@@ -95,10 +95,22 @@ TextTheme _appTextTheme(Brightness brightness, ColorScheme colorScheme) {
   final displayColor = brightness == Brightness.dark
       ? colorScheme.onSurface.withOpacity(0.88)
       : colorScheme.onSurface;
-  return GoogleFonts.getTextTheme(
+  final themed = GoogleFonts.getTextTheme(
     'Jost',
     base,
   ).apply(bodyColor: bodyColor, displayColor: displayColor);
+
+  if (brightness == Brightness.light) {
+    return themed.copyWith(
+      bodyLarge: themed.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+      bodyMedium: themed.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+      titleLarge: themed.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+      titleMedium: themed.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+      labelLarge: themed.labelLarge?.copyWith(fontWeight: FontWeight.w600),
+    );
+  }
+
+  return themed;
 }
 
 final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
