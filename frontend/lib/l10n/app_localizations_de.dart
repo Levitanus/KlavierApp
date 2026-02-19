@@ -138,6 +138,15 @@ class AppLocalizationsDe extends AppLocalizations {
   String get commonInsertLink => 'Link einfuegen';
 
   @override
+  String get commonHeading2 => 'H2';
+
+  @override
+  String get commonHeading5 => 'H5';
+
+  @override
+  String get commonQuote => 'Zitat';
+
+  @override
   String get commonUrl => 'URL';
 
   @override

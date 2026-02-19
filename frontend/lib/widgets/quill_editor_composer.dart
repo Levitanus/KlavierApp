@@ -213,14 +213,135 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
     widget.controller.formatSelection(quill.LinkAttribute(url));
   }
 
+  void _applySelectionAttribute(quill.Attribute<dynamic> attribute) {
+    final selection = widget.controller.selection;
+    if (selection.isCollapsed) {
+      widget.controller.formatSelection(attribute);
+      return;
+    }
+
+    final index = selection.start;
+    final length = selection.end - selection.start;
+    widget.controller.formatText(index, length, attribute);
+    widget.controller.updateSelection(
+      TextSelection.collapsed(offset: selection.end),
+      quill.ChangeSource.local,
+    );
+  }
+
+  Widget _buildFormatIconButton({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+  }) {
+    return IconButton(
+      icon: Icon(icon, size: 18),
+      tooltip: tooltip,
+      onPressed: onPressed,
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+    );
+  }
+
+  List<Widget> _buildFormattingButtons(
+    BuildContext context, {
+    required bool closeContextMenuOnAction,
+  }) {
+    final l10n = AppLocalizations.of(context);
+
+    void applyAttribute(quill.Attribute<dynamic> attribute) {
+      _applySelectionAttribute(attribute);
+      if (closeContextMenuOnAction) {
+        ContextMenuController.removeAny();
+      }
+    }
+
+    return [
+      _buildFormatIconButton(
+        icon: Icons.format_bold,
+        tooltip: l10n?.commonBold ?? 'Bold',
+        onPressed: () => applyAttribute(quill.Attribute.bold),
+      ),
+      _buildFormatIconButton(
+        icon: Icons.format_italic,
+        tooltip: l10n?.commonItalic ?? 'Italic',
+        onPressed: () => applyAttribute(quill.Attribute.italic),
+      ),
+      _buildFormatIconButton(
+        icon: Icons.format_underlined,
+        tooltip: l10n?.commonUnderline ?? 'Underline',
+        onPressed: () => applyAttribute(quill.Attribute.underline),
+      ),
+      _buildFormatIconButton(
+        icon: Icons.strikethrough_s,
+        tooltip: l10n?.commonStrike ?? 'Strike',
+        onPressed: () => applyAttribute(quill.Attribute.strikeThrough),
+      ),
+      _buildFormatIconButton(
+        icon: Icons.looks_two,
+        tooltip: l10n?.commonHeading2 ?? 'H2',
+        onPressed: () => applyAttribute(quill.Attribute.h2),
+      ),
+      _buildFormatIconButton(
+        icon: Icons.looks_5,
+        tooltip: l10n?.commonHeading5 ?? 'H5',
+        onPressed: () => applyAttribute(quill.Attribute.h5),
+      ),
+      _buildFormatIconButton(
+        icon: Icons.link,
+        tooltip: l10n?.commonInsertLink ?? 'Link',
+        onPressed: () {
+          _promptForLink();
+          if (closeContextMenuOnAction) {
+            ContextMenuController.removeAny();
+          }
+        },
+      ),
+      _buildFormatIconButton(
+        icon: Icons.format_quote,
+        tooltip: l10n?.commonQuote ?? 'Quote',
+        onPressed: () => applyAttribute(quill.Attribute.blockQuote),
+      ),
+    ];
+  }
+
+  Widget _buildInlineSelectionToolbar(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.controller,
+      builder: (context, child) {
+        final hasSelection = !widget.controller.selection.isCollapsed;
+        if (!hasSelection || widget.config.readOnly) {
+          return const SizedBox.shrink();
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: _buildFormattingButtons(
+                context,
+                closeContextMenuOnAction: false,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildEditorContextMenu(
     BuildContext context,
     quill.QuillRawEditorState editorState,
   ) {
-    final l10n = AppLocalizations.of(context);
-    final controller = editorState.controller;
-    final selection = controller.selection;
-
     // Get button items with error handling for layout issues
     List<ContextMenuButtonItem> buttonItems;
     try {
@@ -229,53 +350,19 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
       return const SizedBox.shrink();
     }
 
-    // If no selection, just show default buttons
-    if (selection.isCollapsed) {
-      return AdaptiveTextSelectionToolbar.buttonItems(
-        anchors: editorState.contextMenuAnchors,
-        buttonItems: buttonItems,
-      );
-    }
+    // Keep default platform actions (copy/paste/etc.)
+    final defaultButtons = AdaptiveTextSelectionToolbar.getAdaptiveButtons(
+      context,
+      buttonItems,
+    ).toList();
+    final formattingWidgets = _buildFormattingButtons(
+      context,
+      closeContextMenuOnAction: true,
+    );
 
-    // Add custom formatting buttons for text selections
-    final formattingButtons = <ContextMenuButtonItem>[
-      ContextMenuButtonItem(
-        onPressed: () {
-          final index = selection.start;
-          final length = selection.end - selection.start;
-          controller.formatText(index, length, quill.Attribute.bold);
-        },
-        label: l10n?.commonBold ?? 'Bold',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          final index = selection.start;
-          final length = selection.end - selection.start;
-          controller.formatText(index, length, quill.Attribute.italic);
-        },
-        label: l10n?.commonItalic ?? 'Italic',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          final index = selection.start;
-          final length = selection.end - selection.start;
-          controller.formatText(index, length, quill.Attribute.underline);
-        },
-        label: l10n?.commonUnderline ?? 'Underline',
-      ),
-      ContextMenuButtonItem(
-        onPressed: () {
-          final index = selection.start;
-          final length = selection.end - selection.start;
-          controller.formatText(index, length, quill.Attribute.strikeThrough);
-        },
-        label: l10n?.commonStrike ?? 'Strike',
-      ),
-    ];
-
-    return AdaptiveTextSelectionToolbar.buttonItems(
+    return AdaptiveTextSelectionToolbar(
       anchors: editorState.contextMenuAnchors,
-      buttonItems: [...formattingButtons, ...buttonItems],
+      children: [...formattingWidgets, ...defaultButtons],
     );
   }
 
@@ -291,124 +378,134 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
           Expanded(
-            child: Shortcuts(
-              shortcuts: {
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.keyB,
-                ): const _FormatIntent(
-                  _FormatType.bold,
-                ),
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.keyI,
-                ): const _FormatIntent(
-                  _FormatType.italic,
-                ),
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.keyU,
-                ): const _FormatIntent(
-                  _FormatType.underline,
-                ),
-                LogicalKeySet(
-                  LogicalKeyboardKey.control,
-                  LogicalKeyboardKey.keyK,
-                ): const _FormatIntent(
-                  _FormatType.link,
-                ),
-                if (_sendOnEnterEnabled)
-                  LogicalKeySet(LogicalKeyboardKey.enter): const _SendIntent(),
-                LogicalKeySet(
-                  LogicalKeyboardKey.shift,
-                  LogicalKeyboardKey.enter,
-                ): const _NewlineIntent(),
-              },
-              child: Actions(
-                actions: {
-                  _FormatIntent: CallbackAction<_FormatIntent>(
-                    onInvoke: (intent) {
-                      switch (intent.type) {
-                        case _FormatType.bold:
-                          widget.controller.formatSelection(
-                            quill.Attribute.bold,
-                          );
-                          break;
-                        case _FormatType.italic:
-                          widget.controller.formatSelection(
-                            quill.Attribute.italic,
-                          );
-                          break;
-                        case _FormatType.underline:
-                          widget.controller.formatSelection(
-                            quill.Attribute.underline,
-                          );
-                          break;
-                        case _FormatType.link:
-                          _promptForLink();
-                          break;
-                      }
-                      return null;
-                    },
-                  ),
-                  _SendIntent: CallbackAction<_SendIntent>(
-                    onInvoke: (intent) {
-                      widget.onSendPressed?.call();
-                      return null;
-                    },
-                  ),
-                  _NewlineIntent: CallbackAction<_NewlineIntent>(
-                    onInvoke: (intent) {
-                      _insertNewline();
-                      return null;
-                    },
-                  ),
-                },
-                child: Focus(
-                  focusNode: _focusNode,
-                  onKeyEvent: (node, event) {
-                    if (event is KeyDownEvent) {
-                      final isShiftPressed =
-                          event.logicalKey == LogicalKeyboardKey.shiftLeft ||
-                          event.logicalKey == LogicalKeyboardKey.shiftRight ||
-                          HardwareKeyboard.instance.isShiftPressed;
-                      if (event.logicalKey == LogicalKeyboardKey.enter &&
-                          isShiftPressed) {
-                        _insertNewline();
-                        return KeyEventResult.handled;
-                      }
-                      if (event.logicalKey == LogicalKeyboardKey.enter &&
-                          !isShiftPressed &&
-                          _sendOnEnterEnabled) {
-                        widget.onSendPressed?.call();
-                        return KeyEventResult.handled;
-                      }
-                    }
-                    return KeyEventResult.ignored;
-                  },
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      minHeight: widget.config.minHeight,
-                      maxHeight: widget.config.maxHeight,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildInlineSelectionToolbar(context),
+                Shortcuts(
+                  shortcuts: {
+                    LogicalKeySet(
+                      LogicalKeyboardKey.control,
+                      LogicalKeyboardKey.keyB,
+                    ): const _FormatIntent(
+                      _FormatType.bold,
                     ),
-                    child: quill.QuillEditor.basic(
-                      controller: widget.controller,
-                      config: quill.QuillEditorConfig(
-                        contextMenuBuilder: _buildEditorContextMenu,
-                        padding: EdgeInsets.zero,
-                        embedBuilders: [
-                          ImageEmbedBuilder(),
-                          VideoEmbedBuilder(),
-                          AudioEmbedBuilder(),
-                          VoiceEmbedBuilder(),
-                          FileEmbedBuilder(),
-                        ],
-                        unknownEmbedBuilder: UnknownEmbedBuilder(),
+                    LogicalKeySet(
+                      LogicalKeyboardKey.control,
+                      LogicalKeyboardKey.keyI,
+                    ): const _FormatIntent(
+                      _FormatType.italic,
+                    ),
+                    LogicalKeySet(
+                      LogicalKeyboardKey.control,
+                      LogicalKeyboardKey.keyU,
+                    ): const _FormatIntent(
+                      _FormatType.underline,
+                    ),
+                    LogicalKeySet(
+                      LogicalKeyboardKey.control,
+                      LogicalKeyboardKey.keyK,
+                    ): const _FormatIntent(
+                      _FormatType.link,
+                    ),
+                    if (_sendOnEnterEnabled)
+                      LogicalKeySet(LogicalKeyboardKey.enter):
+                          const _SendIntent(),
+                    LogicalKeySet(
+                      LogicalKeyboardKey.shift,
+                      LogicalKeyboardKey.enter,
+                    ): const _NewlineIntent(),
+                  },
+                  child: Actions(
+                    actions: {
+                      _FormatIntent: CallbackAction<_FormatIntent>(
+                        onInvoke: (intent) {
+                          switch (intent.type) {
+                            case _FormatType.bold:
+                              widget.controller.formatSelection(
+                                quill.Attribute.bold,
+                              );
+                              break;
+                            case _FormatType.italic:
+                              widget.controller.formatSelection(
+                                quill.Attribute.italic,
+                              );
+                              break;
+                            case _FormatType.underline:
+                              widget.controller.formatSelection(
+                                quill.Attribute.underline,
+                              );
+                              break;
+                            case _FormatType.link:
+                              _promptForLink();
+                              break;
+                          }
+                          return null;
+                        },
+                      ),
+                      _SendIntent: CallbackAction<_SendIntent>(
+                        onInvoke: (intent) {
+                          widget.onSendPressed?.call();
+                          return null;
+                        },
+                      ),
+                      _NewlineIntent: CallbackAction<_NewlineIntent>(
+                        onInvoke: (intent) {
+                          _insertNewline();
+                          return null;
+                        },
+                      ),
+                    },
+                    child: Focus(
+                      focusNode: _focusNode,
+                      onKeyEvent: (node, event) {
+                        if (event is KeyDownEvent) {
+                          final isShiftPressed =
+                              event.logicalKey ==
+                                  LogicalKeyboardKey.shiftLeft ||
+                              event.logicalKey ==
+                                  LogicalKeyboardKey.shiftRight ||
+                              HardwareKeyboard.instance.isShiftPressed;
+                          if (event.logicalKey == LogicalKeyboardKey.enter &&
+                              isShiftPressed) {
+                            _insertNewline();
+                            return KeyEventResult.handled;
+                          }
+                          if (event.logicalKey == LogicalKeyboardKey.enter &&
+                              !isShiftPressed &&
+                              _sendOnEnterEnabled) {
+                            widget.onSendPressed?.call();
+                            return KeyEventResult.handled;
+                          }
+                        }
+                        return KeyEventResult.ignored;
+                      },
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: widget.config.minHeight,
+                          maxHeight: widget.config.maxHeight,
+                        ),
+                        child: quill.QuillEditor.basic(
+                          controller: widget.controller,
+                          config: quill.QuillEditorConfig(
+                            contextMenuBuilder: _buildEditorContextMenu,
+                            padding: EdgeInsets.zero,
+                            embedBuilders: [
+                              ImageEmbedBuilder(),
+                              VideoEmbedBuilder(),
+                              AudioEmbedBuilder(),
+                              VoiceEmbedBuilder(),
+                              FileEmbedBuilder(),
+                            ],
+                            unknownEmbedBuilder: UnknownEmbedBuilder(),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
           if (widget.config.showAttachButton) ...[

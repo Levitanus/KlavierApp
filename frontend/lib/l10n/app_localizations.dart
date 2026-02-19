@@ -346,6 +346,24 @@ abstract class AppLocalizations {
   /// **'Insert link'**
   String get commonInsertLink;
 
+  /// No description provided for @commonHeading2.
+  ///
+  /// In en, this message translates to:
+  /// **'H2'**
+  String get commonHeading2;
+
+  /// No description provided for @commonHeading5.
+  ///
+  /// In en, this message translates to:
+  /// **'H5'**
+  String get commonHeading5;
+
+  /// No description provided for @commonQuote.
+  ///
+  /// In en, this message translates to:
+  /// **'Quote'**
+  String get commonQuote;
+
   /// No description provided for @commonUrl.
   ///
   /// In en, this message translates to:

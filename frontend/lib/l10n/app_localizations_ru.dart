@@ -137,6 +137,15 @@ class AppLocalizationsRu extends AppLocalizations {
   String get commonInsertLink => 'Вставить ссылку';
 
   @override
+  String get commonHeading2 => 'H2';
+
+  @override
+  String get commonHeading5 => 'H5';
+
+  @override
+  String get commonQuote => 'Цитата';
+
+  @override
   String get commonUrl => 'URL';
 
   @override
