@@ -783,117 +783,129 @@ class _MessageBubble extends StatelessWidget {
     final name = message.senderName;
     final l10n = AppLocalizations.of(context);
     final controller = _buildReadOnlyController();
-    final maxWidth = MediaQuery.of(context).size.width * 0.72;
     final attachments = _visibleAttachments();
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Align(
-        alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
-        child: Column(
-          crossAxisAlignment: align,
-          children: [
-            if (showSenderName) ...[
-              Text(
-                name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 12,
-                ),
-              ),
-              const SizedBox(height: 4),
-            ],
-            ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: maxWidth),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: bubbleColor,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxWidth = constraints.maxWidth * 0.72;
+
+          return Align(
+            alignment: isOwn ? Alignment.centerRight : Alignment.centerLeft,
+            child: Column(
+              crossAxisAlignment: align,
+              children: [
+                if (showSenderName) ...[
+                  Text(
+                    name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: maxWidth),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: bubbleColor,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: quill.QuillEditor.basic(
-                            controller: controller,
-                            config: quill.QuillEditorConfig(
-                              scrollable: false,
-                              autoFocus: false,
-                              showCursor: false,
-                              padding: EdgeInsets.zero,
-                              embedBuilders: [
-                                ImageEmbedBuilder(),
-                                VideoEmbedBuilder(),
-                                AudioEmbedBuilder(),
-                                VoiceEmbedBuilder(),
-                                FileEmbedBuilder(),
-                              ],
-                              unknownEmbedBuilder: UnknownEmbedBuilder(),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: quill.QuillEditor.basic(
+                                controller: controller,
+                                config: quill.QuillEditorConfig(
+                                  scrollable: false,
+                                  autoFocus: false,
+                                  showCursor: false,
+                                  padding: EdgeInsets.zero,
+                                  embedBuilders: [
+                                    ImageEmbedBuilder(),
+                                    VideoEmbedBuilder(),
+                                    AudioEmbedBuilder(),
+                                    VoiceEmbedBuilder(),
+                                    FileEmbedBuilder(),
+                                  ],
+                                  unknownEmbedBuilder: UnknownEmbedBuilder(),
+                                ),
+                              ),
                             ),
-                          ),
+                            if (onEdit != null || onDelete != null)
+                              PopupMenuButton<String>(
+                                icon: const Icon(Icons.more_horiz, size: 18),
+                                tooltip:
+                                    l10n?.chatMessageActions ??
+                                    'Message actions',
+                                onSelected: (value) {
+                                  if (value == 'edit') {
+                                    onEdit?.call();
+                                  } else if (value == 'delete') {
+                                    onDelete?.call();
+                                  }
+                                },
+                                itemBuilder: (context) {
+                                  final items = <PopupMenuEntry<String>>[];
+                                  if (onEdit != null) {
+                                    items.add(
+                                      PopupMenuItem<String>(
+                                        value: 'edit',
+                                        child: Text(
+                                          l10n?.chatEditMessage ??
+                                              'Edit message',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  if (onDelete != null) {
+                                    items.add(
+                                      PopupMenuItem<String>(
+                                        value: 'delete',
+                                        child: Text(
+                                          l10n?.commonDelete ?? 'Delete',
+                                        ),
+                                      ),
+                                    );
+                                  }
+                                  return items;
+                                },
+                              ),
+                          ],
                         ),
-                        if (onEdit != null || onDelete != null)
-                          PopupMenuButton<String>(
-                            icon: const Icon(Icons.more_horiz, size: 18),
-                            tooltip:
-                                l10n?.chatMessageActions ?? 'Message actions',
-                            onSelected: (value) {
-                              if (value == 'edit') {
-                                onEdit?.call();
-                              } else if (value == 'delete') {
-                                onDelete?.call();
-                              }
-                            },
-                            itemBuilder: (context) {
-                              final items = <PopupMenuEntry<String>>[];
-                              if (onEdit != null) {
-                                items.add(
-                                  PopupMenuItem<String>(
-                                    value: 'edit',
-                                    child: Text(
-                                      l10n?.chatEditMessage ?? 'Edit message',
-                                    ),
-                                  ),
-                                );
-                              }
-                              if (onDelete != null) {
-                                items.add(
-                                  PopupMenuItem<String>(
-                                    value: 'delete',
-                                    child: Text(l10n?.commonDelete ?? 'Delete'),
-                                  ),
-                                );
-                              }
-                              return items;
-                            },
-                          ),
+                        if (attachments.isNotEmpty) ...[
+                          const SizedBox(height: 8),
+                          for (final attachment in attachments)
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: _buildAttachmentWidget(
+                                context,
+                                attachment,
+                              ),
+                            ),
+                        ],
+                        const SizedBox(height: 4),
+                        if (isOwn) _buildReceiptStatus(message.receipts),
                       ],
                     ),
-                    if (attachments.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      for (final attachment in attachments)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 6),
-                          child: _buildAttachmentWidget(context, attachment),
-                        ),
-                    ],
-                    const SizedBox(height: 4),
-                    if (isOwn) _buildReceiptStatus(message.receipts),
-                  ],
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  _formatTime(message.createdAt, isEdited: message.isEdited),
+                  style: const TextStyle(fontSize: 10, color: Colors.grey),
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text(
-              _formatTime(message.createdAt, isEdited: message.isEdited),
-              style: const TextStyle(fontSize: 10, color: Colors.grey),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
