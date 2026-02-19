@@ -1233,13 +1233,18 @@ async fn send_message(
                 "[CHAT] Sending push to user {} for thread {}",
                 recipient_id, thread_id
             );
-            push::send_notification_to_user(
-                &app_state.db,
-                *recipient_id,
-                &notification_body,
-                Some(notification_id),
-            )
-            .await;
+            let db = app_state.db.clone();
+            let recipient_id = *recipient_id;
+            let notification_body = notification_body.clone();
+            actix_web::rt::spawn(async move {
+                push::send_notification_to_user(
+                    &db,
+                    recipient_id,
+                    &notification_body,
+                    Some(notification_id),
+                )
+                .await;
+            });
         }
     }
 
@@ -1387,13 +1392,18 @@ async fn send_admin_message(
                 "[CHAT] Sending push to admin {} for thread {}",
                 admin_id, thread_id
             );
-            push::send_notification_to_user(
-                &app_state.db,
-                *admin_id,
-                &notification_body,
-                Some(notification_id),
-            )
-            .await;
+            let db = app_state.db.clone();
+            let admin_id = *admin_id;
+            let notification_body = notification_body.clone();
+            actix_web::rt::spawn(async move {
+                push::send_notification_to_user(
+                    &db,
+                    admin_id,
+                    &notification_body,
+                    Some(notification_id),
+                )
+                .await;
+            });
         }
     }
 

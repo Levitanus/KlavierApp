@@ -7,6 +7,7 @@ use sqlx::PgPool;
 use std::env;
 use std::fs;
 use std::sync::OnceLock;
+use std::time::Duration as StdDuration;
 use tokio::sync::Mutex;
 
 use crate::notifications::{ContentBlock, NotificationBody};
@@ -57,6 +58,17 @@ struct CachedAccessToken {
 static SERVICE_ACCOUNT: OnceLock<Option<ServiceAccountKey>> = OnceLock::new();
 static ACCESS_TOKEN: OnceLock<Mutex<Option<CachedAccessToken>>> = OnceLock::new();
 
+fn fcm_http_client() -> Result<reqwest::Client> {
+    reqwest::Client::builder()
+        .connect_timeout(StdDuration::from_secs(5))
+        .timeout(StdDuration::from_secs(10))
+        .build()
+        .map_err(|e| {
+            error!("Failed to build FCM HTTP client: {}", e);
+            actix_web::error::ErrorInternalServerError("Failed to initialize push transport")
+        })
+}
+
 fn load_service_account() -> Option<&'static ServiceAccountKey> {
     SERVICE_ACCOUNT
         .get_or_init(|| {
@@ -84,7 +96,10 @@ fn load_service_account() -> Option<&'static ServiceAccountKey> {
 
             match serde_json::from_str::<ServiceAccountKey>(&contents) {
                 Ok(value) => {
-                    info!("Service account parsed successfully for project: {}", value.project_id);
+                    info!(
+                        "Service account parsed successfully for project: {}",
+                        value.project_id
+                    );
                     Some(value)
                 }
                 Err(err) => {
@@ -102,7 +117,10 @@ async fn get_access_token(service_account: &ServiceAccountKey) -> Result<String>
         let guard = cache.lock().await;
         if let Some(cached) = guard.as_ref() {
             if cached.expires_at > Utc::now() + Duration::seconds(30) {
-                debug!("Using cached FCM access token (expires at {})", cached.expires_at);
+                debug!(
+                    "Using cached FCM access token (expires at {})",
+                    cached.expires_at
+                );
                 return Ok(cached.token.clone());
             }
         }
@@ -120,20 +138,21 @@ async fn get_access_token(service_account: &ServiceAccountKey) -> Result<String>
     };
 
     let header = Header::new(jsonwebtoken::Algorithm::RS256);
-    let key = EncodingKey::from_rsa_pem(service_account.private_key.as_bytes())
-        .map_err(|e| {
-            error!("Failed to create encoding key: {}", e);
-            actix_web::error::ErrorInternalServerError("Invalid FCM credentials")
-        })?;
+    let key = EncodingKey::from_rsa_pem(service_account.private_key.as_bytes()).map_err(|e| {
+        error!("Failed to create encoding key: {}", e);
+        actix_web::error::ErrorInternalServerError("Invalid FCM credentials")
+    })?;
 
-    let assertion = jsonwebtoken::encode(&header, &token_request, &key)
-        .map_err(|e| {
-            error!("Failed to sign JWT: {}", e);
-            actix_web::error::ErrorInternalServerError("Failed to authenticate FCM")
-        })?;
+    let assertion = jsonwebtoken::encode(&header, &token_request, &key).map_err(|e| {
+        error!("Failed to sign JWT: {}", e);
+        actix_web::error::ErrorInternalServerError("Failed to authenticate FCM")
+    })?;
 
-    let client = reqwest::Client::new();
-    debug!("Sending JWT assertion to FCM token endpoint: {}", service_account.token_uri);
+    let client = fcm_http_client()?;
+    debug!(
+        "Sending JWT assertion to FCM token endpoint: {}",
+        service_account.token_uri
+    );
     let response = client
         .post(&service_account.token_uri)
         .form(&[
@@ -198,9 +217,12 @@ async fn send_fcm_message(
     body: &NotificationBody,
     notification_id: Option<i32>,
 ) -> Result<SendOutcome> {
-    debug!("[FCM] Preparing message for token: {}... (type: {})", 
-        &token[..token.len().min(20)], body.body_type);
-    
+    debug!(
+        "[FCM] Preparing message for token: {}... (type: {})",
+        &token[..token.len().min(20)],
+        body.body_type
+    );
+
     let preview = notification_preview(body);
 
     #[derive(Serialize)]
@@ -238,7 +260,10 @@ async fn send_fcm_message(
 
     let mut data_map = serde_json::Map::new();
     if let Some(route) = &body.route {
-        data_map.insert("route".to_string(), serde_json::Value::String(route.clone()));
+        data_map.insert(
+            "route".to_string(),
+            serde_json::Value::String(route.clone()),
+        );
     }
     if let Some(id) = notification_id {
         data_map.insert(
@@ -288,7 +313,7 @@ async fn send_fcm_message(
     );
 
     debug!("[FCM] Sending to: {}", url);
-    let client = reqwest::Client::new();
+    let client = fcm_http_client()?;
     let response = client
         .post(&url)
         .bearer_auth(access_token)
@@ -301,7 +326,10 @@ async fn send_fcm_message(
         })?;
 
     if response.status().is_success() {
-        info!("[FCM] Message sent successfully to token: {}...", &token[..token.len().min(20)]);
+        info!(
+            "[FCM] Message sent successfully to token: {}...",
+            &token[..token.len().min(20)]
+        );
         return Ok(SendOutcome::Delivered);
     }
 
@@ -310,11 +338,16 @@ async fn send_fcm_message(
     error!("[FCM] Send failed: {} {}", status, body_text);
 
     if body_text.contains("UNREGISTERED") || body_text.contains("NOT_FOUND") {
-        warn!("[FCM] Token is unregistered: {}...", &token[..token.len().min(20)]);
+        warn!(
+            "[FCM] Token is unregistered: {}...",
+            &token[..token.len().min(20)]
+        );
         return Ok(SendOutcome::Unregistered);
     }
 
-    Err(actix_web::error::ErrorInternalServerError("FCM send failed"))
+    Err(actix_web::error::ErrorInternalServerError(
+        "FCM send failed",
+    ))
 }
 
 async fn revoke_token(db: &PgPool, token: &str) {
@@ -333,9 +366,11 @@ pub async fn send_notification_to_user(
     body: &NotificationBody,
     notification_id: Option<i32>,
 ) {
-    debug!("[PUSH] Attempting to send notification to user {} (type: {}, id: {:?})", 
-        user_id, body.body_type, notification_id);
-    
+    debug!(
+        "[PUSH] Attempting to send notification to user {} (type: {}, id: {:?})",
+        user_id, body.body_type, notification_id
+    );
+
     let service_account = match load_service_account() {
         Some(account) => {
             debug!("[PUSH] Service account loaded");
@@ -359,7 +394,10 @@ pub async fn send_notification_to_user(
             values
         }
         Err(err) => {
-            error!("[PUSH] Failed to load push tokens for user {}: {}", user_id, err);
+            error!(
+                "[PUSH] Failed to load push tokens for user {}: {}",
+                user_id, err
+            );
             return;
         }
     };
@@ -381,12 +419,26 @@ pub async fn send_notification_to_user(
     };
 
     for token in tokens {
-        match send_fcm_message(service_account, &access_token, &token, body, notification_id).await {
+        match send_fcm_message(
+            service_account,
+            &access_token,
+            &token,
+            body,
+            notification_id,
+        )
+        .await
+        {
             Ok(SendOutcome::Delivered) => {
-                debug!("[PUSH] Delivered to token: {}...", &token[..token.len().min(20)]);
+                debug!(
+                    "[PUSH] Delivered to token: {}...",
+                    &token[..token.len().min(20)]
+                );
             }
             Ok(SendOutcome::Unregistered) => {
-                warn!("[PUSH] Token unregistered, revoking: {}...", &token[..token.len().min(20)]);
+                warn!(
+                    "[PUSH] Token unregistered, revoking: {}...",
+                    &token[..token.len().min(20)]
+                );
                 revoke_token(db, &token).await;
             }
             Err(err) => {
@@ -403,7 +455,7 @@ pub async fn register_token(
     payload: web::Json<RegisterPushTokenRequest>,
 ) -> Result<HttpResponse> {
     debug!("[PUSH] Registering token, platform: {:?}", payload.platform);
-    
+
     let claims = match verify_token(&req, &app_state) {
         Ok(claims) => {
             debug!("[PUSH] Token verified for user: {}", claims.sub);
@@ -411,7 +463,9 @@ pub async fn register_token(
         }
         Err(_) => {
             error!("[PUSH] Invalid or missing JWT token");
-            return Err(actix_web::error::ErrorUnauthorized("Invalid or missing token"));
+            return Err(actix_web::error::ErrorUnauthorized(
+                "Invalid or missing token",
+            ));
         }
     };
 
@@ -433,7 +487,10 @@ pub async fn register_token(
         .clone()
         .unwrap_or_else(|| "unknown".to_string());
 
-    info!("[PUSH] Registering token for user {} (platform: {})", user_id, platform);
+    info!(
+        "[PUSH] Registering token for user {} (platform: {})",
+        user_id, platform
+    );
 
     sqlx::query(
         r#"
@@ -456,7 +513,10 @@ pub async fn register_token(
         actix_web::error::ErrorInternalServerError("Failed to register push token")
     })?;
 
-    info!("[PUSH] Successfully registered token for user {} (platform: {})", user_id, platform);
+    info!(
+        "[PUSH] Successfully registered token for user {} (platform: {})",
+        user_id, platform
+    );
     Ok(HttpResponse::Ok().json(serde_json::json!({"ok": true})))
 }
 
@@ -469,7 +529,9 @@ pub async fn revoke_token_endpoint(
     let claims = match verify_token(&req, &app_state) {
         Ok(claims) => claims,
         Err(_) => {
-            return Err(actix_web::error::ErrorUnauthorized("Invalid or missing token"));
+            return Err(actix_web::error::ErrorUnauthorized(
+                "Invalid or missing token",
+            ));
         }
     };
 
