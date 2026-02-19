@@ -586,19 +586,22 @@ class FeedPostCard extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             const SizedBox(height: 12),
-            Row(
+            Wrap(
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              spacing: 8,
+              runSpacing: 4,
               children: [
+                TextButton(
+                  onPressed: onOpen,
+                  child: Text(l10n?.feedsReadAndDiscuss ?? 'Read and discuss'),
+                ),
                 Text(
                   l10n?.feedsPostedAt(
                         '${post.createdAt.toLocal()}'.split('.').first,
                       ) ??
                       'Posted ${post.createdAt.toLocal()}'.split('.').first,
                   style: Theme.of(context).textTheme.bodySmall,
-                ),
-                const Spacer(),
-                TextButton(
-                  onPressed: onOpen,
-                  child: Text(l10n?.feedsReadAndDiscuss ?? 'Read and discuss'),
                 ),
               ],
             ),
