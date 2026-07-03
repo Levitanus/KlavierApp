@@ -434,13 +434,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _navigateToPage(Widget page) {
-    setState(() {
-      _currentPage = page;
-      _selectedDrawerIndex = null;
-    });
-  }
-
   void _toggleNotificationsPage() {
     if (_currentPage is NotificationsScreen) {
       final fallbackPage =
