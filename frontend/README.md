@@ -1,27 +1,17 @@
-# Frontend
+# music_school_app_frontend
 
-This folder contains a minimal Flutter scaffold for the music school app.
+A new Flutter project.
 
-To fully initialize the Flutter project locally (if Flutter is installed), run:
+## Getting Started
 
-```bash
-flutter create frontend
-```
+This project is a starting point for a Flutter application.
 
-Or open this folder in an IDE with Flutter support.
+A few resources to get you started if this is your first Flutter project:
 
-## API base URL
+- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
+- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
+- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
 
-The frontend reads `API_BASE_URL` from a Flutter compile-time define.
-
-Examples:
-
-```bash
-flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8080
-```
-
-```bash
-flutter build web --dart-define=API_BASE_URL=https://api.tkazantsev.org
-```
-
-If `API_BASE_URL` is not provided, it falls back to `assets/config.json`.
+For help getting started with Flutter development, view the
+[online documentation](https://docs.flutter.dev/), which offers tutorials,
+samples, guidance on mobile development, and a full API reference.

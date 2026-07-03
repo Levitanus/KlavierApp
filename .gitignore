@@ -6,6 +6,8 @@
 /build/
 /frontend/build/
 /frontend/.gradle/
+/frontend_legacy/build/
+/frontend_legacy/.gradle/
 /backend/target/
 *.log
 node_modules/

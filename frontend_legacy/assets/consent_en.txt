@@ -1,0 +1,5 @@
+By registering and using the app and website, you consent to the processing of your personal data under the following conditions:
+Data is used solely to provide music learning content and operate the service.
+You may edit or delete your profile at any time.
+Data transmission is protected using TLS encryption.
+Data is not shared with third parties, except for email delivery via SendGrid.

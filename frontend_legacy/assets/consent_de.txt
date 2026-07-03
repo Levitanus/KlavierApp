@@ -1,0 +1,5 @@
+Durch die Registrierung und Nutzung der App und Website stimmen Sie der Verarbeitung Ihrer personenbezogenen Daten unter folgenden Bedingungen zu:
+Daten werden ausschliesslich fuer Musiklern-Inhalte und den Betrieb des Dienstes verwendet.
+Sie koennen Ihr Profil jederzeit bearbeiten oder loeschen.
+Die Datenuebertragung ist durch TLS geschuetzt.
+Daten werden nicht an Dritte weitergegeben, ausser fuer E-Mail-Versand ueber SendGrid.

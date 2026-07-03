@@ -1,0 +1,63 @@
+name: music_school_app_frontend
+description: Music school app Flutter frontend
+publish_to: 'none'
+version: 0.1.0
+environment:
+  sdk: ">=3.10.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  flutter_web_plugins:
+    sdk: flutter
+  shared_preferences: ^2.2.2
+  http: ^1.1.2
+  provider: ^6.1.1
+  jwt_decode: ^0.3.1
+  file_picker: ^8.0.0
+  intl: ^0.20.2
+  flutter_quill: ^11.5.0
+  flutter_svg: ^2.0.10
+  web_socket_channel: ^3.0.0
+  just_audio: ^0.9.38
+  audio_session: ^0.1.21
+  video_player: ^2.9.1
+  record: ^6.2.0
+  path_provider: ^2.1.4
+  cached_network_image: ^3.3.1
+  flutter_cache_manager: ^3.3.1
+  firebase_core: ^3.8.0
+  firebase_messaging: ^15.1.2
+  flutter_local_notifications: ^17.2.3
+  web: ^1.1.1
+  google_fonts: ^8.0.2
+
+dev_dependencies:
+  flutter_lints: ^2.0.0
+  flutter_launcher_icons: ^0.14.3
+
+flutter_launcher_icons:
+  image_path: assets/branding/icon_padded.png
+  android: true
+  ios: false
+  web:
+    generate: true
+    image_path: assets/branding/icon_padded.png
+    background_color: "#ffffff"
+    theme_color: "#c4161d"
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: assets/branding/icon_padded.png
+
+
+flutter:
+  uses-material-design: true
+  generate: true
+  assets:
+    - assets/config.json
+    - assets/branding/
+    - assets/consent.txt
+    - assets/consent_de.txt
+    - assets/consent_en.txt
+    - assets/consent_ru.txt
