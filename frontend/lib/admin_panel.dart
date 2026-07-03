@@ -229,8 +229,8 @@ class _AdminPanelState extends _AdminPanelStateBase
   }
 
   Widget _buildUserActions(User user) {
-    final buttonPadding = const EdgeInsets.symmetric(horizontal: 10, vertical: 8);
-    final compactDensity = VisualDensity.compact;
+    const buttonPadding = EdgeInsets.symmetric(horizontal: 10, vertical: 8);
+    const compactDensity = VisualDensity.compact;
     const buttonShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.all(Radius.circular(8)),
     );
@@ -528,7 +528,7 @@ class _AdminPanelState extends _AdminPanelStateBase
           Container(
             padding: EdgeInsets.all(isMobile ? 8.0 : 16.0),
             decoration: BoxDecoration(
-              color: outlineColor.withOpacity(0.12),
+              color: outlineColor.withValues(alpha: 0.12),
               border: Border(
                 top: BorderSide(color: outlineColor),
               ),

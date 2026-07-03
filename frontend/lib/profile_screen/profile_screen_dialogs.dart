@@ -36,6 +36,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<bool> _showLockedConfirmationDialog({
     required String title,
     required String content,
@@ -294,7 +295,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                     controller: groupNameController,
                     decoration: InputDecoration(
                       labelText: l10n?.profileGroupNameLabel ?? 'Group name',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -456,7 +457,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
                     controller: groupNameController,
                     decoration: InputDecoration(
                       labelText: l10n?.profileGroupNameLabel ?? 'Group name',
-                      border: OutlineInputBorder(),
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -1311,6 +1312,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     );
   }
 
+  @override
   void _showMakeStudentDialog() {
     final birthdayController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -1368,6 +1370,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     );
   }
 
+  @override
   void _showMakeParentDialog() async {
     final studentFilterController = TextEditingController();
     final formKey = GlobalKey<FormState>();
@@ -1501,6 +1504,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     );
   }
 
+  @override
   void _showMakeTeacherDialog() {
     showDialog(
       context: context,
@@ -1528,6 +1532,7 @@ mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
     );
   }
 
+  @override
   void _showAddChildrenDialog() async {
     if (_userId == null) return;
     final studentFilterController = TextEditingController();

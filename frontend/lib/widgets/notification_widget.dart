@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import '../services/notification_service.dart';
 import '../models/notification.dart';
@@ -27,6 +26,7 @@ class NotificationBellWidget extends StatelessWidget {
                 if (pushService.isEnabled) {
                   await pushService.requestPermissionAndRegister();
                 }
+                if (!context.mounted) return;
                 _showNotificationsDropdown(context, notificationService);
               },
             ),

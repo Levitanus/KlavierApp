@@ -50,8 +50,6 @@ final ColorScheme _lightColorScheme =
       onError: const Color(0xFFFFFFFF),
       errorContainer: const Color(0xFFF6C7C9),
       onErrorContainer: const Color(0xFF3A0B0D),
-      background: const Color(0xFFFFF6E8),
-      onBackground: const Color(0xFF231F20),
       surface: const Color(0xFFFFFFFF),
       onSurface: const Color(0xFF231F20),
       outline: const Color(0xFFE8DCC7),
@@ -79,8 +77,6 @@ final ColorScheme _darkColorScheme =
       onError: const Color(0xFFFFFFFF),
       errorContainer: const Color(0xFF7A0D12),
       onErrorContainer: const Color(0xFFF7E3E4),
-      background: const Color(0xFF141211),
-      onBackground: const Color(0xFFE9E1D7),
       surface: const Color(0xFF1F1B1A),
       onSurface: const Color(0xFFE9E1D7),
       outline: const Color(0xFF3A3130),
@@ -90,10 +86,10 @@ final ColorScheme _darkColorScheme =
 TextTheme _appTextTheme(Brightness brightness, ColorScheme colorScheme) {
   final base = ThemeData(brightness: brightness, useMaterial3: true).textTheme;
   final bodyColor = brightness == Brightness.dark
-      ? colorScheme.onSurface.withOpacity(0.92)
+    ? colorScheme.onSurface.withValues(alpha: 0.92)
       : colorScheme.onSurface;
   final displayColor = brightness == Brightness.dark
-      ? colorScheme.onSurface.withOpacity(0.88)
+    ? colorScheme.onSurface.withValues(alpha: 0.88)
       : colorScheme.onSurface;
   final themed = GoogleFonts.getTextTheme(
     'Jost',
@@ -418,7 +414,7 @@ class MyApp extends StatelessWidget {
               theme: ThemeData(
                 useMaterial3: true,
                 colorScheme: _lightColorScheme,
-                scaffoldBackgroundColor: _lightColorScheme.background,
+                scaffoldBackgroundColor: _lightColorScheme.surface,
                 dividerColor: _lightColorScheme.outline,
                 textTheme: lightTextTheme,
                 primaryTextTheme: lightTextTheme,
@@ -431,7 +427,7 @@ class MyApp extends StatelessWidget {
               darkTheme: ThemeData(
                 useMaterial3: true,
                 colorScheme: _darkColorScheme,
-                scaffoldBackgroundColor: _darkColorScheme.background,
+                scaffoldBackgroundColor: _darkColorScheme.surface,
                 dividerColor: _darkColorScheme.outline,
                 textTheme: darkTextTheme,
                 primaryTextTheme: darkTextTheme,
@@ -442,7 +438,7 @@ class MyApp extends StatelessWidget {
                 ),
               ),
               themeMode: themeService.themeMode,
-              localizationsDelegates: [
+              localizationsDelegates: const [
                 AppLocalizations.delegate,
                 GlobalMaterialLocalizations.delegate,
                 GlobalWidgetsLocalizations.delegate,

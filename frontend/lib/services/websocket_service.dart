@@ -97,12 +97,12 @@ class WebSocketService extends ChangeNotifier {
 
     _isConnecting = true;
     if (kDebugMode) {
-      print('WebSocket connecting to $serverUrl');
+      debugPrint('WebSocket connecting to $serverUrl');
     }
     _safeNotifyListeners();
 
     try {
-      final wsUrl = serverUrl.replaceFirst('http', 'ws') + '/ws';
+      final wsUrl = '${serverUrl.replaceFirst('http', 'ws')}/ws';
       final wsUri = Uri.parse(wsUrl);
       final wsUriWithToken = token.isNotEmpty
           ? wsUri.replace(queryParameters: {
@@ -120,7 +120,7 @@ class WebSocketService extends ChangeNotifier {
           _handleDisconnection();
         },
         onError: (error) {
-          print('WebSocket error: $error');
+          debugPrint('WebSocket error: $error');
           _handleDisconnection();
         },
       );
@@ -132,13 +132,13 @@ class WebSocketService extends ChangeNotifier {
       _notifyConnectionListeners(true);
 
       if (kDebugMode) {
-        print('WebSocket connected');
+        debugPrint('WebSocket connected');
       }
       _flushPendingMessages();
       return true;
     } catch (e) {
       if (kDebugMode) {
-        print('Failed to connect to WebSocket: $e');
+        debugPrint('Failed to connect to WebSocket: $e');
       }
       _isConnecting = false;
       _isConnected = false;
@@ -173,7 +173,7 @@ class WebSocketService extends ChangeNotifier {
     }
     if (!_isConnected || _channel == null) {
       if (kDebugMode) {
-        print('WebSocket not connected, message not sent: ${message.msgType}');
+        debugPrint('WebSocket not connected, message not sent: ${message.msgType}');
       }
       _enqueueMessage(message);
       return;
@@ -183,11 +183,11 @@ class WebSocketService extends ChangeNotifier {
       final json = jsonEncode(message.toJson());
       _channel?.sink.add(json);
       if (kDebugMode) {
-        print('WebSocket sent: ${message.msgType}');
+        debugPrint('WebSocket sent: ${message.msgType}');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error sending WebSocket message: $e');
+        debugPrint('Error sending WebSocket message: $e');
       }
       _handleDisconnection();
       _enqueueMessage(message);
@@ -271,11 +271,11 @@ class WebSocketService extends ChangeNotifier {
       }
 
       if (kDebugMode) {
-        print('WebSocket message received: ${message.msgType}');
+        debugPrint('WebSocket message received: ${message.msgType}');
       }
     } catch (e) {
       if (kDebugMode) {
-        print('Error handling WebSocket message: $e');
+        debugPrint('Error handling WebSocket message: $e');
       }
     }
   }
@@ -289,7 +289,7 @@ class WebSocketService extends ChangeNotifier {
     _safeNotifyListeners();
     _notifyConnectionListeners(false);
     if (kDebugMode) {
-      print('WebSocket disconnected');
+      debugPrint('WebSocket disconnected');
     }
     _scheduleReconnect();
   }
@@ -299,7 +299,7 @@ class WebSocketService extends ChangeNotifier {
     if (_isDisposed) return;
     if (_reconnectAttempts >= _maxReconnectAttempts) {
       if (kDebugMode) {
-        print('Max reconnection attempts reached');
+        debugPrint('Max reconnection attempts reached');
       }
       return;
     }
@@ -308,7 +308,9 @@ class WebSocketService extends ChangeNotifier {
     _reconnectTimer = Timer(_reconnectDelay, () {
       if (_isDisposed) return;
       _reconnectAttempts++;
-      print('Attempting to reconnect... (${_reconnectAttempts}/$_maxReconnectAttempts)');
+      if (kDebugMode) {
+        debugPrint('Attempting to reconnect... ($_reconnectAttempts/$_maxReconnectAttempts)');
+      }
       connect();
     });
   }

@@ -385,7 +385,7 @@ class ChatService extends ChangeNotifier {
       _updateThreadPreview(threadId, newMessage, incrementUnread: !isOwn);
       notifyListeners();
     } catch (e) {
-      print('Error handling new message: $e');
+      debugPrint('Error handling new message: $e');
     }
   }
 
@@ -457,7 +457,7 @@ class ChatService extends ChangeNotifier {
 
       notifyListeners();
     } catch (e) {
-      print('Error handling message update: $e');
+      debugPrint('Error handling message update: $e');
     }
   }
 
@@ -635,7 +635,7 @@ class ChatService extends ChangeNotifier {
         }
       }
     } catch (e) {
-      print('Error handling receipt update: $e');
+      debugPrint('Error handling receipt update: $e');
     }
   }
 
@@ -758,7 +758,7 @@ class ChatService extends ChangeNotifier {
         final updated = ChatMessage.fromJson(json.decode(response.body));
         final entry = messagesByThread.entries.firstWhere(
           (entry) => entry.value.any((message) => message.id == messageId),
-          orElse: () => MapEntry(-1, []),
+          orElse: () => const MapEntry(-1, []),
         );
 
         if (entry.key != -1) {
@@ -981,10 +981,10 @@ class ChatService extends ChangeNotifier {
       );
 
       if (response.statusCode != 200) {
-        print('Failed to update receipt: ${response.statusCode}');
+        debugPrint('Failed to update receipt: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error updating receipt: $e');
+      debugPrint('Error updating receipt: $e');
     }
   }
 

@@ -139,6 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     final localeCode = Localizations.localeOf(context).languageCode;
     final consentText = await _loadConsentText(localeCode);
+    if (!mounted) return;
     bool consentAccepted = false;
 
     await showDialog<void>(
@@ -197,7 +198,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<String> _loadConsentText(String localeCode) async {
     try {
-      final localizedPath = 'assets/consent_${localeCode}.txt';
+      final localizedPath = 'assets/consent_$localeCode.txt';
       String text;
       try {
         text = await rootBundle.loadString(localizedPath);
@@ -341,10 +342,13 @@ class _HomeScreenState extends State<HomeScreen> {
     if (confirmed != true || !mounted) return;
 
     final authService = context.read<AuthService>();
+    final feedService = context.read<FeedService>();
+    final hometaskService = context.read<HometaskService>();
+    final chatService = context.read<ChatService>();
     await AppDataCacheService.instance.clearUserData(authService.userId);
-    context.read<FeedService>().clearLocalCache();
-    context.read<HometaskService>().clearLocalCache();
-    context.read<ChatService>().clearLocalCache();
+    feedService.clearLocalCache();
+    hometaskService.clearLocalCache();
+    chatService.clearLocalCache();
 
     setState(() {
       _drawerUsername = null;
@@ -693,28 +697,28 @@ class _HomeScreenState extends State<HomeScreen> {
         onTap: _navigateToTab,
         items: [
           BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard_outlined),
-            activeIcon: Icon(Icons.dashboard),
+            icon: const Icon(Icons.dashboard_outlined),
+            activeIcon: const Icon(Icons.dashboard),
             label: l10n?.commonDashboard ?? 'Dashboard',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.checklist),
-            activeIcon: Icon(Icons.checklist),
+            icon: const Icon(Icons.checklist),
+            activeIcon: const Icon(Icons.checklist),
             label: l10n?.commonHometasks ?? 'Hometasks',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.dynamic_feed_outlined),
-            activeIcon: Icon(Icons.dynamic_feed),
+            icon: const Icon(Icons.dynamic_feed_outlined),
+            activeIcon: const Icon(Icons.dynamic_feed),
             label: l10n?.commonFeeds ?? 'Feeds',
           ),
           BottomNavigationBarItem(
-            icon: _ChatNavIcon(active: false),
-            activeIcon: _ChatNavIcon(active: true),
+            icon: const _ChatNavIcon(active: false),
+            activeIcon: const _ChatNavIcon(active: true),
             label: l10n?.commonChats ?? 'Chats',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_outline),
-            activeIcon: Icon(Icons.person),
+            icon: const Icon(Icons.person_outline),
+            activeIcon: const Icon(Icons.person),
             label: l10n?.commonProfile ?? 'Profile',
           ),
         ],

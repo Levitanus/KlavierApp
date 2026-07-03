@@ -1,8 +1,6 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_quill/flutter_quill.dart' as quill;
 import 'package:file_picker/file_picker.dart';
 import 'package:provider/provider.dart';
@@ -275,6 +273,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final file = result.files.first;
     final bytes = file.bytes;
     if (bytes == null) return;
+    if (!mounted) return;
 
     setState(() {
       _isUploadingAttachment = true;
@@ -451,13 +450,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         }
 
         if (messages.isEmpty && !chatService.isLoading) {
-          return Center(
+          return const Center(
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.mail_outline, size: 64, color: Colors.grey),
-                const SizedBox(height: 16),
-                const Text('No messages yet'),
+                Icon(Icons.mail_outline, size: 64, color: Colors.grey),
+                SizedBox(height: 16),
+                Text('No messages yet'),
               ],
             ),
           );

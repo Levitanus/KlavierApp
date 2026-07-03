@@ -1030,6 +1030,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         if (success && context.mounted) {
                           Navigator.of(context).pop();
                           await _loadHometasks();
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -1330,6 +1331,8 @@ class _HometasksScreenState extends State<HometasksScreen> {
                           applyToGroup = decision;
                         }
 
+                        if (!context.mounted) return;
+
                         final hometaskService = context.read<HometaskService>();
                         final success = await hometaskService.updateHometask(
                           hometaskId: hometask.id,
@@ -1349,6 +1352,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         if (success && context.mounted) {
                           Navigator.of(context).pop();
                           await _loadHometasks();
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -1473,6 +1477,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
                         if (success && context.mounted) {
                           Navigator.of(context).pop();
                           await _loadHometasks();
+                          if (!context.mounted) return;
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(
@@ -1557,6 +1562,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
     final file = result.files.first;
     final bytes = file.bytes;
     if (bytes == null) return;
+    if (!mounted) return;
 
     final feedService = context.read<FeedService>();
     final uploaded = await feedService.uploadMedia(
@@ -1708,6 +1714,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
 
     if (!success && mounted) {
       await _loadHometasks();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -1787,6 +1794,7 @@ class _HometasksScreenState extends State<HometasksScreen> {
 
     if (!success && mounted) {
       await _loadHometasks();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

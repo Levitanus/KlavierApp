@@ -1,6 +1,7 @@
 part of '../admin_panel.dart';
 
 mixin _AdminPanelData on _AdminPanelStateBase {
+  @override
   Future<void> _loadUsers() async {
     setState(() {
       _isLoading = true;

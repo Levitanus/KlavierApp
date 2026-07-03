@@ -1,6 +1,7 @@
 part of '../admin_panel.dart';
 
 mixin _AdminPanelActions on _AdminPanelStateBase {
+  @override
   Future<void> _saveUser({
     int? userId,
     required String username,
@@ -195,6 +196,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     }
   }
 
+  @override
   Future<void> _deleteUser(User user) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
@@ -243,7 +245,8 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     }
   }
 
-    Future<void> _makeUserStudent(
+    @override
+  Future<void> _makeUserStudent(
       int userId, String birthday) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
@@ -297,6 +300,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     }
   }
 
+  @override
   Future<void> _makeUserParent(
       int userId, List<int> studentIds) async {
     try {
@@ -351,6 +355,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     }
   }
 
+  @override
   Future<void> _makeUserTeacher(int userId) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
@@ -402,7 +407,8 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     }
   }
 
-    Future<void> _createStudent(String username, String password, String? email,
+    @override
+  Future<void> _createStudent(String username, String password, String? email,
       String? phone, String fullName, String birthday) async {
     try {
       final authService = Provider.of<AuthService>(context, listen: false);
@@ -461,6 +467,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     }
   }
 
+  @override
   Future<void> _createParent(String username, String password, String? email,
       String? phone, String fullName, List<int> studentIds) async {
     try {
@@ -520,6 +527,7 @@ mixin _AdminPanelActions on _AdminPanelStateBase {
     }
   }
 
+  @override
   Future<void> _createTeacher(String username, String password, String? email,
       String? phone, String fullName) async {
     try {

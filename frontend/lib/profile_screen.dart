@@ -349,8 +349,6 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                   ),
                   const Divider(),
                   const SizedBox(height: 16),
-
-                  // Username (read-only)
                   _buildProfileField(
                     label: l10n?.commonUsername ?? 'Username',
                     value: _username,
@@ -1355,7 +1353,7 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                     const Divider(),
                     const SizedBox(height: 8),
                     DropdownButtonFormField<String>(
-                      value: localeService.locale?.languageCode ?? 'de',
+                      initialValue: localeService.locale?.languageCode ?? 'de',
                       decoration: const InputDecoration(
                         border: OutlineInputBorder(),
                       ),

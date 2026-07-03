@@ -182,7 +182,7 @@ Widget _buildVideoPreviewEmbed(
   required String url,
   required bool showMenu,
 }) {
-  final isWeb = kIsWeb;
+    const isWeb = kIsWeb;
   
   return GestureDetector(
     onTap: () {
@@ -250,8 +250,8 @@ Widget _buildVideoPreviewEmbed(
             ),
           ),
           // Play icon overlay
-          Container(
-            decoration: BoxDecoration(
+            Container(
+              decoration: const BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.black54,
             ),

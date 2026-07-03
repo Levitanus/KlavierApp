@@ -566,7 +566,7 @@ class _HometaskWidgetState extends State<HometaskWidget> {
                               context,
                             )?.hometasksItemHint(index + 1) ??
                             'Item ${index + 1}',
-                        border: OutlineInputBorder(),
+                          border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 4,

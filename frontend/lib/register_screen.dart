@@ -87,7 +87,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _loadConsentText(String localeCode) async {
     try {
-      final localizedPath = 'assets/consent_${localeCode}.txt';
+      final localizedPath = 'assets/consent_$localeCode.txt';
       String text;
       try {
         text = await rootBundle.loadString(localizedPath);
@@ -212,6 +212,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
       if (response.statusCode == 201) {
         // Registration successful
+        if (!mounted) return;
         final authService = Provider.of<AuthService>(context, listen: false);
 
         final prefs = await SharedPreferences.getInstance();

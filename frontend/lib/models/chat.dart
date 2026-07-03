@@ -91,7 +91,7 @@ class ChatMessage {
         selection: const TextSelection.collapsed(offset: 0),
       );
     } catch (e) {
-      print('Error creating QuillController: $e');
+      debugPrint('Error creating QuillController: $e');
       return quill.QuillController.basic();
     }
   }

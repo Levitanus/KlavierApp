@@ -104,7 +104,7 @@ class _FeedsScreenState extends State<FeedsScreen> {
             if (isLoading) const LinearProgressIndicator(),
             if (!isLoading && feeds.isEmpty)
               Padding(
-                padding: EdgeInsets.symmetric(vertical: 24),
+                padding: const EdgeInsets.symmetric(vertical: 24),
                 child: Text(l10n?.feedsNone ?? 'No feeds available'),
               ),
             if (schoolFeeds.isNotEmpty) ...[
@@ -569,7 +569,7 @@ class FeedPostCard extends StatelessWidget {
                             colors: [
                               Theme.of(
                                 context,
-                              ).colorScheme.surface.withOpacity(0),
+                              ).colorScheme.surface.withValues(alpha: 0),
                               Theme.of(context).colorScheme.surface,
                             ],
                           ),
@@ -768,6 +768,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     );
 
     if (confirmed != true) return;
+    if (!mounted) return;
 
     setState(() {
       _isDeleting = true;
@@ -1188,6 +1189,7 @@ class _FeedPostDetailScreenState extends State<FeedPostDetailScreen> {
     );
 
     if (confirmed != true) return;
+    if (!mounted) return;
 
     final service = context.read<FeedService>();
     final success = await service.deleteComment(_post.id, comment.id);
@@ -1461,6 +1463,7 @@ class _FeedPostEditorState extends State<FeedPostEditor> {
     final file = result.files.first;
     final bytes = file.bytes;
     if (bytes == null) return;
+    if (!mounted) return;
 
     setState(() {
       _isUploadingAttachment = true;
@@ -2247,6 +2250,7 @@ class _FeedPostComposerState extends State<FeedPostComposer> {
     final file = result.files.first;
     final bytes = file.bytes;
     if (bytes == null) return;
+    if (!mounted) return;
 
     setState(() {
       _isUploadingAttachment = true;
@@ -3161,6 +3165,7 @@ class _FeedCommentComposerState extends State<FeedCommentComposer> {
     final file = result.files.first;
     final bytes = file.bytes;
     if (bytes == null) return;
+    if (!mounted) return;
 
     setState(() {
       _isUploadingAttachment = true;

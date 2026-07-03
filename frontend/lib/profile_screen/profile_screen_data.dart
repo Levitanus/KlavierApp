@@ -36,6 +36,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _loadProfile() async {
     setState(() {
       _isLoading = true;
@@ -490,6 +491,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     });
   }
 
+  @override
   Future<void> _pickImage() async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -512,6 +514,8 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
         }
         return;
       }
+
+      if (!mounted) return;
 
       final authService = Provider.of<AuthService>(context, listen: false);
       final token = authService.token;
@@ -576,10 +580,10 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        print('Upload response: $data');
+        debugPrint('Upload response: $data');
         setState(() {
           _profileImage = '${_ProfileScreenStateBase._baseUrl}${data['url']}';
-          print('New profile image URL: $_profileImage');
+          debugPrint('New profile image URL: $_profileImage');
         });
 
         if (mounted) {
@@ -615,6 +619,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _removeImage() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     final token = authService.token;
@@ -718,8 +723,8 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
             : _ProfileScreenStateBase._baseUrl;
         final registrationLink = '$origin/register?token=$registrationToken';
 
-        print('DEBUG - Registration link origin: $origin');
-        print('DEBUG - Full registration link: $registrationLink');
+        debugPrint('DEBUG - Registration link origin: $origin');
+        debugPrint('DEBUG - Full registration link: $registrationLink');
 
         if (mounted) {
           showDialog(
@@ -876,6 +881,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     } catch (_) {}
   }
 
+  @override
   Future<List<Map<String, dynamic>>> _fetchTeacherStudents(
     int teacherId,
   ) async {
@@ -906,6 +912,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     return [];
   }
 
+  @override
   Future<List<Map<String, dynamic>>> _fetchStudentTeachers(
     int studentId,
   ) async {
@@ -946,6 +953,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<List<Map<String, dynamic>>> _fetchStudentParents(int studentId) async {
     final authService = Provider.of<AuthService>(context, listen: false);
     final token = authService.token;
@@ -974,6 +982,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     return [];
   }
 
+  @override
   Future<void> _addStudentsToTeacher(List<int> studentIds) async {
     if (_userId == null || studentIds.isEmpty) return;
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -1017,6 +1026,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _createTeacherGroup(String name, List<int> studentIds) async {
     if (_userId == null || name.trim().isEmpty || studentIds.isEmpty) return;
 
@@ -1065,6 +1075,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _updateTeacherGroup({
     required int groupId,
     String? name,
@@ -1131,6 +1142,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _deleteTeacherGroup(int groupId) async {
     if (_userId == null) return;
 
@@ -1189,6 +1201,8 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
 
     if (!confirmed) return;
 
+    if (!mounted) return;
+
     final authService = Provider.of<AuthService>(context, listen: false);
 
     try {
@@ -1222,6 +1236,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _removeTeacherFromStudent(int studentId, int teacherId) async {
     final confirmed = await _showLockedConfirmationDialog(
       title: 'Leave teacher',
@@ -1230,6 +1245,8 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     );
 
     if (!confirmed) return;
+
+    if (!mounted) return;
 
     final authService = Provider.of<AuthService>(context, listen: false);
 
@@ -1410,6 +1427,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _updateAdminRole() async {
     if (_userId == null) return;
 
@@ -1476,6 +1494,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   bool _isRoleArchived(String role) {
     return _statusForRole(role)?.toLowerCase() == 'archived';
   }
@@ -1493,6 +1512,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _toggleRoleArchive(String role) async {
     if (_userId == null) return;
 
@@ -1525,6 +1545,8 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     );
 
     if (confirmed != true) return;
+
+    if (!mounted) return;
 
     final url = _roleArchiveUrl(role, _userId!, archive: archive);
     if (url == null) return;
@@ -1568,6 +1590,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _makeUserStudent(String birthday) async {
     if (_userId == null) return;
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -1608,6 +1631,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _makeUserParent(List<int> studentIds) async {
     if (_userId == null) return;
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -1648,6 +1672,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _makeUserTeacher() async {
     if (_userId == null) return;
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -1688,6 +1713,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<List<StudentInfo>> _loadStudentsForSelection() async {
     final authService = Provider.of<AuthService>(context, listen: false);
     final token = authService.token;
@@ -1779,6 +1805,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _addChildrenToParent(List<int> studentIds) async {
     if (_userId == null || studentIds.isEmpty) return;
     final authService = Provider.of<AuthService>(context, listen: false);
@@ -1822,6 +1849,7 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
   Future<void> _updateChildData(
     int childUserId,
     String fullName,

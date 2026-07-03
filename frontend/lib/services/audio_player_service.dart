@@ -37,7 +37,7 @@ class AudioPlayerService extends ChangeNotifier {
       await _player.play();
       notifyListeners();
     } catch (e) {
-      print('Error playing audio: $e');
+      debugPrint('Error playing audio: $e');
       _currentUrl = null;
       _currentLabel = null;
       notifyListeners();
@@ -70,6 +70,7 @@ class AudioPlayerService extends ChangeNotifier {
 
   @override
   void dispose() {
-    // Intentionally left empty to avoid disposing the singleton.
+    // Keep the singleton alive, but still honor ChangeNotifier contract.
+    super.dispose();
   }
 }

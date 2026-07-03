@@ -349,6 +349,7 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
     );
   }
 
+  @override
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Row(
       children: [
@@ -367,6 +368,7 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
     );
   }
 
+  @override
   Widget _buildChildAvatar(
     String? profileImage,
     String fullName,
