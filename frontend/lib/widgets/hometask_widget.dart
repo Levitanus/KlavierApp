@@ -725,14 +725,8 @@ class _ReadOnlyQuillContentState extends State<_ReadOnlyQuillContent> {
         showCursor: false,
         expands: false,
         padding: EdgeInsets.zero,
-        embedBuilders: [
-          ImageEmbedBuilder(),
-          VideoEmbedBuilder(),
-          AudioEmbedBuilder(),
-          VoiceEmbedBuilder(),
-          FileEmbedBuilder(),
-        ],
-        unknownEmbedBuilder: UnknownEmbedBuilder(),
+        embedBuilders: defaultQuillEmbedBuilders(),
+        unknownEmbedBuilder: defaultUnknownEmbedBuilder(),
       ),
     );
   }

@@ -491,14 +491,8 @@ class _QuillEditorComposerState extends State<QuillEditorComposer> {
                           config: quill.QuillEditorConfig(
                             contextMenuBuilder: _buildEditorContextMenu,
                             padding: EdgeInsets.zero,
-                            embedBuilders: [
-                              ImageEmbedBuilder(),
-                              VideoEmbedBuilder(),
-                              AudioEmbedBuilder(),
-                              VoiceEmbedBuilder(),
-                              FileEmbedBuilder(),
-                            ],
-                            unknownEmbedBuilder: UnknownEmbedBuilder(),
+                            embedBuilders: defaultQuillEmbedBuilders(),
+                            unknownEmbedBuilder: defaultUnknownEmbedBuilder(),
                           ),
                         ),
                       ),
