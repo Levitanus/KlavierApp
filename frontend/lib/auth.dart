@@ -190,7 +190,47 @@ class AuthService extends ChangeNotifier {
 
   /// Logout and remove token
   Future<void> logout() async {
+    if (_token != null && _token!.isNotEmpty) {
+      try {
+        await http.post(
+          Uri.parse('$_baseUrl/api/auth/logout'),
+          headers: {
+            'Authorization': 'Bearer $_token',
+            'Content-Type': 'application/json',
+          },
+        );
+      } catch (e) {
+        if (kDebugMode) {
+          print('Backend logout error: $e');
+        }
+      }
+    }
+
     await _removeToken();
+  }
+
+  /// Revoke all sessions except the current device.
+  Future<bool> logoutOtherDevices() async {
+    if (_token == null || _token!.isEmpty) {
+      return false;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse('$_baseUrl/api/auth/logout-other-devices'),
+        headers: {
+          'Authorization': 'Bearer $_token',
+          'Content-Type': 'application/json',
+        },
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      if (kDebugMode) {
+        print('Logout other devices error: $e');
+      }
+      return false;
+    }
   }
 
   /// Check if the stored token is still valid (optional: you can implement token validation)

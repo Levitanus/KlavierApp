@@ -121,11 +121,15 @@ abstract class _ProfileScreenStateBase extends State<ProfileScreen> {
   Future<List<Map<String, dynamic>>> _fetchTeacherStudents(int teacherId);
   Future<List<Map<String, dynamic>>> _fetchStudentTeachers(int studentId);
   Future<List<Map<String, dynamic>>> _fetchStudentParents(int studentId);
+  Future<void> _logoutCurrentDevice();
+  Future<void> _logoutOtherDevices();
   Future<bool> _showLockedConfirmationDialog({
     required String title,
     required String content,
     required String confirmLabel,
   });
+  void _showLogoutCurrentDeviceDialog();
+  void _showLogoutOtherDevicesDialog();
   void _showMakeStudentDialog();
   void _showMakeParentDialog();
   void _showMakeTeacherDialog();
@@ -493,6 +497,11 @@ class _ProfileScreenState extends _ProfileScreenStateBase
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+          ],
+
+          if (!_isAdminView) ...[
+            _buildSessionManagementCard(),
             const SizedBox(height: 16),
           ],
 

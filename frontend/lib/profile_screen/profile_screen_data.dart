@@ -359,6 +359,39 @@ mixin _ProfileScreenData on _ProfileScreenStateBase {
     }
   }
 
+  @override
+  Future<void> _logoutCurrentDevice() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    await authService.logout();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('You have been logged out from this device'),
+      ),
+    );
+  }
+
+  @override
+  Future<void> _logoutOtherDevices() async {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final success = await authService.logoutOtherDevices();
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? 'Logged out from all other devices'
+              : 'Failed to logout from other devices',
+        ),
+        backgroundColor: success ? Colors.green : null,
+      ),
+    );
+  }
+
   Future<void> _saveAdminProfile(String token) async {
     if (_userId == null) {
       setState(() {

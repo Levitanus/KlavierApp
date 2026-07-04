@@ -126,6 +126,52 @@ mixin _ProfileScreenWidgets on _ProfileScreenStateBase {
     );
   }
 
+  Widget _buildSessionManagementCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Session Management',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const Divider(),
+            const SizedBox(height: 8),
+            Text(
+              'Manage active logins on this and other devices.',
+              style: TextStyle(color: Colors.grey[700]),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: (_isSaving || _isEditing)
+                      ? null
+                      : _showLogoutOtherDevicesDialog,
+                  icon: const Icon(Icons.devices_other),
+                  label: const Text('Logout Other Devices'),
+                ),
+                FilledButton.tonalIcon(
+                  onPressed: (_isSaving || _isEditing)
+                      ? null
+                      : _showLogoutCurrentDeviceDialog,
+                  icon: const Icon(Icons.logout),
+                  label: Text(
+                    AppLocalizations.of(context)?.commonLogout ?? 'Logout',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildAdminControlsCard() {
     final hasUserId = _userId != null;
     final canUpdate = !_isSaving && hasUserId;

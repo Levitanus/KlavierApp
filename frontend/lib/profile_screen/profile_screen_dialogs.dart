@@ -1,6 +1,34 @@
 part of '../profile_screen.dart';
 
 mixin _ProfileScreenDialogs on _ProfileScreenStateBase {
+  @override
+  void _showLogoutCurrentDeviceDialog() async {
+    final l10n = AppLocalizations.of(context);
+    final confirmed = await _showLockedConfirmationDialog(
+      title: l10n?.homeLogoutTitle ?? 'Logout',
+      content:
+          l10n?.homeLogoutBody ??
+          'Are you sure you want to logout from this device?',
+      confirmLabel: l10n?.commonLogout ?? 'Logout',
+    );
+
+    if (!confirmed || !mounted) return;
+    await _logoutCurrentDevice();
+  }
+
+  @override
+  void _showLogoutOtherDevicesDialog() async {
+    final confirmed = await _showLockedConfirmationDialog(
+      title: 'Logout Other Devices',
+      content:
+          'This will end sessions on all other devices and keep this device logged in. Continue?',
+      confirmLabel: 'Logout Others',
+    );
+
+    if (!confirmed || !mounted) return;
+    await _logoutOtherDevices();
+  }
+
   Future<void> _startChatWithUser(int userId, String userName) async {
     final chatService = Provider.of<ChatService>(context, listen: false);
 

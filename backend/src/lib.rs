@@ -67,17 +67,10 @@ async fn ws_endpoint(
     }
 
     if let Some(token) = token {
-        // Verify token and get user_id
-        use jsonwebtoken::{decode, DecodingKey, Validation};
-        let decoding_key = DecodingKey::from_secret(app_state.jwt_secret.as_bytes());
-
-        if let Ok(token_data) =
-            decode::<users::Claims>(&token, &decoding_key, &Validation::default())
-        {
-            // Query database to get user_id from username
-            let username = &token_data.claims.sub;
+        if let Ok(claims) = users::verify_token_from_raw(&token, &app_state) {
+            let username = claims.sub;
             match sqlx::query_scalar::<_, i32>("SELECT id FROM users WHERE username = $1")
-                .bind(username)
+                .bind(&username)
                 .fetch_optional(&app_state.db)
                 .await
             {

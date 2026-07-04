@@ -7,9 +7,14 @@ use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation}
 use log::error;
 use serde::{Deserialize, Serialize};
 use sqlx::{FromRow, PgPool};
+use uuid::Uuid;
 
 use crate::storage::{MediaError, MediaService};
 use crate::{password_reset, AppState};
+
+const SESSION_IDLE_TIMEOUT_DAYS: i64 = 90;
+const JWT_EXP_YEARS: i64 = 10;
+const MAX_ACTIVE_SESSIONS_PER_USER: i64 = 5;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct LoginRequest {
@@ -32,31 +37,46 @@ pub struct Claims {
     pub sub: String,        // username
     pub exp: usize,         // expiration time
     pub roles: Vec<String>, // user roles
+    pub jti: Option<String>,
+}
+
+fn extract_bearer_token(req: &HttpRequest) -> Result<&str, HttpResponse> {
+    let auth_header = req.headers().get("Authorization");
+
+    match auth_header {
+        Some(header) => {
+            let header_str = header.to_str().unwrap_or("");
+            if header_str.starts_with("Bearer ") {
+                Ok(&header_str[7..])
+            } else {
+                Err(HttpResponse::Unauthorized().json(serde_json::json!({
+                    "error": "Invalid authorization header"
+                })))
+            }
+        }
+        None => Err(HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "Missing authorization header"
+        }))),
+    }
+}
+
+fn hash_login_token(token: &str) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut hasher = Sha256::new();
+    hasher.update(token.as_bytes());
+    format!("{:x}", hasher.finalize())
 }
 
 /// Extract and validate JWT token from request
 /// Returns Claims if valid, or an error HttpResponse
 pub fn verify_token(req: &HttpRequest, app_state: &AppState) -> Result<Claims, HttpResponse> {
-    let auth_header = req.headers().get("Authorization");
+    let token = extract_bearer_token(req)?;
 
-    let token = match auth_header {
-        Some(header) => {
-            let header_str = header.to_str().unwrap_or("");
-            if header_str.starts_with("Bearer ") {
-                &header_str[7..]
-            } else {
-                return Err(HttpResponse::Unauthorized().json(serde_json::json!({
-                    "error": "Invalid authorization header"
-                })));
-            }
-        }
-        None => {
-            return Err(HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Missing authorization header"
-            })));
-        }
-    };
+    verify_token_from_raw(token, app_state)
+}
 
+pub fn verify_token_from_raw(token: &str, app_state: &AppState) -> Result<Claims, HttpResponse> {
     let claims = match decode::<Claims>(
         token,
         &DecodingKey::from_secret(app_state.jwt_secret.as_ref()),
@@ -69,6 +89,65 @@ pub fn verify_token(req: &HttpRequest, app_state: &AppState) -> Result<Claims, H
             })));
         }
     };
+
+    let token_hash = hash_login_token(token);
+    let username = claims.sub.clone();
+    let db = app_state.db.clone();
+    let runtime_handle = match tokio::runtime::Handle::try_current() {
+        Ok(handle) => handle,
+        Err(e) => {
+            error!("Runtime handle is unavailable while validating token: {}", e);
+            return Err(HttpResponse::Unauthorized().json(serde_json::json!({
+                "error": "Invalid token"
+            })));
+        }
+    };
+
+    let session_valid = tokio::task::block_in_place(|| {
+        runtime_handle.block_on(async move {
+            let session_id = sqlx::query_scalar::<_, i64>(
+                "SELECT ls.id
+                   FROM login_sessions ls
+                   INNER JOIN users u ON u.id = ls.user_id
+                  WHERE ls.token_hash = $1
+                    AND u.username = $2
+                    AND ls.revoked_at IS NULL
+                                        AND ls.last_used_at > NOW() - ($3::text || ' days')::interval
+                  LIMIT 1",
+            )
+            .bind(&token_hash)
+            .bind(&username)
+                        .bind(SESSION_IDLE_TIMEOUT_DAYS)
+            .fetch_optional(&db)
+            .await;
+
+            match session_id {
+                Ok(Some(id)) => {
+                    let _ = sqlx::query(
+                        "UPDATE login_sessions
+                            SET last_used_at = NOW()
+                          WHERE id = $1
+                            AND last_used_at < NOW() - INTERVAL '12 hours'",
+                    )
+                    .bind(id)
+                    .execute(&db)
+                    .await;
+                    true
+                }
+                Ok(None) => false,
+                Err(e) => {
+                    error!("Database error while validating session: {}", e);
+                    false
+                }
+            }
+        })
+    });
+
+    if !session_valid {
+        return Err(HttpResponse::Unauthorized().json(serde_json::json!({
+            "error": "Invalid token"
+        })));
+    }
 
     Ok(claims)
 }
@@ -191,9 +270,10 @@ async fn login(
         });
     }
 
-    // Generate JWT token
+    // Generate long-lived JWT token. Session revocation and idle cleanup are controlled in DB.
+    let session_id = Uuid::new_v4().to_string();
     let expiration = Utc::now()
-        .checked_add_signed(Duration::hours(24))
+        .checked_add_signed(Duration::days(365 * JWT_EXP_YEARS))
         .expect("valid timestamp")
         .timestamp() as usize;
 
@@ -201,6 +281,7 @@ async fn login(
         sub: user.username.clone(),
         exp: expiration,
         roles,
+        jti: Some(session_id),
     };
 
     let token = match encode(
@@ -217,7 +298,125 @@ async fn login(
         }
     };
 
+    let token_hash = hash_login_token(&token);
+    if let Err(e) = sqlx::query(
+        "INSERT INTO login_sessions (user_id, token_hash)
+         VALUES ($1, $2)",
+    )
+    .bind(user.id)
+    .bind(&token_hash)
+    .execute(&app_state.db)
+    .await
+    {
+        error!("Failed to create login session: {}", e);
+        return HttpResponse::InternalServerError().json(ErrorResponse {
+            error: "Could not generate token".to_string(),
+        });
+    }
+
+    if let Err(e) = sqlx::query(
+        "DELETE FROM login_sessions
+          WHERE user_id = $1
+            AND revoked_at IS NULL
+            AND id NOT IN (
+                SELECT id
+                  FROM login_sessions
+                 WHERE user_id = $1
+                   AND revoked_at IS NULL
+                 ORDER BY last_used_at DESC, id DESC
+                                 LIMIT $2
+            )",
+    )
+    .bind(user.id)
+        .bind(MAX_ACTIVE_SESSIONS_PER_USER)
+    .execute(&app_state.db)
+    .await
+    {
+        error!("Failed to prune old login sessions: {}", e);
+    }
+
     HttpResponse::Ok().json(LoginResponse { token })
+}
+
+#[post("/logout")]
+async fn logout(app_state: web::Data<AppState>, req: HttpRequest) -> impl Responder {
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let token = match extract_bearer_token(&req) {
+        Ok(token) => token,
+        Err(response) => return response,
+    };
+
+    let token_hash = hash_login_token(token);
+
+    if let Err(e) = sqlx::query(
+        "UPDATE login_sessions ls
+            SET revoked_at = NOW()
+           FROM users u
+          WHERE ls.user_id = u.id
+            AND u.username = $1
+            AND ls.token_hash = $2
+            AND ls.revoked_at IS NULL",
+    )
+    .bind(&claims.sub)
+    .bind(token_hash)
+    .execute(&app_state.db)
+    .await
+    {
+        error!("Failed to revoke session: {}", e);
+        return HttpResponse::InternalServerError().json(ErrorResponse {
+            error: "Failed to logout".to_string(),
+        });
+    }
+
+    HttpResponse::Ok().json(serde_json::json!({
+        "message": "Logged out"
+    }))
+}
+
+#[post("/logout-other-devices")]
+async fn logout_other_devices(app_state: web::Data<AppState>, req: HttpRequest) -> impl Responder {
+    let claims = match verify_token(&req, &app_state) {
+        Ok(claims) => claims,
+        Err(response) => return response,
+    };
+
+    let token = match extract_bearer_token(&req) {
+        Ok(token) => token,
+        Err(response) => return response,
+    };
+
+    let token_hash = hash_login_token(token);
+
+    let result = sqlx::query(
+        "UPDATE login_sessions ls
+            SET revoked_at = NOW()
+           FROM users u
+          WHERE ls.user_id = u.id
+            AND u.username = $1
+            AND ls.token_hash <> $2
+            AND ls.revoked_at IS NULL",
+    )
+    .bind(&claims.sub)
+    .bind(token_hash)
+    .execute(&app_state.db)
+    .await;
+
+    match result {
+        Ok(done) => HttpResponse::Ok().json(serde_json::json!({
+            "message": "Other sessions revoked",
+            "revoked_sessions": done.rows_affected(),
+        })),
+        Err(e) => {
+            error!("Failed to revoke other sessions: {}", e);
+            HttpResponse::InternalServerError().json(ErrorResponse {
+                error: "Failed to logout from other devices".to_string(),
+            })
+        }
+    }
 }
 
 #[get("/validate")]
@@ -954,6 +1153,8 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(
         web::scope("/api/auth")
             .service(login)
+            .service(logout)
+            .service(logout_other_devices)
             .service(validate_token_endpoint)
             .service(forgot_password)
             .service(validate_reset_token)
