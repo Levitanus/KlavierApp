@@ -691,37 +691,40 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedTabIndex,
-        type: BottomNavigationBarType.fixed,
-        onTap: _navigateToTab,
-        items: [
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.dashboard_outlined),
-            activeIcon: const Icon(Icons.dashboard),
-            label: l10n?.commonDashboard ?? 'Dashboard',
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.checklist),
-            activeIcon: const Icon(Icons.checklist),
-            label: l10n?.commonHometasks ?? 'Hometasks',
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.dynamic_feed_outlined),
-            activeIcon: const Icon(Icons.dynamic_feed),
-            label: l10n?.commonFeeds ?? 'Feeds',
-          ),
-          BottomNavigationBarItem(
-            icon: const _ChatNavIcon(active: false),
-            activeIcon: const _ChatNavIcon(active: true),
-            label: l10n?.commonChats ?? 'Chats',
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.person_outline),
-            activeIcon: const Icon(Icons.person),
-            label: l10n?.commonProfile ?? 'Profile',
-          ),
-        ],
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: BottomNavigationBar(
+          currentIndex: _selectedTabIndex,
+          type: BottomNavigationBarType.fixed,
+          onTap: _navigateToTab,
+          items: [
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.dashboard_outlined),
+              activeIcon: const Icon(Icons.dashboard),
+              label: l10n?.commonDashboard ?? 'Dashboard',
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.checklist),
+              activeIcon: const Icon(Icons.checklist),
+              label: l10n?.commonHometasks ?? 'Hometasks',
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.dynamic_feed_outlined),
+              activeIcon: const Icon(Icons.dynamic_feed),
+              label: l10n?.commonFeeds ?? 'Feeds',
+            ),
+            BottomNavigationBarItem(
+              icon: const _ChatNavIcon(active: false),
+              activeIcon: const _ChatNavIcon(active: true),
+              label: l10n?.commonChats ?? 'Chats',
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.person_outline),
+              activeIcon: const Icon(Icons.person),
+              label: l10n?.commonProfile ?? 'Profile',
+            ),
+          ],
+        ),
       ),
       // body assignment fixed above, remove duplicate
     );
