@@ -62,6 +62,8 @@ class _AppRoot extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
+      darkTheme: AppTheme.dark(),
+      themeMode: ThemeMode.system,
       onGenerateTitle: (context) => AppLocalizations.of(context)?.appTitle ?? 'Musikschule am Thomas-Mann-Platz',
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,

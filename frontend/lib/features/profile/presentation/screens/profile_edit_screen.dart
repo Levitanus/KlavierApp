@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../l10n/app_localizations.dart';
+import '../../../../shared/widgets/app_body_container.dart';
 import '../../../auth/domain/entities/auth_session.dart';
 import '../../application/providers/profile_provider.dart';
 import '../../domain/entities/user_profile.dart';
@@ -181,12 +182,12 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text('Edit profile'),
+        centerTitle: true,
       ),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 760),
+      body: SafeArea(
+        child: AppBodyContainer(
           child: ListView(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.symmetric(vertical: 24),
             children: [
               Card(
                 child: Padding(
@@ -258,7 +259,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         const SizedBox(height: 24),
                         Align(
                           alignment: Alignment.centerRight,
-                          child: FilledButton.icon(
+                          child: ElevatedButton.icon(
                             onPressed: _isSavingProfile ? null : _saveProfile,
                             icon: _isSavingProfile
                                 ? const SizedBox(
@@ -345,7 +346,7 @@ class _ProfileEditScreenState extends ConsumerState<ProfileEditScreen> {
                         const SizedBox(height: 24),
                         Align(
                           alignment: Alignment.centerRight,
-                          child: FilledButton.icon(
+                          child: ElevatedButton.icon(
                             onPressed: _isChangingPassword ? null : _changePassword,
                             icon: _isChangingPassword
                                 ? const SizedBox(
