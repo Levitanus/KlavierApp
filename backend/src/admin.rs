@@ -63,8 +63,8 @@ pub struct UsersPageResponse {
 }
 
 // Helper to verify admin role from claims
-fn verify_admin_role(req: &HttpRequest, app_state: &AppState) -> Result<(), HttpResponse> {
-    let claims = verify_token(req, app_state)?;
+async fn verify_admin_role(req: &HttpRequest, app_state: &AppState) -> Result<(), HttpResponse> {
+    let claims = verify_token(req, app_state).await?;
 
     if !claims.roles.contains(&"admin".to_string()) {
         return Err(HttpResponse::Forbidden().json(serde_json::json!({
@@ -88,7 +88,7 @@ async fn get_users(
     app_state: web::Data<AppState>,
     query: web::Query<UsersQuery>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -220,7 +220,7 @@ async fn get_user_by_id(
     app_state: web::Data<AppState>,
     user_id: web::Path<i32>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -300,7 +300,7 @@ async fn create_user(
     app_state: web::Data<AppState>,
     user_data: web::Json<CreateUserRequest>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -369,7 +369,7 @@ async fn update_user(
     user_id: web::Path<i32>,
     user_data: web::Json<UpdateUserRequest>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -496,7 +496,7 @@ async fn delete_user(
     app_state: web::Data<AppState>,
     user_id: web::Path<i32>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -532,11 +532,11 @@ async fn generate_reset_link(
     app_state: web::Data<AppState>,
     user_id: web::Path<i32>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
-    let _claims = match verify_token(&req, &app_state) {
+    let _claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -595,7 +595,7 @@ async fn get_password_reset_requests(
     req: HttpRequest,
     app_state: web::Data<AppState>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -629,12 +629,12 @@ async fn resolve_password_reset_request(
     app_state: web::Data<AppState>,
     request_id: web::Path<i32>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
     // Get admin user ID from token
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(c) => c,
         Err(response) => return response,
     };
@@ -686,7 +686,7 @@ async fn make_student(
     user_id: web::Path<i32>,
     student_data: web::Json<MakeStudentRequest>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -818,7 +818,7 @@ async fn make_parent(
     user_id: web::Path<i32>,
     parent_data: web::Json<MakeParentRequest>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -984,7 +984,7 @@ async fn make_teacher(
     user_id: web::Path<i32>,
     _teacher_data: web::Json<MakeTeacherRequest>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 

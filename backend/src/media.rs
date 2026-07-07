@@ -25,7 +25,7 @@ fn parse_media_kind(value: &str) -> Option<MediaKind> {
 }
 
 async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> Result<i32, HttpResponse> {
-    let claims = match verify_token(req, app_state) {
+    let claims = match verify_token(req, app_state).await {
         Ok(claims) => claims,
         Err(response) => return Err(response),
     };

@@ -20,7 +20,7 @@ pub(crate) async fn create_parent(
     app_state: web::Data<AppState>,
     parent_req: web::Json<CreateParentRequest>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -178,7 +178,7 @@ pub(crate) async fn get_parent(
     let user_id = path.into_inner();
 
     // Verify authentication
-    if let Err(response) = verify_token(&req, &app_state) {
+    if let Err(response) = verify_token(&req, &app_state).await {
         return response;
     }
 
@@ -267,7 +267,7 @@ pub(crate) async fn update_parent(
     let user_id = path.into_inner();
 
     // Only admins or the parent themselves can update
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -377,7 +377,7 @@ pub(crate) async fn add_parent_student_relation(
     let parent_user_id = path.into_inner();
 
     // Only admins can add relations
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -447,7 +447,7 @@ pub(crate) async fn remove_parent_student_relation(
     let (parent_user_id, student_user_id) = path.into_inner();
 
     // Only admins can remove relations
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -490,11 +490,11 @@ pub(crate) async fn archive_parent_role(
     app_state: web::Data<AppState>,
     user_id: web::Path<i32>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -552,7 +552,7 @@ pub(crate) async fn unarchive_parent_role(
     app_state: web::Data<AppState>,
     user_id: web::Path<i32>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 

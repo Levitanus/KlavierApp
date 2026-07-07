@@ -19,7 +19,7 @@ use crate::AppState;
 // ============================================================================
 
 async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> Result<i32> {
-    let claims = match verify_token(req, app_state) {
+    let claims = match verify_token(req, app_state).await {
         Ok(claims) => claims,
         Err(_response) => {
             return Err(actix_web::error::ErrorUnauthorized(
@@ -1014,7 +1014,7 @@ async fn start_thread(
     app_state: web::Data<AppState>,
     payload: web::Json<StartThreadRequest>,
 ) -> Result<HttpResponse> {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(_response) => {
             return Err(actix_web::error::ErrorUnauthorized(
@@ -1718,7 +1718,7 @@ async fn list_available_chat_users(
     req: HttpRequest,
     app_state: web::Data<AppState>,
 ) -> Result<HttpResponse> {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(_response) => {
             return Err(actix_web::error::ErrorUnauthorized(

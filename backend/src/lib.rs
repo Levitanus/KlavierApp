@@ -67,7 +67,7 @@ async fn ws_endpoint(
     }
 
     if let Some(token) = token {
-        if let Ok(claims) = users::verify_token_from_raw(&token, &app_state) {
+        if let Ok(claims) = users::verify_token_from_raw(&token, &app_state).await {
             let username = claims.sub;
             match sqlx::query_scalar::<_, i32>("SELECT id FROM users WHERE username = $1")
                 .bind(&username)

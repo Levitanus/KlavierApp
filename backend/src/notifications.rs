@@ -323,7 +323,7 @@ pub async fn delete_notification(
 /// Extract user_id from JWT token
 async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> Result<i32> {
     // Verify JWT token and get claims
-    let claims = match verify_token(req, app_state) {
+    let claims = match verify_token(req, app_state).await {
         Ok(claims) => claims,
         Err(_response) => {
             return Err(actix_web::error::ErrorUnauthorized(

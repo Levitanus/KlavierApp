@@ -4,8 +4,8 @@ use serde_json::json;
 use crate::users::verify_token;
 use crate::AppState;
 
-pub fn verify_admin_role(req: &HttpRequest, app_state: &AppState) -> Result<(), HttpResponse> {
-    let claims = verify_token(req, app_state)?;
+pub async fn verify_admin_role(req: &HttpRequest, app_state: &AppState) -> Result<(), HttpResponse> {
+    let claims = verify_token(req, app_state).await?;
 
     if !claims.roles.contains(&"admin".to_string()) {
         return Err(HttpResponse::Forbidden().json(json!({
@@ -21,7 +21,7 @@ pub async fn verify_can_edit_student(
     app_state: &AppState,
     student_user_id: i32,
 ) -> Result<(), HttpResponse> {
-    let claims = verify_token(req, app_state)?;
+    let claims = verify_token(req, app_state).await?;
 
     if claims.roles.contains(&"admin".to_string()) {
         return Ok(());
@@ -68,7 +68,7 @@ pub async fn verify_can_access_student(
     app_state: &AppState,
     student_user_id: i32,
 ) -> Result<i32, HttpResponse> {
-    let claims = verify_token(req, app_state)?;
+    let claims = verify_token(req, app_state).await?;
 
     let current_user_id = match sqlx::query_scalar::<_, i32>(
         "SELECT id FROM users WHERE username = $1"

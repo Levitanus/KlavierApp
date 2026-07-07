@@ -20,7 +20,7 @@ pub(crate) async fn create_teacher(
     app_state: web::Data<AppState>,
     teacher_req: web::Json<CreateTeacherRequest>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -159,7 +159,7 @@ pub(crate) async fn get_teacher(
     let user_id = path.into_inner();
 
     // Verify authentication
-    if let Err(response) = verify_token(&req, &app_state) {
+    if let Err(response) = verify_token(&req, &app_state).await {
         return response;
     }
 
@@ -207,7 +207,7 @@ pub(crate) async fn update_teacher(
     let user_id = path.into_inner();
 
     // Only admins or the teacher themselves can update
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -320,7 +320,7 @@ pub(crate) async fn list_teacher_students(
 ) -> impl Responder {
     let teacher_id = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -410,7 +410,7 @@ pub(crate) async fn add_teacher_student_relation(
 ) -> impl Responder {
     let teacher_id = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -497,7 +497,7 @@ pub(crate) async fn remove_teacher_student_relation(
 ) -> impl Responder {
     let (teacher_id, student_id) = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -599,11 +599,11 @@ pub(crate) async fn archive_teacher_role(
     app_state: web::Data<AppState>,
     user_id: web::Path<i32>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -663,7 +663,7 @@ pub(crate) async fn unarchive_teacher_role(
     app_state: web::Data<AppState>,
     user_id: web::Path<i32>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 

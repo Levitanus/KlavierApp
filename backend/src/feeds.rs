@@ -152,7 +152,7 @@ pub struct UpdateSubscriptionRequest {
 }
 
 async fn extract_user_id_from_token(req: &HttpRequest, app_state: &AppState) -> Result<i32> {
-    let claims = match verify_token(req, app_state) {
+    let claims = match verify_token(req, app_state).await {
         Ok(claims) => claims,
         Err(_response) => {
             return Err(actix_web::error::ErrorUnauthorized(
@@ -662,7 +662,7 @@ fn can_edit_post(
 }
 
 pub async fn list_feeds(req: HttpRequest, app_state: web::Data<AppState>) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
 
@@ -802,7 +802,7 @@ pub async fn get_feed_settings(
     app_state: web::Data<AppState>,
     feed_id: web::Path<i32>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     let feed = fetch_feed(&app_state, *feed_id).await?;
@@ -833,7 +833,7 @@ pub async fn update_feed_settings(
     feed_id: web::Path<i32>,
     payload: web::Json<UpdateFeedSettingsRequest>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     let feed = fetch_feed(&app_state, *feed_id).await?;
@@ -864,7 +864,7 @@ pub async fn get_feed_user_settings(
     app_state: web::Data<AppState>,
     feed_id: web::Path<i32>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     let feed = fetch_feed(&app_state, *feed_id).await?;
@@ -896,7 +896,7 @@ pub async fn update_feed_user_settings(
     feed_id: web::Path<i32>,
     payload: web::Json<UpdateFeedUserSettingsRequest>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     let feed = fetch_feed(&app_state, *feed_id).await?;
@@ -932,7 +932,7 @@ pub async fn list_posts(
     feed_id: web::Path<i32>,
     query: web::Query<PostListQuery>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     let feed = fetch_feed(&app_state, *feed_id).await?;
@@ -1008,7 +1008,7 @@ pub async fn get_post(
     app_state: web::Data<AppState>,
     post_id: web::Path<i32>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
 
@@ -1058,7 +1058,7 @@ pub async fn mark_post_read(
     app_state: web::Data<AppState>,
     post_id: web::Path<i32>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
 
@@ -1107,7 +1107,7 @@ pub async fn mark_feed_read(
     app_state: web::Data<AppState>,
     feed_id: web::Path<i32>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     let feed = fetch_feed(&app_state, *feed_id).await?;
@@ -1142,7 +1142,7 @@ pub async fn create_post(
     feed_id: web::Path<i32>,
     payload: web::Json<CreatePostRequest>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     let feed = fetch_feed(&app_state, *feed_id).await?;
@@ -1446,7 +1446,7 @@ pub async fn list_comments(
     app_state: web::Data<AppState>,
     post_id: web::Path<i32>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
 
@@ -1528,7 +1528,7 @@ pub async fn create_comment(
     post_id: web::Path<i32>,
     payload: web::Json<CreateCommentRequest>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
 
@@ -1667,7 +1667,7 @@ pub async fn update_post(
     post_id: web::Path<i32>,
     payload: web::Json<UpdatePostRequest>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
 
@@ -1803,7 +1803,7 @@ pub async fn update_comment(
     path: web::Path<(i32, i32)>,
     payload: web::Json<UpdateCommentRequest>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     let (post_id, comment_id) = path.into_inner();
@@ -1946,7 +1946,7 @@ pub async fn update_post_subscription(
     post_id: web::Path<i32>,
     payload: web::Json<UpdateSubscriptionRequest>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
 
@@ -1997,7 +1997,7 @@ pub async fn get_post_subscription(
     app_state: web::Data<AppState>,
     post_id: web::Path<i32>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
 
@@ -2043,7 +2043,7 @@ pub async fn delete_post_subscription(
     app_state: web::Data<AppState>,
     post_id: web::Path<i32>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
 
@@ -2090,7 +2090,7 @@ pub async fn delete_comment(
     app_state: web::Data<AppState>,
     path: web::Path<(i32, i32)>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
     let (post_id, comment_id) = path.into_inner();
@@ -2177,7 +2177,7 @@ pub async fn delete_post(
     app_state: web::Data<AppState>,
     post_id: web::Path<i32>,
 ) -> Result<HttpResponse> {
-    let claims = verify_token(&req, &app_state)
+    let claims = verify_token(&req, &app_state).await
         .map_err(|_response| actix_web::error::ErrorUnauthorized("Invalid or missing token"))?;
     let user_id = extract_user_id_from_token(&req, &app_state).await?;
 

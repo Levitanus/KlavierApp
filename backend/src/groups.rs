@@ -219,7 +219,7 @@ async fn list_teacher_groups(
 ) -> impl Responder {
     let teacher_id = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -294,7 +294,7 @@ async fn create_teacher_group(
 ) -> impl Responder {
     let teacher_id = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -438,7 +438,7 @@ async fn update_teacher_group(
 ) -> impl Responder {
     let (teacher_id, group_id) = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -650,7 +650,7 @@ async fn delete_teacher_group(
 ) -> impl Responder {
     let (teacher_id, group_id) = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };

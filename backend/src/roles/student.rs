@@ -20,11 +20,11 @@ pub(crate) async fn archive_student_role(
     app_state: web::Data<AppState>,
     user_id: web::Path<i32>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -121,7 +121,7 @@ pub(crate) async fn unarchive_student_role(
     app_state: web::Data<AppState>,
     user_id: web::Path<i32>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -194,7 +194,7 @@ pub(crate) async fn create_student(
     app_state: web::Data<AppState>,
     student_req: web::Json<CreateStudentRequest>,
 ) -> impl Responder {
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
 
@@ -329,7 +329,7 @@ pub(crate) async fn get_student(
     let user_id = path.into_inner();
 
     // Verify authentication
-    if let Err(response) = verify_token(&req, &app_state) {
+    if let Err(response) = verify_token(&req, &app_state).await {
         return response;
     }
 
@@ -373,7 +373,7 @@ pub(crate) async fn list_students(
     req: HttpRequest,
     app_state: web::Data<AppState>,
 ) -> impl Responder {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };

@@ -72,8 +72,8 @@ pub struct TeacherInfo {
     pub full_name: String,
 }
 
-fn verify_admin_role(req: &HttpRequest, app_state: &AppState) -> Result<(), HttpResponse> {
-    let claims = verify_token(req, app_state)?;
+async fn verify_admin_role(req: &HttpRequest, app_state: &AppState) -> Result<(), HttpResponse> {
+    let claims = verify_token(req, app_state).await?;
     
     if !claims.roles.contains(&"admin".to_string()) {
         return Err(HttpResponse::Forbidden().json(serde_json::json!({
@@ -92,7 +92,7 @@ async fn create_registration_token(
     token_req: web::Json<CreateRegistrationTokenRequest>,
 ) -> impl Responder {
     // Verify admin role
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
     
@@ -104,7 +104,7 @@ async fn create_registration_token(
     }
     
     // Get admin user ID
-    let claims = verify_token(&req, &app_state).unwrap();
+    let claims = verify_token(&req, &app_state).await.unwrap();
     let admin_id = match sqlx::query_scalar::<_, i32>(
         "SELECT id FROM users WHERE username = $1"
     )
@@ -201,7 +201,7 @@ async fn create_parent_token_from_student(
     let student_id = path.into_inner();
     
     // Verify authentication
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -290,7 +290,7 @@ async fn create_student_token_from_teacher(
 ) -> impl Responder {
     let teacher_id = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -761,7 +761,7 @@ async fn list_registration_tokens(
     app_state: web::Data<AppState>,
 ) -> impl Responder {
     // Verify admin role
-    if let Err(response) = verify_admin_role(&req, &app_state) {
+    if let Err(response) = verify_admin_role(&req, &app_state).await {
         return response;
     }
     

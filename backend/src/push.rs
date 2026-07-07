@@ -456,7 +456,7 @@ pub async fn register_token(
 ) -> Result<HttpResponse> {
     debug!("[PUSH] Registering token, platform: {:?}", payload.platform);
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => {
             debug!("[PUSH] Token verified for user: {}", claims.sub);
             claims
@@ -526,7 +526,7 @@ pub async fn revoke_token_endpoint(
     app_state: web::Data<AppState>,
     payload: web::Json<RevokePushTokenRequest>,
 ) -> Result<HttpResponse> {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(_) => {
             return Err(actix_web::error::ErrorUnauthorized(

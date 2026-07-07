@@ -458,7 +458,7 @@ async fn create_hometask(
     app_state: web::Data<AppState>,
     payload: web::Json<CreateHometaskRequest>,
 ) -> impl Responder {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -750,7 +750,7 @@ async fn list_student_hometasks(
 
     refresh_repeatable_hometasks(&app_state.db, student_id).await;
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -842,7 +842,7 @@ async fn get_hometask(
         return response;
     }
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -956,7 +956,7 @@ async fn update_hometask(
 ) -> impl Responder {
     let hometask_id = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -1206,7 +1206,7 @@ async fn update_hometask_checklist(
 ) -> impl Responder {
     let hometask_id = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -1342,7 +1342,7 @@ async fn update_hometask_status(
 ) -> impl Responder {
     let hometask_id = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -1648,7 +1648,7 @@ async fn update_hometask_order(
 ) -> impl Responder {
     let student_id = path.into_inner();
 
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };

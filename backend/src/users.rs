@@ -70,13 +70,19 @@ fn hash_login_token(token: &str) -> String {
 
 /// Extract and validate JWT token from request
 /// Returns Claims if valid, or an error HttpResponse
-pub fn verify_token(req: &HttpRequest, app_state: &AppState) -> Result<Claims, HttpResponse> {
+pub async fn verify_token(
+    req: &HttpRequest,
+    app_state: &AppState,
+) -> Result<Claims, HttpResponse> {
     let token = extract_bearer_token(req)?;
 
-    verify_token_from_raw(token, app_state)
+    verify_token_from_raw(token, app_state).await
 }
 
-pub fn verify_token_from_raw(token: &str, app_state: &AppState) -> Result<Claims, HttpResponse> {
+pub async fn verify_token_from_raw(
+    token: &str,
+    app_state: &AppState,
+) -> Result<Claims, HttpResponse> {
     let claims = match decode::<Claims>(
         token,
         &DecodingKey::from_secret(app_state.jwt_secret.as_ref()),
@@ -93,55 +99,41 @@ pub fn verify_token_from_raw(token: &str, app_state: &AppState) -> Result<Claims
     let token_hash = hash_login_token(token);
     let username = claims.sub.clone();
     let db = app_state.db.clone();
-    let runtime_handle = match tokio::runtime::Handle::try_current() {
-        Ok(handle) => handle,
+    let session_id = sqlx::query_scalar::<_, i64>(
+        "SELECT ls.id
+           FROM login_sessions ls
+           INNER JOIN users u ON u.id = ls.user_id
+          WHERE ls.token_hash = $1
+            AND u.username = $2
+            AND ls.revoked_at IS NULL
+            AND ls.last_used_at > NOW() - ($3::text || ' days')::interval
+          LIMIT 1",
+    )
+    .bind(&token_hash)
+    .bind(&username)
+    .bind(SESSION_IDLE_TIMEOUT_DAYS)
+    .fetch_optional(&db)
+    .await;
+
+    let session_valid = match session_id {
+        Ok(Some(id)) => {
+            let _ = sqlx::query(
+                "UPDATE login_sessions
+                    SET last_used_at = NOW()
+                  WHERE id = $1
+                    AND last_used_at < NOW() - INTERVAL '12 hours'",
+            )
+            .bind(id)
+            .execute(&db)
+            .await;
+            true
+        }
+        Ok(None) => false,
         Err(e) => {
-            error!("Runtime handle is unavailable while validating token: {}", e);
-            return Err(HttpResponse::Unauthorized().json(serde_json::json!({
-                "error": "Invalid token"
-            })));
+            error!("Database error while validating session: {}", e);
+            false
         }
     };
-
-    let session_valid = tokio::task::block_in_place(|| {
-        runtime_handle.block_on(async move {
-            let session_id = sqlx::query_scalar::<_, i64>(
-                "SELECT ls.id
-                   FROM login_sessions ls
-                   INNER JOIN users u ON u.id = ls.user_id
-                  WHERE ls.token_hash = $1
-                    AND u.username = $2
-                    AND ls.revoked_at IS NULL
-                                        AND ls.last_used_at > NOW() - ($3::text || ' days')::interval
-                  LIMIT 1",
-            )
-            .bind(&token_hash)
-            .bind(&username)
-                        .bind(SESSION_IDLE_TIMEOUT_DAYS)
-            .fetch_optional(&db)
-            .await;
-
-            match session_id {
-                Ok(Some(id)) => {
-                    let _ = sqlx::query(
-                        "UPDATE login_sessions
-                            SET last_used_at = NOW()
-                          WHERE id = $1
-                            AND last_used_at < NOW() - INTERVAL '12 hours'",
-                    )
-                    .bind(id)
-                    .execute(&db)
-                    .await;
-                    true
-                }
-                Ok(None) => false,
-                Err(e) => {
-                    error!("Database error while validating session: {}", e);
-                    false
-                }
-            }
-        })
-    });
 
     if !session_valid {
         return Err(HttpResponse::Unauthorized().json(serde_json::json!({
@@ -340,7 +332,7 @@ async fn login(
 
 #[post("/logout")]
 async fn logout(app_state: web::Data<AppState>, req: HttpRequest) -> impl Responder {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -379,7 +371,7 @@ async fn logout(app_state: web::Data<AppState>, req: HttpRequest) -> impl Respon
 
 #[post("/logout-other-devices")]
 async fn logout_other_devices(app_state: web::Data<AppState>, req: HttpRequest) -> impl Responder {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -424,7 +416,7 @@ async fn validate_token_endpoint(
     req: HttpRequest,
     app_state: web::Data<AppState>,
 ) -> impl Responder {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -623,7 +615,7 @@ pub struct ChangePasswordRequest {
 /// Get current user's profile
 #[get("")]
 async fn get_profile(app_state: web::Data<AppState>, req: HttpRequest) -> impl Responder {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -759,7 +751,7 @@ async fn update_profile(
     req: HttpRequest,
     update_req: web::Json<UpdateProfileRequest>,
 ) -> impl Responder {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -898,7 +890,7 @@ async fn change_password(
     req: HttpRequest,
     change_req: web::Json<ChangePasswordRequest>,
 ) -> impl Responder {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -992,7 +984,7 @@ async fn upload_profile_image(
     req: HttpRequest,
     payload: Multipart,
 ) -> impl Responder {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
@@ -1106,7 +1098,7 @@ async fn upload_profile_image(
 /// Delete profile image
 #[actix_web::delete("/image")]
 async fn delete_profile_image(app_state: web::Data<AppState>, req: HttpRequest) -> impl Responder {
-    let claims = match verify_token(&req, &app_state) {
+    let claims = match verify_token(&req, &app_state).await {
         Ok(claims) => claims,
         Err(response) => return response,
     };
