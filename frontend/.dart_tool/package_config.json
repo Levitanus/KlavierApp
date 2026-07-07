@@ -215,7 +215,7 @@
       "name": "flutter",
       "rootUri": "file:///home/levitanus/flutter/packages/flutter",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.10"
     },
     {
       "name": "flutter_cache_manager",
@@ -293,7 +293,7 @@
       "name": "flutter_localizations",
       "rootUri": "file:///home/levitanus/flutter/packages/flutter_localizations",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.10"
     },
     {
       "name": "flutter_plugin_android_lifecycle",
@@ -303,9 +303,9 @@
     },
     {
       "name": "flutter_quill",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/flutter_quill-11.5.0",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/flutter_quill-11.5.1",
       "packageUri": "lib/",
-      "languageVersion": "3.0"
+      "languageVersion": "3.12"
     },
     {
       "name": "flutter_quill_delta_from_html",
@@ -323,13 +323,13 @@
       "name": "flutter_test",
       "rootUri": "file:///home/levitanus/flutter/packages/flutter_test",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.10"
     },
     {
       "name": "flutter_web_plugins",
       "rootUri": "file:///home/levitanus/flutter/packages/flutter_web_plugins",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.10"
     },
     {
       "name": "google_fonts",
@@ -453,7 +453,7 @@
     },
     {
       "name": "matcher",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/matcher-0.12.18",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/matcher-0.12.19",
       "packageUri": "lib/",
       "languageVersion": "3.7"
     },
@@ -465,7 +465,7 @@
     },
     {
       "name": "meta",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/meta-1.17.0",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/meta-1.18.0",
       "packageUri": "lib/",
       "languageVersion": "3.5"
     },
@@ -693,9 +693,9 @@
     },
     {
       "name": "shared_preferences_android",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/shared_preferences_android-2.4.23",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/shared_preferences_android-2.4.26",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.12"
     },
     {
       "name": "shared_preferences_foundation",
@@ -731,7 +731,7 @@
       "name": "sky_engine",
       "rootUri": "file:///home/levitanus/flutter/bin/cache/pkg/sky_engine",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.10"
     },
     {
       "name": "source_span",
@@ -741,33 +741,33 @@
     },
     {
       "name": "sqflite",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/sqflite-2.4.2+1",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/sqflite-2.4.3",
       "packageUri": "lib/",
-      "languageVersion": "3.10"
+      "languageVersion": "3.12"
     },
     {
       "name": "sqflite_android",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/sqflite_android-2.4.2+3",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/sqflite_android-2.4.3",
       "packageUri": "lib/",
-      "languageVersion": "3.10"
+      "languageVersion": "3.12"
     },
     {
       "name": "sqflite_common",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/sqflite_common-2.5.8",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/sqflite_common-2.5.11",
       "packageUri": "lib/",
-      "languageVersion": "3.10"
+      "languageVersion": "3.12"
     },
     {
       "name": "sqflite_darwin",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/sqflite_darwin-2.4.2",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/sqflite_darwin-2.4.3+1",
       "packageUri": "lib/",
-      "languageVersion": "3.7"
+      "languageVersion": "3.12"
     },
     {
       "name": "sqflite_platform_interface",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/sqflite_platform_interface-2.4.0",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/sqflite_platform_interface-2.4.1",
       "packageUri": "lib/",
-      "languageVersion": "3.5"
+      "languageVersion": "3.12"
     },
     {
       "name": "stack_trace",
@@ -789,9 +789,9 @@
     },
     {
       "name": "synchronized",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/synchronized-3.4.0+1",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/synchronized-3.4.1",
       "packageUri": "lib/",
-      "languageVersion": "3.11"
+      "languageVersion": "3.12"
     },
     {
       "name": "term_glyph",
@@ -801,7 +801,7 @@
     },
     {
       "name": "test_api",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/test_api-0.7.9",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/test_api-0.7.11",
       "packageUri": "lib/",
       "languageVersion": "3.7"
     },
@@ -825,9 +825,9 @@
     },
     {
       "name": "url_launcher_android",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/url_launcher_android-6.3.30",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/url_launcher_android-6.3.32",
       "packageUri": "lib/",
-      "languageVersion": "3.10"
+      "languageVersion": "3.12"
     },
     {
       "name": "url_launcher_ios",
@@ -903,9 +903,9 @@
     },
     {
       "name": "video_player_android",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/video_player_android-2.9.5",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/video_player_android-2.10.0",
       "packageUri": "lib/",
-      "languageVersion": "3.9"
+      "languageVersion": "3.12"
     },
     {
       "name": "video_player_avfoundation",
@@ -915,7 +915,7 @@
     },
     {
       "name": "video_player_platform_interface",
-      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/video_player_platform_interface-6.8.0",
+      "rootUri": "file:///home/levitanus/.pub-cache/hosted/pub.dev/video_player_platform_interface-6.9.0",
       "packageUri": "lib/",
       "languageVersion": "3.10"
     },
@@ -981,8 +981,8 @@
     }
   ],
   "generator": "pub",
-  "generatorVersion": "3.11.0",
+  "generatorVersion": "3.12.2",
   "flutterRoot": "file:///home/levitanus/flutter",
-  "flutterVersion": "3.41.1",
+  "flutterVersion": "3.44.5",
   "pubCache": "file:///home/levitanus/.pub-cache"
 }
